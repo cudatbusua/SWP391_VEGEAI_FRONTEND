@@ -1,0 +1,14 @@
+{
+  "nav": {
+    "home": "Trang chủ",
+    "recipes": "Công thức",
+    "blog": "Blog"
+  },
+  "actions": {
+    "save": "Lưu",
+    "cancel": "Hủy"
+  },
+  "signin": {
+    "title": "Đăng nhập"
+  }
+}

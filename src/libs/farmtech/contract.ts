@@ -1,0 +1,2 @@
+// contract envelope definition
+export {};

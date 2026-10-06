@@ -1,0 +1,2 @@
+// server-only: profile
+export {};

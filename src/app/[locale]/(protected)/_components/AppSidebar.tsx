@@ -1,1 +1,0 @@
-export function AppSidebar() { return <aside>Sidebar</aside>; }

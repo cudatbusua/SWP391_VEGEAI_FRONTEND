@@ -67,7 +67,7 @@ export const LoginForm: React.FC = () => {
 
   return (
     <div className="w-full">
-      
+
       {/* Form Header (Image 3) */}
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
@@ -93,7 +93,7 @@ export const LoginForm: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        
+
         {/* Email hoặc Số điện thoại */}
         <Input
           label="Email hoặc Số điện thoại"
@@ -165,13 +165,25 @@ export const LoginForm: React.FC = () => {
       </div>
 
       {/* Social Buttons: Google & Facebook (Image 3) */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+
+      {/* Social Buttons: Google */}
+      <div className="flex justify-center items-center mb-6">
         <button
           type="button"
           onClick={() => {
-            setFormData({ emailOrPhone: 'google.user@gmail.com', password: 'password123', rememberMe: true });
+            setFormData({
+              emailOrPhone: 'google.user@gmail.com',
+              password: 'password123',
+              rememberMe: true
+            });
           }}
-          className="flex items-center justify-center gap-2.5 py-3 px-4 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 rounded-xl text-xs font-semibold text-gray-700 shadow-2xs transition cursor-pointer"
+          className="flex items-center justify-center gap-2.5
+      w-full max-w-[240px] py-3 px-4
+      bg-white border border-gray-200
+      hover:border-gray-300 hover:bg-gray-50
+      rounded-xl text-xs font-semibold
+      text-gray-700 shadow-2xs
+      transition cursor-pointer"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -181,20 +193,8 @@ export const LoginForm: React.FC = () => {
           </svg>
           <span>Google</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setFormData({ emailOrPhone: 'facebook.user@fb.com', password: 'password123', rememberMe: true });
-          }}
-          className="flex items-center justify-center gap-2.5 py-3 px-4 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 rounded-xl text-xs font-semibold text-gray-700 shadow-2xs transition cursor-pointer"
-        >
-          <svg className="w-4 h-4 fill-[#1877F2]" viewBox="0 0 24 24">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-          </svg>
-          <span>Facebook</span>
-        </button>
       </div>
+
 
       {/* Footer link (Image 3) */}
       <div className="text-center text-xs text-gray-500">

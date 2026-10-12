@@ -56,7 +56,7 @@ export const DashboardPage: React.FC = () => {
           {/* Date Picker / Today's Date */}
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-white border border-gray-200/80 px-4 py-2.5 rounded-2xl shadow-2xs self-start sm:self-auto">
             <Calendar className="w-4 h-4 text-emerald-600" />
-            <span>Thứ Ba, 06 tháng 10, 2026</span>
+            <span>{new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</span>
           </div>
 
         </div>

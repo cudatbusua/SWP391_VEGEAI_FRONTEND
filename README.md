@@ -62,12 +62,24 @@ SWP391_VEGEAI_FRONTEND/
 ## Các route chính
 
 ```text
-/                       -> Trang khám phá công thức
-/recipe/:id            -> Trang chi tiết món ăn
-/dashboard             -> Dashboard chính
-/login                 -> Đăng nhập
-/register              -> Đăng ký
-/forgot-password       -> Quên mật khẩu
+/                         -> Khám phá và lọc công thức
+/recipe/:id              -> Chi tiết công thức, lưu món và đưa nguyên liệu vào danh sách
+/saved-recipes           -> Công thức đã lưu (cần đăng nhập)
+/dashboard               -> Tổng quan cá nhân (cần đăng nhập)
+/onboarding               -> Hồ sơ dinh dưỡng (cần đăng nhập)
+/meal-plan                -> Kế hoạch bữa ăn tuần (cần đăng nhập)
+/grocery-list             -> Danh sách đi chợ (cần đăng nhập)
+/ai-assistant             -> Giao diện trợ lý/nhận diện nguyên liệu (cần đăng nhập)
+/notifications            -> Hộp thông báo (cần đăng nhập)
+/restaurants              -> Tìm quán chay
+/restaurants/:id          -> Chi tiết quán và đánh giá
+/reviews                  -> Viết/đọc đánh giá (cần đăng nhập)
+/blog                     -> Bài viết đã xuất bản
+/blog/write               -> Soạn và gửi bài viết (cần đăng nhập)
+/blog/preview             -> Xem trước bản nháp và gửi kiểm duyệt (cần đăng nhập)
+/admin                    -> Tổng quan, kiểm duyệt và lịch sử admin
+/login, /register         -> Đăng nhập và tạo tài khoản
+/forgot-password          -> Khôi phục mật khẩu
 ```
 
 ## Tính năng chính
@@ -87,7 +99,15 @@ SWP391_VEGEAI_FRONTEND/
 ### 4. Dashboard người dùng
 - Giao diện tổng quan cá nhân
 - Tab "Tổng quan cá nhân" và "Hồ sơ dinh dưỡng"
-- Dùng để mô phỏng trải nghiệm người dùng đã đăng nhập
+- Dữ liệu hồ sơ, danh sách đi chợ, công thức lưu và kế hoạch tuần được chia sẻ giữa các trang
+
+### 5. Bản demo các vai trò và luồng giao diện
+- Trong `npm run dev`, dùng nút **Demo khách hàng** hoặc **Demo Admin** trên thanh trạng thái để vào giao diện mà không cần tạo tài khoản backend.
+- Tài khoản demo chỉ là trạng thái frontend, không phát hành access token, không tạo phiên đăng nhập backend và không thay thế quyền của tài khoản backend thật.
+- Các luồng có thể trình diễn: lưu công thức; tạo kế hoạch rồi thêm nguyên liệu vào danh sách đi chợ; xem quán rồi gửi đánh giá; soạn, xem trước, gửi bài, duyệt bài và xem bài đã xuất bản; kiểm duyệt công thức/báo cáo và xem lịch sử admin.
+- Các dữ liệu minh họa nằm trong `localStorage` với tiền tố `vegeai-demo:` để trạng thái còn lại khi chuyển trang hoặc tải lại. Đây chưa phải dữ liệu tài khoản nhiều người dùng và không được gửi lên backend.
+- `src/hooks/useDemoState.ts` là adapter tạm cho trạng thái UI. Khi API được thống nhất, thay các thao tác demo bằng service/repository của từng tính năng và giữ nguyên form, route, trạng thái tải/lỗi tương ứng.
+- Nội dung và phản hồi AI/quán/bài viết hiện là dữ liệu mẫu; nhãn demo trên giao diện nhắc rõ thao tác nào chưa gọi API.
 
 ## Bắt đầu
 
@@ -142,8 +162,8 @@ Trong file `package.json`, dự án có các lệnh sau:
 
 ## Lưu ý
 
-- Dự án hiện đang có chế độ thử nghiệm người dùng với khả năng chuyển đổi giữa Guest và Authorized User trong giao diện.
-- Một số tính năng ở menu điều hướng có dạng demo, nhằm thể hiện luồng UX của sản phẩm.
+- Auth thật tiếp tục xác thực với backend qua `src/services/authService.ts`; chế độ Demo chỉ chạy trong môi trường Vite development.
+- Những API chưa có hợp đồng backend được thể hiện bằng dữ liệu mẫu và trạng thái frontend, không giả làm thao tác đã lưu trên máy chủ.
 - Dự án có file `ARCHITECTURE.md` mô tả kiến trúc tổng thể nếu bạn muốn tìm hiểu sâu hơn.
 
 ## Đóng góp

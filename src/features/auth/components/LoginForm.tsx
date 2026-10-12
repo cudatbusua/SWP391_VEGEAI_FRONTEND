@@ -4,7 +4,6 @@ import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
-import { isValidEmailOrPhone } from '../../../utils/validation';
 
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
@@ -25,9 +24,12 @@ export const LoginForm: React.FC = () => {
     const errs: { [key: string]: string } = {};
 
     if (!formData.emailOrPhone.trim()) {
-      errs.emailOrPhone = 'Vui lòng nhập Email hoặc Số điện thoại.';
-    } else if (!isValidEmailOrPhone(formData.emailOrPhone)) {
-      errs.emailOrPhone = 'Email hoặc Số điện thoại không đúng định dạng.';
+      errs.emailOrPhone = 'Vui lòng nhập email hoặc username.';
+    } else if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.emailOrPhone.trim()) &&
+      !/^[a-zA-Z0-9_]{4,50}$/.test(formData.emailOrPhone.trim())
+    ) {
+      errs.emailOrPhone = 'Nhập email hoặc username đã đăng ký.';
     }
 
     if (!formData.password) {
@@ -94,10 +96,10 @@ export const LoginForm: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {/* Email hoặc Số điện thoại */}
+        {/* BE accepts a registered username or email as the login identifier. */}
         <Input
-          label="Email hoặc Số điện thoại"
-          placeholder="nguyen@gmail.com"
+          label="Email hoặc tên đăng nhập"
+          placeholder="nguyen@gmail.com hoặc username"
           value={formData.emailOrPhone}
           onChange={(e) => {
             setFormData({ ...formData, emailOrPhone: e.target.value });
@@ -171,11 +173,7 @@ export const LoginForm: React.FC = () => {
         <button
           type="button"
           onClick={() => {
-            setFormData({
-              emailOrPhone: 'google.user@gmail.com',
-              password: 'password123',
-              rememberMe: true
-            });
+            setGeneralError('Backend hiện chưa cung cấp đăng nhập Google. Vui lòng đăng nhập bằng email/username.');
           }}
           className="flex items-center justify-center gap-2.5
       w-full max-w-[240px] py-3 px-4

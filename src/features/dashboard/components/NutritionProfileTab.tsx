@@ -11,20 +11,24 @@ import {
   Salad,
   AlertTriangle
 } from 'lucide-react';
+import { useDemoState } from '../../../hooks/useDemoState';
 
 export const NutritionProfileTab: React.FC = () => {
-  // Form profile state
-  const [profile, setProfile] = useState({
+  // Profile edits use the same local demo record as onboarding so the two screens never drift.
+  const [profile, setProfile] = useDemoState('nutrition-profile', {
     fullName: 'Nguyễn Hoàng Minh',
     email: 'minh.nguyen@vegeai.vn',
     gender: 'Nam',
     age: 28,
     height: 175,
     weight: 68,
+    heightCm: '',
+    weightKg: '',
     activityLevel: 'Vận động vừa (3-5 buổi/tuần)',
     goal: 'Duy trì cân nặng & Sức khỏe',
     dietStyle: 'Vegan (Thuần chay - Không sữa, không trứng)',
-    allergies: ['Đậu phộng (Lạc)', 'Hải sản chay giả', 'Nấm mỡ']
+    allergies: ['Đậu phộng (Lạc)', 'Hải sản chay giả', 'Nấm mỡ'],
+    completed: true
   });
 
   const [newAllergy, setNewAllergy] = useState('');
@@ -32,7 +36,7 @@ export const NutritionProfileTab: React.FC = () => {
 
   // Dynamic BMI Calculation
   const heightM = profile.height / 100;
-  const bmi = (profile.weight / (heightM * heightM)).toFixed(1);
+  const bmi = heightM > 0 && profile.weight > 0 ? (profile.weight / (heightM * heightM)).toFixed(1) : '—';
 
   const handleAddAllergy = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +58,7 @@ export const NutritionProfileTab: React.FC = () => {
   };
 
   const handleSave = () => {
+    // useDemoState persists every field edit; this confirmation intentionally does not claim a BE save.
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -83,7 +88,7 @@ export const NutritionProfileTab: React.FC = () => {
           </div>
           <div className="text-xs">
             <div className="text-[10px] text-emerald-700 font-medium">Trạng thái Onboarding</div>
-            <div className="font-bold text-emerald-900">Đã hoàn thành ✓</div>
+            <div className="font-bold text-emerald-900">{profile.completed ? 'Đã hoàn thành ✓' : 'Chưa hoàn thành'}</div>
           </div>
         </div>
       </div>
@@ -91,7 +96,7 @@ export const NutritionProfileTab: React.FC = () => {
       {saveSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-800 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          <span>Hồ sơ dinh dưỡng đã được cập nhật thành công! AI đã tính toán lại chỉ số TDEE cho bạn.</span>
+          <span>Hồ sơ demo đã lưu trên trình duyệt. Chưa có API nào được gọi hoặc TDEE nào được tính từ backend.</span>
         </div>
       )}
 

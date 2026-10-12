@@ -4,7 +4,7 @@ import { Mail, ArrowRight, RotateCcw, CheckCircle2, AlertCircle, KeyRound } from
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { authService } from '../../../services/authService';
-import { isValidEmailOrPhone } from '../../../utils/validation';
+import { isStrictEmail } from '../../../utils/validation';
 
 export const ForgotPasswordForm: React.FC = () => {
   const [step, setStep] = useState<'request' | 'otp' | 'success'>('request');
@@ -22,20 +22,25 @@ export const ForgotPasswordForm: React.FC = () => {
     setError('');
 
     if (!emailOrPhone.trim()) {
-      setError('Vui lòng nhập Email hoặc Số điện thoại.');
+      setError('Vui lòng nhập email đã đăng ký.');
       return;
     }
 
-    if (!isValidEmailOrPhone(emailOrPhone)) {
-      setError('Email hoặc Số điện thoại không đúng định dạng.');
+    if (!isStrictEmail(emailOrPhone)) {
+      setError('Backend yêu cầu email hợp lệ để gửi mã đặt lại mật khẩu.');
       return;
     }
 
     setIsLoading(true);
     try {
       const res = await authService.forgotPassword({ emailOrPhone });
-      if (res.success && res.data) {
-        setInfoMessage(res.data.message);
+      if (res.success) {
+        // BE intentionally uses the same response whether or not the account exists.
+        // Email delivery is asynchronous; a local SMTP failure logs a fallback OTP on BE.
+        setInfoMessage(
+          'Nếu email tồn tại, backend đã tiếp nhận yêu cầu gửi OTP. Hãy kiểm tra hộp thư; ' +
+          'nếu chưa nhận, xem console backend với dòng [DEV/FALLBACK] Forgot Password OTP.'
+        );
         setStep('otp');
       } else {
         setError(res.error || 'Có lỗi xảy ra, vui lòng thử lại.');
@@ -51,8 +56,8 @@ export const ForgotPasswordForm: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!otp.trim() || otp.length < 4) {
-      setError('Vui lòng nhập mã xác thực OTP hợp lệ.');
+    if (!/^\d{6}$/.test(otp.trim())) {
+      setError('Mã OTP phải gồm đúng 6 chữ số.');
       return;
     }
 
@@ -67,10 +72,25 @@ export const ForgotPasswordForm: React.FC = () => {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      // BE verifies the OTP and updates the password in a single reset request.
+      const result = await authService.resetPassword({
+        emailOrPhone,
+        otp,
+        newPassword,
+        confirmPassword
+      });
+      if (result.success) {
+        setStep('success');
+      } else {
+        // BE reports invalid or expired OTPs through the standard ApiResponse message.
+        setError(result.error || 'Không thể đặt lại mật khẩu.');
+      }
+    } catch {
+      setError('Không thể kết nối đến máy chủ.');
+    } finally {
       setIsLoading(false);
-      setStep('success');
-    }, 700);
+    }
   };
 
   return (
@@ -89,7 +109,7 @@ export const ForgotPasswordForm: React.FC = () => {
           {step === 'success' ? 'Đặt lại mật khẩu thành công' : 'Khôi phục mật khẩu'}
         </h1>
         <p className="text-sm text-gray-500 leading-relaxed">
-          {step === 'request' && 'Nhập email hoặc số điện thoại đã đăng ký để nhận mã xác thực.'}
+          {step === 'request' && 'Nhập email đã đăng ký để nhận mã xác thực.'}
           {step === 'otp' && 'Nhập mã xác thực đã nhận được và thiết lập mật khẩu mới.'}
           {step === 'success' && 'Mật khẩu của bạn đã được cập nhật thành công. Hãy đăng nhập lại!'}
         </p>
@@ -113,7 +133,7 @@ export const ForgotPasswordForm: React.FC = () => {
       {step === 'request' && (
         <form onSubmit={handleRequestSubmit} className="space-y-4">
           <Input
-            label="Email hoặc số điện thoại"
+            label="Email"
             placeholder="nguyen@gmail.com"
             leftIcon={<Mail className="w-4 h-4" />}
             value={emailOrPhone}
@@ -141,7 +161,7 @@ export const ForgotPasswordForm: React.FC = () => {
         <form onSubmit={handleOtpSubmit} className="space-y-3.5">
           <Input
             label="Mã xác thực OTP (6 chữ số)"
-            placeholder="889922"
+            placeholder="123456"
             value={otp}
             onChange={(e) => setOtp(e.target.value)}
           />

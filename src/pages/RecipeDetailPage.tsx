@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Bookmark, Flame, Clock, Star, Lock } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { RECIPES } from '../data/mockData';
 import { useAuth } from '../hooks/useAuth';
+import { useDemoState } from '../hooks/useDemoState';
+
+type DemoGroceryItem = { id: number; name: string; amount: string; checked: boolean };
+type DemoWeeklyPlan = Record<string, Record<string, string>>;
 
 export const RecipeDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -11,14 +15,45 @@ export const RecipeDetailPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
 
   const recipe = RECIPES.find((r) => r.id === id) || RECIPES[0];
-  const [isSaved, setIsSaved] = useState(false);
+  const [savedRecipeIds, setSavedRecipeIds] = useDemoState<string[]>('saved-recipes', []);
+  const [, setGroceries] = useDemoState<DemoGroceryItem[]>('grocery-list', []);
+  const [, setWeeklyPlan] = useDemoState<DemoWeeklyPlan>('weekly-meal-plan', {});
+  const isSaved = savedRecipeIds.includes(recipe.id);
 
   const handleSave = () => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-    setIsSaved(!isSaved);
+    // Saved recipes use the same browser-backed demo record as discovery and the saved list.
+    setSavedRecipeIds((currentIds) => currentIds.includes(recipe.id)
+      ? currentIds.filter((savedId) => savedId !== recipe.id)
+      : [...currentIds, recipe.id]);
+  };
+
+  const addIngredientsToGroceryList = () => {
+    setGroceries((currentItems) => {
+      const currentNames = new Set(currentItems.map((item) => item.name.toLocaleLowerCase()));
+      const additions = recipe.ingredients
+        .filter((ingredient) => !currentNames.has(ingredient.name.toLocaleLowerCase()))
+        .map((ingredient, index) => ({
+          id: Date.now() + index,
+          name: ingredient.name,
+          amount: ingredient.amount,
+          checked: false
+        }));
+      return [...currentItems, ...additions];
+    });
+    navigate('/grocery-list');
+  };
+
+  const addRecipeToMealPlan = () => {
+    // This demo action uses the same plan key and structure as the weekly planner page.
+    setWeeklyPlan((currentPlan) => ({
+      ...currentPlan,
+      'Thứ 2': { ...currentPlan['Thứ 2'], 'Bữa trưa': recipe.title }
+    }));
+    navigate('/meal-plan');
   };
 
   return (
@@ -67,7 +102,7 @@ export const RecipeDetailPage: React.FC = () => {
               </div>
 
               <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-3 tracking-tight">
-                ${recipe.title}
+                {recipe.title}
               </h1>
 
               <p className="text-sm text-gray-600 leading-relaxed mb-5">
@@ -104,7 +139,7 @@ export const RecipeDetailPage: React.FC = () => {
               </div>
 
               {/* Save Button */}
-              <div>
+              <div className="flex flex-wrap gap-3">
                 <button
                   onClick={handleSave}
                   className={`px-6 py-3 border border-gray-200 hover:border-gray-400 rounded-xl text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition cursor-pointer flex items-center justify-center gap-2 shadow-2xs ${
@@ -113,6 +148,12 @@ export const RecipeDetailPage: React.FC = () => {
                 >
                   <Bookmark className="w-4 h-4" />
                   <span>{isSaved ? 'Đã lưu món ăn' : 'Lưu món'}</span>
+                </button>
+                <button onClick={addIngredientsToGroceryList} className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">
+                  Thêm nguyên liệu vào danh sách
+                </button>
+                <button onClick={addRecipeToMealPlan} className="rounded-xl border border-emerald-700 px-5 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">
+                  Lên kế hoạch bữa trưa
                 </button>
               </div>
             </div>

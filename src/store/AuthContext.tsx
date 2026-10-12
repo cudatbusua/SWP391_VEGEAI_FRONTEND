@@ -1,69 +1,106 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { User, LoginFormData, RegisterFormData, ActionResult } from '../types';
 import { authService } from '../services/authService';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isPreviewSession: boolean;
   isLoading: boolean;
   login: (data: LoginFormData) => Promise<ActionResult<User>>;
-  register: (data: RegisterFormData) => Promise<ActionResult<User>>;
-  logout: () => void;
-  switchRole: (role: 'guest' | 'user') => void;
+  register: (data: RegisterFormData) => Promise<ActionResult<void>>;
+  logout: () => Promise<ActionResult<void>>;
+  startPreviewSession: (role?: 'user' | 'admin') => void;
+  endPreviewSession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// These sample identities exist only in FE state and never create backend credentials.
+const previewUsers: Record<'user' | 'admin', User> = {
+  user: {
+    id: 'fe-preview-user',
+    name: 'VEGEAI Demo User',
+    emailOrPhone: 'demo@vegeai.local',
+    role: 'user'
+  },
+  admin: {
+    id: 'fe-preview-admin',
+    name: 'VEGEAI Demo Admin',
+    emailOrPhone: 'admin@vegeai.local',
+    role: 'admin'
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isPreviewSession, setIsPreviewSession] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const authOperationRef = useRef(0);
 
   useEffect(() => {
-    const savedUser = authService.getCurrentUser();
-    if (savedUser) {
-      setUser(savedUser);
-    }
-    setIsLoading(false);
+    // Rehydrate the user from BE via the HttpOnly refresh cookie on page load.
+    const operation = ++authOperationRef.current;
+    void authService.restoreSession().then((result) => {
+      if (authOperationRef.current === operation) {
+        setUser(result.success ? result.data ?? null : null);
+        setIsPreviewSession(false);
+        setIsLoading(false);
+      }
+    });
   }, []);
 
   const login = async (data: LoginFormData): Promise<ActionResult<User>> => {
+    authOperationRef.current += 1;
     setIsLoading(true);
-    const res = await authService.login(data);
-    setIsLoading(false);
-    if (res.success && res.data) {
-      setUser(res.data);
+    try {
+      const res = await authService.login(data);
+      if (res.success && res.data) {
+        setUser(res.data);
+        setIsPreviewSession(false);
+      }
+      return res;
+    } finally {
+      setIsLoading(false);
     }
-    return res;
   };
 
-  const register = async (data: RegisterFormData): Promise<ActionResult<User>> => {
+  const register = async (data: RegisterFormData): Promise<ActionResult<void>> => {
+    authOperationRef.current += 1;
     setIsLoading(true);
-    const res = await authService.register(data);
-    setIsLoading(false);
-    if (res.success && res.data) {
-      setUser(res.data);
+    try {
+      return await authService.register(data);
+    } finally {
+      setIsLoading(false);
     }
-    return res;
   };
 
-  const logout = () => {
-    authService.logout();
-    setUser(null);
-  };
-
-  const switchRole = (role: 'guest' | 'user') => {
-    if (role === 'guest') {
+  const logout = async (): Promise<ActionResult<void>> => {
+    authOperationRef.current += 1;
+    if (isPreviewSession) {
+      // A preview has no BE credentials, so leave the backend logout endpoint untouched.
       setUser(null);
-    } else {
-      const demoUser: User = {
-        id: 'usr_demo',
-        name: 'Dat Thai',
-        emailOrPhone: 'datthai@vegeai.vn',
-        role: 'user',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
-      };
-      setUser(demoUser);
+      setIsPreviewSession(false);
+      return { success: true };
     }
+
+    const result = await authService.logout();
+    setUser(null);
+    setIsPreviewSession(false);
+    return result;
+  };
+
+  const startPreviewSession = (role: 'user' | 'admin' = 'user') => {
+    // Compile-time guard: a preview role can never replace or impersonate a real BE login.
+    if (!import.meta.env.DEV || isLoading || (user && !isPreviewSession)) return;
+    setUser(previewUsers[role]);
+    setIsPreviewSession(true);
+  };
+
+  const endPreviewSession = () => {
+    if (!import.meta.env.DEV || !isPreviewSession) return;
+    setUser(null);
+    setIsPreviewSession(false);
   };
 
   return (
@@ -71,11 +108,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         isAuthenticated: !!user,
+        isPreviewSession,
         isLoading,
         login,
         register,
         logout,
-        switchRole
+        startPreviewSession,
+        endPreviewSession
       }}
     >
       {children}

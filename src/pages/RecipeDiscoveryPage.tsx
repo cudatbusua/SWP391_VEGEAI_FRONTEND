@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Search, Camera, Bookmark, Flame, Scale, Clock, SlidersHorizontal, Leaf } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { RECIPES } from '../data/mockData';
 import { useAuth } from '../hooks/useAuth';
+import { useDemoState } from '../hooks/useDemoState';
 
 export const RecipeDiscoveryPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -11,7 +13,7 @@ export const RecipeDiscoveryPage: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activePill, setActivePill] = useState('Tất cả');
-  const [savedRecipes, setSavedRecipes] = useState<Set<string>>(new Set());
+  const [savedRecipeIds, setSavedRecipeIds] = useDemoState<string[]>('saved-recipes', []);
 
   // Filter criteria
   const [selectedCookTimes, setSelectedCookTimes] = useState<string[]>([]);
@@ -19,6 +21,7 @@ export const RecipeDiscoveryPage: React.FC = () => {
   const [selectedMeals, setSelectedMeals] = useState<string[]>([]);
   const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState('popular');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const pills = ['Tất cả', 'Giàu Protein', 'Low GI', 'Dưới 20 phút', 'Thuần Chay', 'Món Nước'];
 
@@ -78,6 +81,21 @@ export const RecipeDiscoveryPage: React.FC = () => {
     return true;
   });
 
+  // Sorting is applied after filters so the count and selected criteria always refer to one result set.
+  const sortedRecipes = useMemo(() => [...filteredRecipes].sort((first, second) => {
+    if (sortBy === 'calories_asc') return first.calories - second.calories;
+    if (sortBy === 'time_asc') return first.cookTime - second.cookTime;
+    return second.rating - first.rating;
+  }), [filteredRecipes, sortBy]);
+  const pageSize = 6;
+  const pageCount = Math.ceil(sortedRecipes.length / pageSize);
+  const visibleRecipes = sortedRecipes.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // A changed search/filter starts at the first result page instead of leaving an empty later page selected.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activePill, selectedCookTimes, selectedCalories, selectedMeals, selectedIngredients, sortBy]);
+
   const toggleArrayItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
     if (arr.includes(item)) {
       setArr(arr.filter((i) => i !== item));
@@ -102,10 +120,9 @@ export const RecipeDiscoveryPage: React.FC = () => {
       navigate('/login');
       return;
     }
-    const next = new Set(savedRecipes);
-    if (next.has(recipeId)) next.delete(recipeId);
-    else next.add(recipeId);
-    setSavedRecipes(next);
+    setSavedRecipeIds((currentIds) => currentIds.includes(recipeId)
+      ? currentIds.filter((id) => id !== recipeId)
+      : [...currentIds, recipeId]);
   };
 
   return (
@@ -132,7 +149,7 @@ export const RecipeDiscoveryPage: React.FC = () => {
                 if (!isAuthenticated) {
                   navigate('/login');
                 } else {
-                  alert('Tính năng AI Quét Tủ Lạnh: Đang mở máy ảnh nhận diện nguyên liệu...');
+                  navigate('/ai-assistant');
                 }
               }}
               className="w-full md:w-auto px-6 py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
@@ -268,7 +285,9 @@ export const RecipeDiscoveryPage: React.FC = () => {
               <div className="text-sm text-gray-600">
                 Hiển thị <span className="font-bold text-gray-900">{filteredRecipes.length}</span> công thức thuần chay
               </div>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                {isAuthenticated && <Link to="/saved-recipes" className="font-semibold text-emerald-700">Món đã lưu ({savedRecipeIds.length})</Link>}
+                <div className="flex items-center gap-2">
                 <span className="text-gray-500">Sắp xếp theo:</span>
                 <select
                   value={sortBy}
@@ -279,6 +298,7 @@ export const RecipeDiscoveryPage: React.FC = () => {
                   <option value="calories_asc">Calo thấp nhất</option>
                   <option value="time_asc">Thời gian nấu nhanh</option>
                 </select>
+                </div>
               </div>
             </div>
 
@@ -298,7 +318,7 @@ export const RecipeDiscoveryPage: React.FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredRecipes.map((recipe) => (
+                {visibleRecipes.map((recipe) => (
                   <div
                     key={recipe.id}
                     onClick={() => navigate(`/recipe/${recipe.id}`)}
@@ -318,8 +338,9 @@ export const RecipeDiscoveryPage: React.FC = () => {
                       </div>
                       <button
                         onClick={(e) => handleBookmark(recipe.id, e)}
+                        aria-label={savedRecipeIds.includes(recipe.id) ? `Bỏ lưu ${recipe.title}` : `Lưu ${recipe.title}`}
                         className={`absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-gray-700 flex items-center justify-center shadow-sm transition cursor-pointer ${
-                          savedRecipes.has(recipe.id) ? 'text-emerald-600 fill-emerald-600' : ''
+                          savedRecipeIds.includes(recipe.id) ? 'text-emerald-600 fill-emerald-600' : ''
                         }`}
                       >
                         <Bookmark className="w-4 h-4" />
@@ -356,16 +377,12 @@ export const RecipeDiscoveryPage: React.FC = () => {
               </div>
             )}
 
-            {/* Pagination */}
-            <div className="flex items-center justify-center gap-2 mt-12 mb-6">
-              <button className="w-10 h-10 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">‹</button>
-              <button className="w-10 h-10 rounded-lg bg-emerald-600 text-white font-medium flex items-center justify-center shadow-2xs">1</button>
-              <button className="w-10 h-10 rounded-lg bg-white border border-gray-200 text-gray-700 font-medium flex items-center justify-center">2</button>
-              <button className="w-10 h-10 rounded-lg bg-white border border-gray-200 text-gray-700 font-medium flex items-center justify-center">3</button>
-              <span className="px-1 text-gray-400">...</span>
-              <button className="w-10 h-10 rounded-lg bg-white border border-gray-200 text-gray-700 font-medium flex items-center justify-center">8</button>
-              <button className="w-10 h-10 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">›</button>
-            </div>
+            {/* Pagination only appears when the loaded recipe collection actually has more than one page. */}
+            {pageCount > 1 && <nav aria-label="Phân trang công thức" className="mt-10 flex items-center justify-center gap-2">
+              <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => page - 1)} className="h-10 rounded-lg border px-3 text-sm disabled:opacity-40">Trang trước</button>
+              {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => <button type="button" key={page} aria-current={currentPage === page ? 'page' : undefined} onClick={() => setCurrentPage(page)} className={`h-10 w-10 rounded-lg text-sm font-semibold ${currentPage === page ? 'bg-emerald-700 text-white' : 'border bg-white text-slate-700'}`}>{page}</button>)}
+              <button type="button" disabled={currentPage === pageCount} onClick={() => setCurrentPage((page) => page + 1)} className="h-10 rounded-lg border px-3 text-sm disabled:opacity-40">Trang sau</button>
+            </nav>}
           </div>
 
         </div>

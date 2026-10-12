@@ -13,6 +13,7 @@ export interface LoginFormData {
 }
 
 export interface RegisterFormData {
+  username: string;
   fullName: string;
   emailOrPhone: string;
   password: string;
@@ -24,6 +25,7 @@ export interface ForgotPasswordFormData {
   emailOrPhone: string;
   otp?: string;
   newPassword?: string;
+  confirmPassword?: string;
 }
 
 export interface ValidationErrors {

@@ -1,53 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Leaf, Bell } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isAuthenticated, logout, switchRole } = useAuth();
+  const { user, isAuthenticated, logout, sessionError, retrySession } = useAuth();
   const location = useLocation();
+  const [logoutError, setLogoutError] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const handleLogout = async () => {
+    setLoggingOut(true); setLogoutError('');
+    const result = await logout();
+    if (!result.success) setLogoutError(result.error || 'Không thể đăng xuất.');
+    setLoggingOut(false);
+  };
 
   const isCurrent = (path: string) => location.pathname === path;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
       
-      {/* Top Testing Banner */}
-      <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-flex items-center justify-center w-2 h-2 rounded-full ${
-              !isAuthenticated ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'
-            }`}
-          />
-          <span className="font-medium">Chế độ kiểm thử:</span>
-          <span
-            className={`px-2 py-0.5 rounded-full font-semibold ${
-              !isAuthenticated
-                ? 'bg-amber-100 text-amber-800'
-                : 'bg-emerald-100 text-emerald-800'
-            }`}
-          >
-            {!isAuthenticated
-              ? 'Unauthorized User (Khách vãng lai)'
-              : 'Authorized User (Đã đăng nhập)'}
-          </span>
-          <span className="hidden md:inline text-amber-700">
-            | Trải nghiệm luồng Đăng nhập, Đăng ký và Quên mật khẩu.
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => switchRole(isAuthenticated ? 'guest' : 'user')}
-            className="px-2.5 py-1 text-xs rounded bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 font-medium transition cursor-pointer shadow-2xs"
-          >
-            {!isAuthenticated
-              ? 'Chuyển sang Authorized User (Thử nghiệm)'
-              : 'Chuyển về Guest (Khách)'}
-          </button>
-        </div>
-      </div>
+      {sessionError && <div role="alert" className="bg-amber-50 p-3 text-sm text-center text-amber-900">
+        {sessionError} <button onClick={retrySession} className="underline ml-2">Thử lại</button>
+      </div>}
+      {logoutError && <div role="alert" className="bg-red-50 p-3 text-sm text-center text-red-700">{logoutError}</div>}
 
       {/* Main Navigation Header */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-2xs">
@@ -63,7 +39,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             </Link>
 
             {/* Nav Menu */}
-            <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-gray-600">
+            <nav className="hidden">
               {isAuthenticated && (
                 <Link
                   to="/dashboard"
@@ -85,18 +61,6 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               {isAuthenticated && (
                 <>
                   <button
-                    onClick={() => alert('Mở tính năng Quét Tủ Lạnh (Computer Vision nhận diện nguyên liệu)')}
-                    className="hover:text-emerald-600 transition cursor-pointer"
-                  >
-                    Quét Tủ Lạnh
-                  </button>
-                  <button
-                    onClick={() => alert('Mở Trợ lý AI Bếp Trưởng: Gợi ý thực đơn')}
-                    className="hover:text-emerald-600 transition cursor-pointer"
-                  >
-                    AI Bếp Trưởng
-                  </button>
-                  <button
                     onClick={() => alert('Mở Kế Hoạch Tuần: Thực đơn 7 ngày cá nhân hóa')}
                     className="hover:text-emerald-600 transition cursor-pointer"
                   >
@@ -104,6 +68,11 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                   </button>
                 </>
               )}
+              <Link to="/fridge-scan" className={`hover:text-emerald-600 transition ${isCurrent('/fridge-scan') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''}`}>Quét Tủ Lạnh</Link>
+              {isAuthenticated && <Link to="/fridge" className={`hover:text-emerald-600 transition ${isCurrent('/fridge') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''}`}>Kho Tủ Lạnh</Link>}
+              <Link to="/ai-chef" className={`hover:text-emerald-600 transition ${isCurrent('/ai-chef') ? 'text-emerald-600 font-bold' : ''}`}>AI Bếp Trưởng</Link>
+              <Link to="/nutrition" className={`hover:text-emerald-600 transition ${isCurrent('/nutrition') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''}`}>Dinh Dưỡng</Link>
+              {user?.role === 'admin' && <Link to="/admin" className={`hover:text-emerald-600 transition ${isCurrent('/admin') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''}`}>Admin</Link>}
               <Link
                 to="/blog"
                 className={`hover:text-emerald-600 transition ${
@@ -129,13 +98,13 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               <>
                 <Link
                   to="/login"
-                  className="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
+                  className="px-3 sm:px-5 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
                 >
                   Đăng nhập
                 </Link>
                 <Link
                   to="/register"
-                  className="px-5 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition cursor-pointer shadow-2xs"
+                  className="px-3 sm:px-5 py-2 text-xs sm:text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition cursor-pointer shadow-2xs"
                 >
                   Đăng ký
                 </Link>
@@ -166,16 +135,26 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                 </Link>
 
                 <button
-                  onClick={logout}
+                  onClick={handleLogout}
+                  disabled={loggingOut}
                   className="text-xs text-red-500 hover:underline cursor-pointer ml-1 font-medium"
                 >
-                  Đăng xuất
+                  {loggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
                 </button>
               </div>
             )}
           </div>
 
         </div>
+        <nav aria-label="Điều hướng chính" className="flex gap-5 px-4 sm:px-6 py-3 border-t border-gray-100 text-sm font-medium text-gray-600 overflow-x-auto max-w-7xl mx-auto">
+          {[
+            ...(isAuthenticated ? [['/dashboard', 'Trang chủ']] : []),
+            ['/', 'Khám phá'], ['/ai-chef', 'AI Bếp Trưởng'], ['/fridge-scan', 'Quét Tủ Lạnh'],
+            ...(isAuthenticated ? [['/fridge', 'Kho Tủ']] : []),
+            ['/nutrition', 'Dinh dưỡng'], ['/blog', 'Blog'], ['/restaurants', 'Quán chay gần đây'],
+            ...(user?.role === 'admin' ? [['/admin', 'Admin']] : []),
+          ].map(([path, label]) => <Link key={path} to={path} aria-current={isCurrent(path) || (path === '/blog' && location.pathname.startsWith('/blog/')) ? 'page' : undefined} className={`shrink-0 hover:text-emerald-700 ${isCurrent(path) || (path === '/blog' && location.pathname.startsWith('/blog/')) ? 'text-emerald-700 font-bold' : ''}`}>{label}</Link>)}
+        </nav>
       </header>
 
       {/* Page Content */}
@@ -191,7 +170,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             <span>VEGEAI Vietnam</span>
           </div>
 
-          <div className="flex items-center gap-6 text-gray-500 font-medium">
+          <div className="flex flex-wrap justify-center items-center gap-4 text-gray-500 font-medium">
             <a href="#" className="hover:text-emerald-600 transition">Giới thiệu</a>
             <a href="#" className="hover:text-emerald-600 transition">Điều khoản</a>
             <a href="#" className="hover:text-emerald-600 transition">Chính sách bảo mật</a>

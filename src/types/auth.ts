@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   name: string;
+  username?: string;
   emailOrPhone: string;
   role: 'guest' | 'user' | 'admin';
   avatar?: string;
@@ -13,6 +14,7 @@ export interface LoginFormData {
 }
 
 export interface RegisterFormData {
+  username: string;
   fullName: string;
   emailOrPhone: string;
   password: string;

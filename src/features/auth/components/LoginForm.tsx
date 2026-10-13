@@ -4,7 +4,6 @@ import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
-import { isValidEmailOrPhone } from '../../../utils/validation';
 
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
@@ -25,9 +24,7 @@ export const LoginForm: React.FC = () => {
     const errs: { [key: string]: string } = {};
 
     if (!formData.emailOrPhone.trim()) {
-      errs.emailOrPhone = 'Vui lòng nhập Email hoặc Số điện thoại.';
-    } else if (!isValidEmailOrPhone(formData.emailOrPhone)) {
-      errs.emailOrPhone = 'Email hoặc Số điện thoại không đúng định dạng.';
+      errs.emailOrPhone = 'Vui lòng nhập tên đăng nhập hoặc email.';
     }
 
     if (!formData.password) {
@@ -96,7 +93,7 @@ export const LoginForm: React.FC = () => {
 
         {/* Email hoặc Số điện thoại */}
         <Input
-          label="Email hoặc Số điện thoại"
+          label="Tên đăng nhập hoặc email"
           placeholder="nguyen@gmail.com"
           value={formData.emailOrPhone}
           onChange={(e) => {
@@ -170,13 +167,8 @@ export const LoginForm: React.FC = () => {
       <div className="flex justify-center items-center mb-6">
         <button
           type="button"
-          onClick={() => {
-            setFormData({
-              emailOrPhone: 'google.user@gmail.com',
-              password: 'password123',
-              rememberMe: true
-            });
-          }}
+          disabled
+          title="Đăng nhập Google chưa được hỗ trợ"
           className="flex items-center justify-center gap-2.5
       w-full max-w-[240px] py-3 px-4
       bg-white border border-gray-200

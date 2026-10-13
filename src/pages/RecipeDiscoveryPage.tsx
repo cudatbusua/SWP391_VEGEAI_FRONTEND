@@ -128,13 +128,7 @@ export const RecipeDiscoveryPage: React.FC = () => {
               />
             </div>
             <button
-              onClick={() => {
-                if (!isAuthenticated) {
-                  navigate('/login');
-                } else {
-                  alert('Tính năng AI Quét Tủ Lạnh: Đang mở máy ảnh nhận diện nguyên liệu...');
-                }
-              }}
+              onClick={() => navigate('/fridge-scan')}
               className="w-full md:w-auto px-6 py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
             >
               <Camera className="w-5 h-5" />

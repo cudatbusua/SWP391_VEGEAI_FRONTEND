@@ -1,15 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, LoginFormData, RegisterFormData, ActionResult } from '../types';
 import { authService } from '../services/authService';
+import { AUTH_EXPIRED_EVENT, errorMessage } from '../services/apiClient';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (data: LoginFormData) => Promise<ActionResult<User>>;
-  register: (data: RegisterFormData) => Promise<ActionResult<User>>;
-  logout: () => void;
-  switchRole: (role: 'guest' | 'user') => void;
+  register: (data: RegisterFormData) => Promise<ActionResult<void>>;
+  logout: () => Promise<ActionResult<void>>;
+  updateUser: (user: User) => void;
+  sessionError: string;
+  retrySession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,14 +20,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [sessionError, setSessionError] = useState('');
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
 
   useEffect(() => {
-    const savedUser = authService.getCurrentUser();
-    if (savedUser) {
-      setUser(savedUser);
-    }
-    setIsLoading(false);
-  }, []);
+    let active = true;
+    setIsLoading(true);
+    setSessionError('');
+    const onExpired = () => { setUser(null); setSessionError(''); };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    authService.getCurrentUser()
+      .then(saved => { if (active) setUser(saved); })
+      .catch(error => { if (active) setSessionError(errorMessage(error)); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired); };
+  }, [restoreAttempt]);
 
   const login = async (data: LoginFormData): Promise<ActionResult<User>> => {
     setIsLoading(true);
@@ -32,38 +42,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
     if (res.success && res.data) {
       setUser(res.data);
+      setSessionError('');
     }
     return res;
   };
 
-  const register = async (data: RegisterFormData): Promise<ActionResult<User>> => {
-    setIsLoading(true);
-    const res = await authService.register(data);
-    setIsLoading(false);
-    if (res.success && res.data) {
-      setUser(res.data);
-    }
-    return res;
-  };
+  const register = (data: RegisterFormData) => authService.register(data);
 
-  const logout = () => {
-    authService.logout();
-    setUser(null);
-  };
-
-  const switchRole = (role: 'guest' | 'user') => {
-    if (role === 'guest') {
-      setUser(null);
-    } else {
-      const demoUser: User = {
-        id: 'usr_demo',
-        name: 'Dat Thai',
-        emailOrPhone: 'datthai@vegeai.vn',
-        role: 'user',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
-      };
-      setUser(demoUser);
-    }
+  const logout = async () => {
+    const result = await authService.logout();
+    if (result.success) { setUser(null); setSessionError(''); }
+    return result;
   };
 
   return (
@@ -75,7 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
-        switchRole
+        updateUser: setUser,
+        sessionError,
+        retrySession: () => setRestoreAttempt(value => value + 1),
       }}
     >
       {children}

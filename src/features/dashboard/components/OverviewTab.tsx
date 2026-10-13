@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Sparkles,
   Camera,
@@ -12,8 +12,11 @@ import {
   ExternalLink,
   Leaf
 } from 'lucide-react';
+import { useAuth } from '../../../hooks/useAuth';
 
 export const OverviewTab: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [waterMl, setWaterMl] = useState(1200);
   const [shoppingItems, setShoppingItems] = useState([
     { id: 1, name: 'Đậu lăng đỏ', amount: '200 g', checked: false },
@@ -49,10 +52,10 @@ export const OverviewTab: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Chào Minh, hôm nay mình ăn xanh nhé!
+            Chào {user?.name}, hôm nay mình ăn xanh nhé!
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Một ngày đủ chất, nhẹ nhàng — được chuẩn bị riêng cho Nguyễn Hoàng Minh.
+            Một ngày đủ chất, nhẹ nhàng — cùng {user?.name}.
           </p>
         </div>
 
@@ -65,6 +68,7 @@ export const OverviewTab: React.FC = () => {
         </div>
       </div>
 
+      <p className="text-xs text-gray-500">Các số liệu dinh dưỡng và thực đơn bên dưới là dữ liệu minh họa.</p>
       {/* Section 1: Dinh dưỡng hôm nay (Image 1) */}
       <div className="bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xs">
         <div className="flex items-center justify-between mb-6">
@@ -299,7 +303,7 @@ export const OverviewTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Gợi ý dành riêng cho Minh */}
+          {/* Gợi ý món chay */}
           <div className="bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
               <h2 className="text-lg font-bold text-gray-900">Gợi ý dành riêng cho Minh</h2>
@@ -434,7 +438,7 @@ export const OverviewTab: React.FC = () => {
             </p>
 
             <button
-              onClick={() => alert('Đang kết nối AI Bếp Trưởng... Trò chuyện về thực đơn tối nay!')}
+              onClick={() => navigate('/ai-chef')}
               className="w-full py-3 bg-white text-[#03543f] hover:bg-emerald-50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
             >
               <span>Trò chuyện với AI</span>
@@ -444,7 +448,7 @@ export const OverviewTab: React.FC = () => {
 
           {/* Card 2: Quét Tủ Lạnh */}
           <div
-            onClick={() => alert('Mở máy ảnh: Quét nhận diện thực phẩm trong tủ lạnh!')}
+            onClick={() => navigate('/fridge-scan')}
             className="bg-white rounded-3xl border border-gray-100 p-6 shadow-2xs hover:shadow-md transition cursor-pointer group flex items-start justify-between"
           >
             <div className="flex items-start gap-4">

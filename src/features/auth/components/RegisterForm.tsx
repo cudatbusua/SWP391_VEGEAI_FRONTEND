@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle } from 'lucide-react';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
-import { isValidEmailOrPhone, calculatePasswordStrength } from '../../../utils/validation';
+import { isStrictEmail, calculatePasswordStrength } from '../../../utils/validation';
 
 export const RegisterForm: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
+    username: '',
     fullName: '',
     emailOrPhone: '',
     password: '',
@@ -20,7 +21,6 @@ export const RegisterForm: React.FC = () => {
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [generalError, setGeneralError] = useState<string>('');
-  const [successMessage, setSuccessMessage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dynamic password strength bar
@@ -31,10 +31,16 @@ export const RegisterForm: React.FC = () => {
 
     if (!formData.emailOrPhone.trim()) {
       errs.emailOrPhone = 'Email không đúng định dạng';
-    } else if (!isValidEmailOrPhone(formData.emailOrPhone)) {
+    } else if (!isStrictEmail(formData.emailOrPhone)) {
       errs.emailOrPhone = 'Email không đúng định dạng';
     }
 
+    if (!/^[a-zA-Z0-9_]{4,50}$/.test(formData.username.trim())) {
+      errs.username = 'Tên đăng nhập cần 4–50 ký tự, chỉ gồm chữ, số và dấu gạch dưới.';
+    }
+    if (!formData.fullName.trim() || formData.fullName.trim().length > 100 || /[0-9]/.test(formData.fullName)) {
+      errs.fullName = 'Vui lòng nhập họ tên (tối đa 100 ký tự, không chứa số).';
+    }
     if (!formData.password) {
       errs.password = 'Mật khẩu quá yếu, cần tối thiểu 8 ký tự gồm chữ và số';
     } else if (
@@ -62,7 +68,6 @@ export const RegisterForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError('');
-    setSuccessMessage('');
 
     if (!validate()) return;
 
@@ -70,10 +75,8 @@ export const RegisterForm: React.FC = () => {
     try {
       const res = await register(formData);
       if (res.success) {
-        setSuccessMessage('Tạo tài khoản thành công! Đang chuyển hướng...');
-        setTimeout(() => {
-          navigate('/dashboard?tab=profile');
-        }, 1000);
+        const email = formData.emailOrPhone.trim();
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`, { state: { email } });
       } else {
         setGeneralError(res.error || 'Đăng ký không thành công.');
       }
@@ -107,28 +110,26 @@ export const RegisterForm: React.FC = () => {
         </div>
       )}
 
-      {successMessage && (
-        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-          <span>{successMessage}</span>
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-3.5">
+        <Input label="Tên đăng nhập" placeholder="nguyen_van_a" autoComplete="username"
+          value={formData.username} error={errors.username}
+          onChange={e => setFormData({ ...formData, username: e.target.value })} />
         
         {/* Họ tên */}
         <Input
           label="Họ tên"
           placeholder="Nguyễn Văn A"
           value={formData.fullName}
+          error={errors.fullName}
           onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
         />
 
         {/* Email hoặc Số điện thoại (Image 1 & 2) */}
         <div>
           <Input
-            label="Email hoặc Số điện thoại"
-            placeholder="nguyen@gmail.com hoặc 090..."
+            label="Email"
+            type="email"
+            placeholder="nguyen@gmail.com"
             value={formData.emailOrPhone}
             onChange={(e) => {
               setFormData({ ...formData, emailOrPhone: e.target.value });

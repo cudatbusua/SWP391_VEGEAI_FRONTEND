@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import { Calendar } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { OverviewTab } from '../features/dashboard/components/OverviewTab';
 import { NutritionProfileTab } from '../features/dashboard/components/NutritionProfileTab';
 
 export const DashboardPage: React.FC = () => {
+  const { isLoading, isAuthenticated, sessionError, retrySession } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') === 'profile' ? 'profile' : 'overview';
   const [activeTab, setActiveTab] = useState<'overview' | 'profile'>(initialTab);
@@ -21,6 +23,9 @@ export const DashboardPage: React.FC = () => {
     setSearchParams({ tab });
   };
 
+  if (isLoading) return <MainLayout><p role="status" className="p-8 text-center">Đang tải phiên đăng nhập...</p></MainLayout>;
+  if (sessionError && !isAuthenticated) return <MainLayout><div className="p-8 text-center"><p>{sessionError}</p><button onClick={retrySession} className="text-emerald-700 underline">Thử lại</button></div></MainLayout>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
   return (
     <MainLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -56,7 +61,7 @@ export const DashboardPage: React.FC = () => {
           {/* Date Picker / Today's Date */}
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-white border border-gray-200/80 px-4 py-2.5 rounded-2xl shadow-2xs self-start sm:self-auto">
             <Calendar className="w-4 h-4 text-emerald-600" />
-            <span>Thứ Ba, 06 tháng 10, 2026</span>
+            <span>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
           </div>
 
         </div>

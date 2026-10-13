@@ -4,7 +4,7 @@ import { Mail, ArrowRight, RotateCcw, CheckCircle2, AlertCircle, KeyRound } from
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { authService } from '../../../services/authService';
-import { isValidEmailOrPhone } from '../../../utils/validation';
+import { isStrictEmail } from '../../../utils/validation';
 
 export const ForgotPasswordForm: React.FC = () => {
   const [step, setStep] = useState<'request' | 'otp' | 'success'>('request');
@@ -22,12 +22,12 @@ export const ForgotPasswordForm: React.FC = () => {
     setError('');
 
     if (!emailOrPhone.trim()) {
-      setError('Vui lòng nhập Email hoặc Số điện thoại.');
+      setError('Vui lòng nhập email.');
       return;
     }
 
-    if (!isValidEmailOrPhone(emailOrPhone)) {
-      setError('Email hoặc Số điện thoại không đúng định dạng.');
+    if (!isStrictEmail(emailOrPhone)) {
+      setError('Email không đúng định dạng.');
       return;
     }
 
@@ -51,7 +51,7 @@ export const ForgotPasswordForm: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!otp.trim() || otp.length < 4) {
+    if (!/^\d{6}$/.test(otp.trim())) {
       setError('Vui lòng nhập mã xác thực OTP hợp lệ.');
       return;
     }
@@ -67,10 +67,13 @@ export const ForgotPasswordForm: React.FC = () => {
     }
 
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const result = await authService.resetPassword(emailOrPhone, otp.trim(), newPassword, confirmPassword);
+      if (result.success) setStep('success');
+      else setError(result.error || 'Không thể đặt lại mật khẩu.');
+    } finally {
       setIsLoading(false);
-      setStep('success');
-    }, 700);
+    }
   };
 
   return (
@@ -89,7 +92,7 @@ export const ForgotPasswordForm: React.FC = () => {
           {step === 'success' ? 'Đặt lại mật khẩu thành công' : 'Khôi phục mật khẩu'}
         </h1>
         <p className="text-sm text-gray-500 leading-relaxed">
-          {step === 'request' && 'Nhập email hoặc số điện thoại đã đăng ký để nhận mã xác thực.'}
+          {step === 'request' && 'Nhập email đã đăng ký để nhận mã xác thực.'}
           {step === 'otp' && 'Nhập mã xác thực đã nhận được và thiết lập mật khẩu mới.'}
           {step === 'success' && 'Mật khẩu của bạn đã được cập nhật thành công. Hãy đăng nhập lại!'}
         </p>
@@ -113,7 +116,8 @@ export const ForgotPasswordForm: React.FC = () => {
       {step === 'request' && (
         <form onSubmit={handleRequestSubmit} className="space-y-4">
           <Input
-            label="Email hoặc số điện thoại"
+            label="Email"
+            type="email"
             placeholder="nguyen@gmail.com"
             leftIcon={<Mail className="w-4 h-4" />}
             value={emailOrPhone}
@@ -141,7 +145,9 @@ export const ForgotPasswordForm: React.FC = () => {
         <form onSubmit={handleOtpSubmit} className="space-y-3.5">
           <Input
             label="Mã xác thực OTP (6 chữ số)"
-            placeholder="889922"
+            placeholder="Nhập 6 chữ số"
+            inputMode="numeric"
+            maxLength={6}
             value={otp}
             onChange={(e) => setOtp(e.target.value)}
           />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
@@ -8,6 +8,10 @@ import { useAuth } from '../../../hooks/useAuth';
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedPath: unknown = location.state?.from;
+  const destination = typeof requestedPath === 'string' && /^\/(?:blog|admin\/blog)(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
+    ? requestedPath : '/dashboard';
 
   const [formData, setFormData] = useState({
     emailOrPhone: '',
@@ -50,7 +54,7 @@ export const LoginForm: React.FC = () => {
       if (res.success) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate(destination, { replace: true });
         }, 800);
       } else {
         setGeneralError(res.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');

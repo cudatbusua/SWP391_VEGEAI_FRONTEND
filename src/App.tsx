@@ -15,6 +15,10 @@ import { NutritionCalculatorPage } from './pages/NutritionCalculatorPage';
 import { AdminPage } from './pages/AdminPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { BlogPage, BlogDetailPage } from './pages/BlogPage';
+import { BlogEditorPage } from './pages/BlogEditorPage';
+import { MyBlogPostsPage } from './pages/MyBlogPostsPage';
+import { BlogPostStatusPage } from './pages/BlogPostStatusPage';
+import { AdminBlogPage } from './pages/AdminBlogPage';
 import { RestaurantsPage } from './pages/RestaurantsPage';
 
 export const App: React.FC = () => {
@@ -36,7 +40,13 @@ export const App: React.FC = () => {
           <Route path="/nutrition" element={<NutritionCalculatorPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:slug" element={<BlogDetailPage />} />
+          <Route path="/blog/write" element={<BlogEditorPage />} />
+          <Route path="/blog/my-posts" element={<MyBlogPostsPage />} />
+          <Route path="/blog/my-posts/:id/edit" element={<BlogEditorPage />} />
+          <Route path="/blog/my-posts/:id" element={<BlogPostStatusPage />} />
+          <Route path="/blog/:id" element={<BlogDetailPage />} />
+          <Route path="/admin/blog" element={<AdminBlogPage />} />
+          <Route path="/admin/blog/:id" element={<BlogPostStatusPage adminMode />} />
           <Route path="/restaurants" element={<RestaurantsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

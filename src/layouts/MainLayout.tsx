@@ -15,7 +15,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     setLoggingOut(false);
   };
 
-  const isCurrent = (path: string) => location.pathname === path;
+  const isCurrent = (path: string) => location.pathname === path || (path === '/admin' && location.pathname.startsWith('/admin/'));
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">

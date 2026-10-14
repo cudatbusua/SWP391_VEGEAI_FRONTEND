@@ -1,28 +1,41 @@
-export interface Place { id: string; name: string; lat: number; lon: number; distance: number; address: string; vegan: boolean; hours?: string; }
+import { apiRequest } from './apiClient';
+
+export type PlaceCategory = 'ALL' | 'RESTAURANT' | 'SUPERMARKET' | 'GROCERY_STORE';
 export interface Coordinates { lat: number; lon: number; }
-function distance(a: Coordinates, b: Coordinates) {
-  const rad = (n: number) => n * Math.PI / 180;
-  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
+export interface Place {
+  id: string; name: string; lat: number; lon: number; distance: number; address: string;
+  category: PlaceCategory; rating?: number; openNow?: boolean; photoUrl?: string; googleMapsUrl?: string; isSample: boolean;
+}
+interface BackendPlace {
+  placeId: string; name: string; latitude: number; longitude: number; distanceKm?: number;
+  address?: string; category: PlaceCategory; rating?: number; isOpenNow?: boolean; openNow?: boolean;
+  photoUrl?: string; googleMapsUrl?: string;
+}
+function mapPlaces(values: BackendPlace[]): Place[] {
+  return values.filter(value => Number.isFinite(value.latitude) && Number.isFinite(value.longitude)).map(value => ({
+    id: value.placeId, name: value.name, lat: value.latitude, lon: value.longitude,
+    distance: value.distanceKm ?? 0, address: value.address || '', category: value.category,
+    rating: value.rating, openNow: value.isOpenNow ?? value.openNow, photoUrl: value.photoUrl, googleMapsUrl: value.googleMapsUrl,
+    isSample: value.placeId.startsWith('mock_'),
+  })).sort((a, b) => a.distance - b.distance);
 }
 export const restaurantService = {
-  async locate(query: string): Promise<Coordinates> {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?${new URLSearchParams({ q: query, format: 'jsonv2', limit: '1' })}`, { signal: AbortSignal.timeout(15000) });
-    if (!response.ok) throw new Error('Không thể tìm khu vực lúc này. Vui lòng thử lại sau.');
-    const data = await response.json() as { lat: string; lon: string }[];
-    if (!data.length) throw new Error('Không tìm thấy khu vực. Hãy nhập thêm quận hoặc thành phố.');
-    return { lat: Number(data[0].lat), lon: Number(data[0].lon) };
+  async categories(): Promise<{ category: PlaceCategory; displayName: string }[]> {
+    const response = await apiRequest<{ category: PlaceCategory; displayName: string }[]>('/places/categories', { auth: 'none' });
+    if (!response.data) throw new Error('Không thể tải danh mục địa điểm.');
+    return response.data;
   },
-  async nearby(center: Coordinates, radius: number): Promise<Place[]> {
-    const around = `around:${radius * 1000},${center.lat},${center.lon}`;
-    const query = `[out:json][timeout:25];(nwr[amenity~"^(restaurant|cafe|fast_food)$"]["diet:vegetarian"~"^(yes|only)$"](${around});nwr[amenity~"^(restaurant|cafe|fast_food)$"]["diet:vegan"~"^(yes|only)$"](${around});nwr[amenity~"^(restaurant|cafe|fast_food)$"][name~"chay|vegan|vegetarian",i](${around}););out center tags;`;
-    const response = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: new URLSearchParams({ data: query }), signal: AbortSignal.timeout(35000) });
-    if (!response.ok) throw new Error('Dịch vụ tìm quán đang bận. Bạn có thể mở Google Maps bên dưới.');
-    const data = await response.json() as { elements: { id: number; type: string; lat?: number; lon?: number; center?: Coordinates; tags?: Record<string, string> }[] };
-    return data.elements.flatMap(item => {
-      const point = item.center ?? { lat: item.lat!, lon: item.lon! };
-      if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon) || !item.tags?.name) return [];
-      return [{ id: `${item.type}-${item.id}`, name: item.tags.name, ...point, distance: distance(center, point), address: ['addr:housenumber', 'addr:street', 'addr:suburb', 'addr:city'].map(key => item.tags?.[key]).filter(Boolean).join(', '), vegan: ['yes', 'only'].includes(item.tags['diet:vegan']), hours: item.tags.opening_hours }];
-    }).sort((a, b) => a.distance - b.distance);
+  async search(query: string, center?: Coordinates, radius = 10): Promise<Place[]> {
+    const params = new URLSearchParams({ query: query.trim(), radius: String(radius * 1000) });
+    if (center) { params.set('lat', String(center.lat)); params.set('lng', String(center.lon)); }
+    const response = await apiRequest<BackendPlace[]>('/places/search?' + params, { auth: 'none', timeoutMs: 45000 });
+    if (!response.data) throw new Error('Không thể tìm địa điểm.');
+    return mapPlaces(response.data);
+  },
+  async nearby(center: Coordinates, radius: number, category: PlaceCategory = 'ALL'): Promise<Place[]> {
+    const params = new URLSearchParams({ lat: String(center.lat), lng: String(center.lon), radius: String(radius * 1000), category });
+    const response = await apiRequest<BackendPlace[]>('/places/nearby?' + params, { auth: 'none', timeoutMs: 45000 });
+    if (!response.data) throw new Error('Không thể tìm địa điểm quanh bạn.');
+    return mapPlaces(response.data);
   },
 };

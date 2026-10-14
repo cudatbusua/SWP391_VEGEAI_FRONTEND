@@ -34,10 +34,11 @@ export const DashboardPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           
           {/* Tabs */}
-          <div className="inline-flex p-1 bg-white border border-gray-200/80 rounded-2xl shadow-2xs">
+          <div className="inline-flex p-1 bg-white border border-gray-200/80 rounded-lg">
             <button
               onClick={() => handleTabChange('overview')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              aria-pressed={activeTab === 'overview'}
+              className={`px-4 py-2.5 rounded-md text-xs font-semibold transition cursor-pointer ${
                 activeTab === 'overview'
                   ? 'bg-emerald-50 text-emerald-800 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
@@ -48,7 +49,8 @@ export const DashboardPage: React.FC = () => {
 
             <button
               onClick={() => handleTabChange('profile')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              aria-pressed={activeTab === 'profile'}
+              className={`px-4 py-2.5 rounded-md text-xs font-semibold transition cursor-pointer ${
                 activeTab === 'profile'
                   ? 'bg-emerald-50 text-emerald-800 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
@@ -59,9 +61,9 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Date Picker / Today's Date */}
-          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-white border border-gray-200/80 px-4 py-2.5 rounded-2xl shadow-2xs self-start sm:self-auto">
+          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 py-2.5 self-start sm:self-auto">
             <Calendar className="w-4 h-4 text-emerald-600" />
-            <span>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            <span>{new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' })}</span>
           </div>
 
         </div>

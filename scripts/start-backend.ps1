@@ -1,5 +1,5 @@
 param(
-    [string]$BackendPath = 'D:\New folder (2)\SWP391_FA26_VEGEAI_PROJECT_THEVEGANCROCO',
+    [string]$BackendPath = 'D:\be\SWP391_FA26_VEGEAI_PROJECT_THEVEGANCROCO',
     [string]$JdkHome = 'C:\Program Files\Microsoft\jdk-21.0.12.101-hotspot'
 )
 
@@ -49,7 +49,7 @@ try {
     try {
         & '.\mvnw.cmd' '-version'
         if ($LASTEXITCODE -ne 0) { throw 'Không chạy được Maven với JDK đã chọn.' }
-        & '.\mvnw.cmd' 'spring-boot:run'
+        & '.\mvnw.cmd' 'spring-boot:run' '-Dspring-boot.run.jvmArguments=-Dspring.devtools.restart.enabled=false'
         if ($LASTEXITCODE -ne 0) { throw 'Backend khởi động thất bại. Kiểm tra log ở trên.' }
     } finally { Pop-Location }
 } finally {

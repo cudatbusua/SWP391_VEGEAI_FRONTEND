@@ -34,7 +34,9 @@ function setup(handler) {
   }
   return { context, calls, api: load('src/services/apiClient.ts'), auth: load('src/services/authService.ts').authService,
     users: load('src/services/userService.ts').userService, ai: load('src/services/aiService.ts').aiService,
-    restaurants: load('src/services/restaurantService.ts').restaurantService };
+    restaurants: load('src/services/restaurantService.ts').restaurantService,
+    recipes: load('src/services/recipeService.ts').recipeService,
+    blogs: load('src/services/blogService.ts').blogService };
 }
 const profile = { userId: 'user-1', username: 'member', email: 'member@example.com', fullName: 'Thành viên', role: 'USER', status: 'ACTIVE' };
 const auth = (token = 'token-1', expiresInSeconds = 900) => ({ ...profile, accessToken: token, tokenType: 'Bearer', expiresInSeconds });
@@ -42,30 +44,109 @@ const reply = (data, status = 200, message = 'OK', code = status) => ({ ok: stat
   json: async () => ({ success: status < 400, code, message, data }) });
 const hash = value => createHash('sha256').update(value).digest('hex');
 
-test('nearby restaurants maps node and way coordinates, skips missing locations and sorts by distance', async () => {
-  const fixture = setup(() => ({ ok: true, json: async () => ({ elements: [
-    { type: 'way', id: 1, center: { lat: 10.02, lon: 106 }, tags: { name: 'Quán xa', 'diet:vegan': 'only', 'addr:street': 'Đường A' } },
-    { type: 'node', id: 2, lat: 10.001, lon: 106, tags: { name: 'Quán gần' } },
-    { type: 'node', id: 3, tags: { name: 'Thiếu vị trí' } },
-  ] }) }));
-  const places = await fixture.restaurants.nearby({ lat: 10, lon: 106 }, 5);
-  assert.equal(places.length, 2);
-  assert.equal(places[0].name, 'Quán gần');
-  assert.equal(places[1].vegan, true);
-  assert.equal(places[1].address, 'Đường A');
-  assert.ok(places[0].distance < places[1].distance);
-  assert.match(fixture.calls[0].body.get('data'), /around:5000,10,106/);
+test('nearby places map backend coordinates and send radius in metres', async () => {
+  const fixture = setup(() => reply([
+    { placeId: 'far', name: 'Far', latitude: 10.02, longitude: 106, distanceKm: 2, category: 'RESTAURANT', isOpenNow: true },
+    { placeId: 'near', name: 'Near', latitude: 10.001, longitude: 106, distanceKm: 0.1, category: 'RESTAURANT' },
+    { placeId: 'invalid', name: 'Invalid' },
+  ]));
+  const places = await fixture.restaurants.nearby({ lat: 10, lon: 106 }, 5, 'RESTAURANT');
+  assert.equal(places.length, 2); assert.equal(places[0].name, 'Near'); assert.equal(places[1].openNow, true);
+  const url = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(url.pathname, '/api/places/nearby'); assert.equal(url.searchParams.get('radius'), '5000');
+  assert.equal(url.searchParams.get('lng'), '106'); assert.equal(url.searchParams.get('category'), 'RESTAURANT');
 });
 
-test('restaurant location lookup encodes text and reports no results or service failure', async () => {
-  const success = setup(() => ({ ok: true, json: async () => [{ lat: '10.5', lon: '106.5' }] }));
-  const point = await success.restaurants.locate('Quận 1 & trung tâm');
-  assert.equal(point.lat, 10.5);
-  assert.equal(new URL(success.calls[0].url).searchParams.get('q'), 'Quận 1 & trung tâm');
-  const empty = setup(() => ({ ok: true, json: async () => [] }));
-  await assert.rejects(empty.restaurants.locate('unknown'), /Không tìm thấy khu vực/);
-  const failure = setup(() => ({ ok: false }));
-  await assert.rejects(failure.restaurants.nearby({ lat: 10, lon: 106 }, 2), /đang bận/);
+test('place search encodes keywords and preserves backend errors', async () => {
+  const fixture = setup(() => reply([]));
+  assert.equal((await fixture.restaurants.search('Quận 1 & trung tâm', { lat: 10, lon: 106 }, 2)).length, 0);
+  const url = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(url.pathname, '/api/places/search');
+  assert.equal(url.searchParams.get('query'), 'Quận 1 & trung tâm'); assert.equal(url.searchParams.get('radius'), '2000');
+  const failure = setup(() => reply(null, 503, 'Places unavailable'));
+  await assert.rejects(failure.restaurants.nearby({ lat: 10, lon: 106 }, 2), /Places unavailable/);
+});
+
+test('recipe filter sends server pagination, inclusion, exclusion and sorting', async () => {
+  const page = { items: [{ recipeId: 'recipe-1', title: 'Tofu' }], page: 1, size: 12, totalElements: 14, totalPages: 2, first: false, last: true };
+  const fixture = setup(() => reply(page));
+  const filter = { page: 1, size: 12, keyword: 'tofu', includeTagCodes: ['VEGAN'], excludeTagCodes: ['GLUTEN'], inclusionMode: 'OR', sortBy: 'protein', sortDirection: 'desc', maxCookTime: 20 };
+  const result = await fixture.recipes.filter(filter);
+  assert.equal(result.totalElements, 14); assert.equal(fixture.calls[0].url, '/api/recipes/filter');
+  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), filter);
+});
+
+test('missing recipe reports 404 instead of substituting another recipe', async () => {
+  const fixture = setup(() => reply(null, 404, 'Recipe not found'));
+  await assert.rejects(fixture.recipes.detail('missing'), /Recipe not found/);
+  assert.equal(fixture.calls[0].url, '/api/recipes/missing');
+});
+
+test('fridge matching requires login and uses bearer authentication', async () => {
+  const fixture = setup(() => reply({ matchedRecipes: [], canCookNowCount: 0 }));
+  await assert.rejects(fixture.recipes.matchFridge(), /đăng nhập/);
+  assert.equal(fixture.calls.length, 0);
+  fixture.api.setSession(auth(), true);
+  await fixture.recipes.matchFridge();
+  assert.equal(fixture.calls[0].url, '/api/recipes/fridge-match?minMatchPercentage=50&limit=20');
+  assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
+});
+
+test('admin recipe and tag writes use the correct paths, DTOs and methods', async () => {
+  const fixture = setup(() => reply({ recipeId: 'recipe-1' }));
+  fixture.api.setSession(auth(), true);
+  const recipe = { title: 'Tofu', description: '', imageUrl: '', difficulty: 'EASY', status: 'DRAFT', ingredients: [{ name: 'Tofu', amount: 100, unit: 'g' }], instructions: ['Cook'], tagCodes: ['VEGAN'] };
+  await fixture.recipes.save(recipe);
+  await fixture.recipes.save({ ...recipe, status: 'PUBLISHED' }, 'recipe-1');
+  await fixture.recipes.remove('recipe-1');
+  await fixture.recipes.createTag({ code: 'VEGAN', name: 'Vegan', group: 'DIETARY_TYPE', description: '' });
+  await fixture.recipes.removeTag('tag-1');
+  assert.deepEqual(fixture.calls.map(call => call.method), ['POST', 'PUT', 'DELETE', 'POST', 'DELETE']);
+  assert.deepEqual(fixture.calls.map(call => call.url), ['/api/admin/recipes', '/api/admin/recipes/recipe-1', '/api/admin/recipes/recipe-1', '/api/admin/tags', '/api/admin/tags/tag-1']);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), recipe);
+  assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
+  const denied = setup(() => reply(null, 403, 'Admin only'));
+  denied.api.setSession(auth(), true);
+  await assert.rejects(denied.recipes.save(recipe), /Admin only/);
+  assert.equal(denied.calls.length, 1);
+});
+
+test('public blog browsing encodes filters and never sends an authenticated token', async () => {
+  const fixture = setup(() => reply({ items: [], totalElements: 0 }));
+  fixture.api.setSession(auth(), true);
+  await fixture.blogs.published({ keyword: 'chay & xanh', category: 'KITCHEN', page: 2 });
+  const url = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(url.pathname, '/api/blog/posts'); assert.equal(url.searchParams.get('keyword'), 'chay & xanh');
+  assert.equal(url.searchParams.get('category'), 'KITCHEN'); assert.equal(url.searchParams.get('page'), '2');
+  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+  const unpublished = setup(() => reply(null, 404, 'Resource not found'));
+  await assert.rejects(unpublished.blogs.publicPost('unpublished'), /Resource not found/);
+});
+
+test('blog drafts, edits, submission and withdrawal preserve the server revision', async () => {
+  const fixture = setup(() => reply({ postId: 'post-1', version: 4, status: 'DRAFT' }));
+  fixture.api.setSession(auth(), true);
+  const input = { title: 'Bữa chay', category: 'KITCHEN', content: 'Nội dung', coverImage: '/images/vegan-tofu-meal.png', excerpt: '', version: 3 };
+  await fixture.blogs.save(input); await fixture.blogs.save(input, 'post-1');
+  await fixture.blogs.submit('post-1', 4); await fixture.blogs.withdraw('post-1', 5); await fixture.blogs.remove('post-1', 6);
+  assert.deepEqual(fixture.calls.map(call => call.method), ['POST', 'PUT', 'POST', 'POST', 'DELETE']);
+  assert.deepEqual(fixture.calls.map(call => call.url), ['/api/blog/my-posts', '/api/blog/my-posts/post-1', '/api/blog/my-posts/post-1/submit', '/api/blog/my-posts/post-1/withdraw', '/api/blog/my-posts/post-1?version=6']);
+  assert.deepEqual(JSON.parse(fixture.calls[2].body), { version: 4 });
+  assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
+  const guest = setup(() => reply({}));
+  await assert.rejects(guest.blogs.save(input), /đăng nhập/); assert.equal(guest.calls.length, 0);
+});
+
+test('admin blog decisions include reason and exact revision; 403 is not retried', async () => {
+  const fixture = setup(() => reply({ postId: 'post-1', status: 'REJECTED' }));
+  fixture.api.setSession(auth(), true);
+  await fixture.blogs.queue('PENDING_REVIEW', 'chay', 0); await fixture.blogs.reviewPost('post-1');
+  await fixture.blogs.review('post-1', 7, 'REJECT', 'Bổ sung nội dung gốc');
+  assert.equal(fixture.calls[2].url, '/api/admin/blog/posts/post-1/review');
+  assert.deepEqual(JSON.parse(fixture.calls[2].body), { version: 7, decision: 'REJECT', reason: 'Bổ sung nội dung gốc' });
+  const denied = setup(() => reply(null, 403, 'Admin only')); denied.api.setSession(auth(), true);
+  await assert.rejects(denied.blogs.review('post-1', 7, 'APPROVE', ''), /Admin only/); assert.equal(denied.calls.length, 1);
 });
 
 test('login hashes the password, maps usernameOrEmail and keeps tokens out of storage', async () => {

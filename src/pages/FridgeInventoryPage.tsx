@@ -4,6 +4,7 @@ import { Plus, RefreshCw, Snowflake, Trash2 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { FridgeRecipeMatches } from '../components/FridgeRecipeMatches';
 import { useAuth } from '../hooks/useAuth';
 import { errorMessage } from '../services/apiClient';
 import { fridgeService } from '../services/fridgeService';
@@ -130,5 +131,6 @@ export function FridgeInventoryPage() {
           </article>)}</div>}
       </section>
     </div>
+    <FridgeRecipeMatches key={items.map(item => item.itemId + item.updatedAt + item.status).join(',')} />
   </div></MainLayout>;
 }

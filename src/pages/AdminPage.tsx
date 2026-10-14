@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { ShieldCheck, Search, Activity } from 'lucide-react';
+import { Link, Navigate } from 'react-router-dom';
+import { ShieldCheck, Search, Activity, BookOpen } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { AdminRecipeTools } from '../components/AdminRecipeTools';
 import { useAuth } from '../hooks/useAuth';
 import { adminService } from '../services/adminService';
 import { errorMessage } from '../services/apiClient';
@@ -52,7 +53,7 @@ export function AdminPage() {
   return <MainLayout><div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div><p className="text-xs font-bold text-emerald-700 uppercase">Super Admin Control Center</p><h1 className="text-3xl font-extrabold flex items-center gap-2"><ShieldCheck className="text-emerald-600" />Quản trị hệ thống</h1></div>
-      <Button variant="outline" onClick={load}>Làm mới</Button>
+      <div className="flex gap-3 items-center"><Link to="/admin/blog" className="inline-flex gap-2 items-center text-sm font-semibold text-emerald-700"><BookOpen size={17} /> Duyệt Blog</Link><Button variant="outline" onClick={load}>Làm mới</Button></div>
     </div>
     {error && <p role="alert" className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
     {message && <p role="status" className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">{message}</p>}
@@ -86,5 +87,6 @@ export function AdminPage() {
         <div className="bg-white border border-gray-200 rounded-3xl p-5 space-y-3"><h2 className="font-bold">AI Audit Logs</h2>{logs.slice(0, 6).map(log => <div key={log.logId} className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="font-semibold">{log.operation} · {log.model}</p><p className="text-gray-500">{log.status} · {log.latencyMs}ms · {log.userType}</p><p>{log.promptSummary}</p></div>)}</div>
       </section>
     </>}
+    <AdminRecipeTools />
   </div></MainLayout>;
 }

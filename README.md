@@ -87,7 +87,7 @@ SWP391_VEGEAI_FRONTEND/
 ### 4. Dashboard người dùng
 - Giao diện tổng quan cá nhân
 - Tab "Tổng quan cá nhân" và "Hồ sơ dinh dưỡng"
-- Dùng để mô phỏng trải nghiệm người dùng đã đăng nhập
+- Tổng quan hiển thị mục tiêu dinh dưỡng, công thức và tủ lạnh từ backend; lượng nước và ghi chú đi chợ lưu riêng trên trình duyệt theo tài khoản.
 
 ## Bắt đầu
 
@@ -179,7 +179,12 @@ Mặc định trình duyệt gọi `/api`, Vite proxy tới `http://localhost:80
 | Khôi phục phiên / làm mới token | `POST /api/auth/refresh` |
 | Đăng xuất | `POST /api/auth/logout` |
 | Quên / đặt lại mật khẩu | `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` |
-| Hồ sơ dinh dưỡng | `GET /api/users/me`, `PUT /api/users/me` |
+| Hồ sơ người dùng | `GET /api/users/me`, `PUT /api/users/me` |
+| Dinh dưỡng / tính mục tiêu | `/api/nutrition/profile`, `/api/nutrition/calculate`, `/api/nutrition/options` |
+| Công thức / lọc / chi tiết | `POST /api/recipes/filter`, `GET /api/recipes/tags`, `GET /api/recipes/{id}` |
+| Gợi ý món từ tủ lạnh | `GET /api/recipes/fridge-match` |
+| Tìm quán / siêu thị / cửa hàng | `/api/places/nearby`, `/api/places/search`, `/api/places/categories` |
+| Admin quản lý công thức / thẻ | `/api/admin/recipes`, `/api/admin/recipes/{id}`, `/api/admin/tags`, `/api/admin/tags/{id}` |
 | AI Bếp Trưởng (`/ai-chef`) | `POST /api/ai/chat` |
 | Quét Tủ Lạnh (`/fridge-scan`) | `POST /api/ai/fridge-scan` (multipart field `image`) |
 
@@ -193,7 +198,7 @@ AI hỗ trợ khách và người đã đăng nhập theo backend. Chat giữ `s
 
 ### Chạy backend
 
-Cần chạy dự án Spring Boot từ ZIP riêng, cấu hình PostgreSQL, Redis, SMTP để nhận OTP và Gemini để dùng AI theo README backend. Frontend không tự khởi động các dịch vụ này. Có thể mở Swagger tại `http://localhost:8081/swagger-ui.html` để kiểm tra backend.
+Cần chạy dự án Spring Boot cập nhật tại `D:\be\SWP391_FA26_VEGEAI_PROJECT_THEVEGANCROCO`, cấu hình PostgreSQL, Redis, SMTP để nhận OTP và Gemini để dùng AI theo README backend. Frontend không tự khởi động các dịch vụ này. Có thể mở Swagger tại `http://localhost:8081/swagger-ui.html` để kiểm tra backend. Script `scripts/start-backend.ps1` mặc định trỏ tới thư mục này.
 
 ### Xử lý lỗi 502 và Java runtime trên Windows
 
@@ -233,4 +238,14 @@ npm run build
 
 Kiểm tra tự động dùng phản hồi mô phỏng theo DTO backend để xác nhận request, SHA-256, OTP, session/cookie, Bearer, refresh đồng thời, lỗi/đăng xuất và multipart ảnh. Đây không phải kiểm thử end-to-end với PostgreSQL/SMTP/Gemini thật.
 
-Backend trong ZIP chưa có controller công thức, thực đơn tuần, nhật ký dinh dưỡng, danh sách đi chợ, blog hoặc nhà hàng. Các nội dung này vẫn là dữ liệu minh họa; dashboard có nhãn phân biệt. Google login chưa có API nên nút được vô hiệu hóa và ghi “Sắp ra mắt”. Không tạo các endpoint giả cho tính năng chưa có backend.
+Backend cập nhật đã hỗ trợ công thức, lọc phân trang, thẻ phân loại, so khớp tủ lạnh và địa điểm. Trang công thức đọc dữ liệu từ backend, có trạng thái tải/lỗi/rỗng; ID không tồn tại trả lỗi thay vì hiển thị món khác. Bộ lọc dùng thẻ từ máy chủ, AND/OR, loại trừ, thời gian, calo, đạm và độ khó.
+
+Trang `/fridge` có mục gợi ý món dựa trên nguyên liệu đang lưu. Trang `/admin` có biểu mẫu tạo/sửa/xóa công thức và tạo/xóa thẻ, yêu cầu quyền ADMIN. Để sửa công thức, lấy ID từ URL `/recipe/{id}` và tải vào biểu mẫu. API hiện không có danh sách riêng cho bản nháp/lưu trữ; giữ ID trả về khi lưu để tải lại các món này.
+
+Tìm quán gọi backend Google Places; bản đồ hiển thị vẫn dùng OpenStreetMap. Backend tự sinh địa điểm dự phòng khi thiếu/lỗi khóa Google Maps. Những kết quả có ID `mock_` được gắn nhãn dữ liệu mẫu, cần kiểm tra trước khi đến. Khóa dịch vụ chỉ lưu ở backend.
+
+Dashboard hiển thị mục tiêu dinh dưỡng từ `/api/nutrition/profile`, trạng thái tủ lạnh từ `/api/fridge/summary` và công thức từ API lọc. Chưa có hồ sơ thì hiển thị trạng thái trống và liên kết thiết lập, không dùng số liệu dinh dưỡng giả. Theo dõi nước và ghi chú đi chợ lưu trong localStorage theo tài khoản; chưa đồng bộ sang thiết bị khác.
+
+Blog đã kết nối API với luồng bản nháp → chờ duyệt → xuất bản/từ chối. Người dùng viết tại `/blog/write`, quản lý tại `/blog/my-posts`; admin duyệt tại `/admin/blog`. Chỉ bài đã duyệt xuất hiện trên Blog công khai. Xem `docs/blog-workflow.md` để biết API và quy tắc sửa/gửi lại.
+
+Thực đơn tuần, nhật ký ăn uống, danh sách đi chợ đồng bộ và lưu công thức chưa có API trong bản backend này. Google login chưa có API. Kiểm thử tự động dùng fixture cho các màn hình yêu cầu đăng nhập; không ghi hoặc xóa dữ liệu thật khi kiểm thử. Prompt và đường dẫn ba ảnh món ăn mới nằm trong `docs/ui-image-update.md`.

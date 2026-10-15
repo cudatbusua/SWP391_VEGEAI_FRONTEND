@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowUp, ChefHat, Leaf, Plus, ScanLine, Sparkles, Soup, Timer, Utensils, Loader2 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { aiService } from '../services/aiService';
@@ -13,8 +13,13 @@ const suggestions = [
   { icon: Leaf, title: 'Đổi vị cho ngày hôm nay', text: 'Gợi ý 3 món chay Việt Nam để đổi vị, ưu tiên nguyên liệu dễ mua.' },
 ];
 function Chat() {
+  const location = useLocation();
   const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string }[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => {
+    const ingredients: unknown = location.state?.ingredients;
+    const names = Array.isArray(ingredients) ? ingredients.filter((name): name is string => typeof name === 'string' && !!name.trim()).slice(0, 20).map(name => name.slice(0, 60)) : [];
+    return names.length ? `Tôi có ${names.join(', ')}. Gợi ý món chay phù hợp, kèm định lượng và các bước nấu.` : '';
+  });
   const [lastResponse, setLastResponse] = useState<AiChatResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -28,7 +33,8 @@ function Chat() {
     const message = input.trim();
     setMessages(previous => [...previous, { sender: 'user', text: message }]); setInput('');
     try {
-      const response = await aiService.chat(message, lastResponse?.sessionId);
+      const history = messages.slice(-10).map(item => ({ role: item.sender === 'user' ? 'user' as const : 'model' as const, text: item.text.slice(0, 4000) }));
+      const response = await aiService.chat(message, lastResponse?.sessionId, history);
       setMessages(previous => [...previous, { sender: 'ai', text: response.reply }]); setLastResponse(response);
     } catch (reason) {
       setError(errorMessage(reason)); setInput(message); setMessages(previous => previous.slice(0, -1));

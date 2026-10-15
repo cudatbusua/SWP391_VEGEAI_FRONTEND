@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Leaf, Bell } from 'lucide-react';
+import { Leaf, Bell, Menu, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import '../styles/navigation.css';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated, logout, sessionError, retrySession } = useAuth();
   const location = useLocation();
   const [logoutError, setLogoutError] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
+  const [mobileMenu, setMobileMenu] = useState(false);
+  useEffect(() => setMobileMenu(false), [location.pathname]);
   const handleLogout = async () => {
     setLoggingOut(true); setLogoutError('');
     const result = await logout();
@@ -15,10 +18,17 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     setLoggingOut(false);
   };
 
-  const isCurrent = (path: string) => location.pathname === path || (path === '/admin' && location.pathname.startsWith('/admin/'));
+  const isCurrent = (path: string) => location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'));
+  const navItems = [
+    ...(isAuthenticated ? [['/dashboard', 'Trang chủ']] : []),
+    ['/', 'Khám phá'], ['/ai-chef', 'AI Bếp Trưởng'], ['/fridge-scan', 'Quét Tủ Lạnh'],
+    ...(isAuthenticated ? [['/fridge', 'Kho Tủ']] : []),
+    ['/nutrition', 'Dinh dưỡng'], ['/blog', 'Blog'], ['/videos', 'Video'], ['/questions', 'Hỏi đáp'], ['/restaurants', 'Quán chay gần đây'],
+    ...(user?.role === 'admin' ? [['/admin', 'Admin']] : []),
+  ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
+    <div className="vegeai-layout min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
       
       {sessionError && <div role="alert" className="bg-amber-50 p-3 text-sm text-center text-amber-900">
         {sessionError} <button onClick={retrySession} className="underline ml-2">Thử lại</button>
@@ -30,9 +40,10 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
           {/* Logo */}
-          <div className="flex items-center gap-8">
-            <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2 text-slate-800 font-bold text-xl tracking-tight">
-              <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
+          <div className="flex items-center gap-1.5 lg:gap-8">
+            <button type="button" className="sm:hidden p-1 text-gray-600" title={mobileMenu ? 'Đóng menu' : 'Mở menu'} aria-label={mobileMenu ? 'Đóng menu' : 'Mở menu'} aria-expanded={mobileMenu} aria-controls="main-mobile-navigation" onClick={() => setMobileMenu(value => !value)}>{mobileMenu ? <X size={21} /> : <Menu size={21} />}</button>
+            <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2 text-slate-800 font-bold text-lg sm:text-xl tracking-tight">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
                 <Leaf className="w-5 h-5 text-emerald-600" />
               </div>
               <span>VEGEAI</span>
@@ -93,24 +104,24 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           </div>
 
           {/* Auth Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {!isAuthenticated ? (
               <>
                 <Link
                   to="/login"
-                  className="px-3 sm:px-5 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
+                  className="px-2 sm:px-5 py-2 text-xs sm:text-sm whitespace-nowrap font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
                 >
                   Đăng nhập
                 </Link>
                 <Link
                   to="/register"
-                  className="px-3 sm:px-5 py-2 text-xs sm:text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition cursor-pointer shadow-2xs"
+                  className="px-2 sm:px-5 py-2 text-xs sm:text-sm whitespace-nowrap font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition cursor-pointer shadow-2xs"
                 >
                   Đăng ký
                 </Link>
               </>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {/* Notification Bell */}
                 <button
                   onClick={() => alert('Thông báo: AI đã gợi ý thực đơn bữa tối cho bạn!')}
@@ -129,7 +140,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                   <div className="w-9 h-9 rounded-full bg-[#005f3e] text-white flex items-center justify-center font-bold text-sm shadow-2xs">
                     {user?.name?.charAt(0) || 'M'}
                   </div>
-                  <span className="text-xs font-bold text-gray-800 hidden sm:inline">
+                  <span className="text-xs font-bold text-gray-800 hidden sm:block max-w-[160px] truncate" title={user?.name}>
                     {user?.name || 'Nguyễn Hoàng Minh'}
                   </span>
                 </Link>
@@ -137,7 +148,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                 <button
                   onClick={handleLogout}
                   disabled={loggingOut}
-                  className="text-xs text-red-500 hover:underline cursor-pointer ml-1 font-medium"
+                  className="text-xs whitespace-nowrap text-red-500 hover:underline cursor-pointer ml-1 font-medium"
                 >
                   {loggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
                 </button>
@@ -146,15 +157,10 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           </div>
 
         </div>
-        <nav aria-label="Điều hướng chính" className="flex gap-5 px-4 sm:px-6 py-3 border-t border-gray-100 text-sm font-medium text-gray-600 overflow-x-auto max-w-7xl mx-auto">
-          {[
-            ...(isAuthenticated ? [['/dashboard', 'Trang chủ']] : []),
-            ['/', 'Khám phá'], ['/ai-chef', 'AI Bếp Trưởng'], ['/fridge-scan', 'Quét Tủ Lạnh'],
-            ...(isAuthenticated ? [['/fridge', 'Kho Tủ']] : []),
-            ['/nutrition', 'Dinh dưỡng'], ['/blog', 'Blog'], ['/restaurants', 'Quán chay gần đây'],
-            ...(user?.role === 'admin' ? [['/admin', 'Admin']] : []),
-          ].map(([path, label]) => <Link key={path} to={path} aria-current={isCurrent(path) || (path === '/blog' && location.pathname.startsWith('/blog/')) ? 'page' : undefined} className={`shrink-0 hover:text-emerald-700 ${isCurrent(path) || (path === '/blog' && location.pathname.startsWith('/blog/')) ? 'text-emerald-700 font-bold' : ''}`}>{label}</Link>)}
+        <nav aria-label="Điều hướng chính" className={`site-navigation ${mobileMenu ? 'is-collapsed' : ''}`}>
+          {navItems.map(([path, label]) => <Link key={path} to={path} aria-current={isCurrent(path) ? 'page' : undefined} className={`shrink-0 hover:text-emerald-700 ${isCurrent(path) ? 'text-emerald-700 font-bold' : ''}`}>{label}</Link>)}
         </nav>
+        {mobileMenu && <nav id="main-mobile-navigation" aria-label="Điều hướng mở rộng" className="site-mobile-navigation sm:hidden grid grid-cols-2 gap-x-4 gap-y-1 px-5 py-4 border-t border-gray-100 text-gray-600">{navItems.map(([path, label]) => <Link key={path} to={path} onClick={() => setMobileMenu(false)} aria-current={isCurrent(path) ? 'page' : undefined} className={`py-2 ${isCurrent(path) ? 'text-emerald-700 font-bold' : ''}`}>{label}</Link>)}</nav>}
       </header>
 
       {/* Page Content */}

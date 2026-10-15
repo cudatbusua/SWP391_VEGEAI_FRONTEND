@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Camera, Clock, ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal, X, Leaf, ArrowUpRight, CheckCheck, Soup, Zap } from 'lucide-react';
+import { Search, Camera, Clock, ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal, X, Leaf, ArrowUpRight, CheckCheck, Soup, Zap, Play, MessageCircle, BookOpen } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { RecipeCard } from '../components/RecipeCard';
 import '../styles/discovery.css';
@@ -66,10 +66,10 @@ export function RecipeDiscoveryPage() {
     <section className="discovery-cover">
       <img src="/images/vietnamese-vegan-table.png" alt="Mâm cơm chay Việt Nam với đậu phụ, nấm, gỏi cuốn và rau xanh" fetchPriority="high" />
       <div className="discovery-cover-shade" />
-      <div className="discovery-cover-content"><span className="discovery-eyebrow"><Leaf size={15} /> VEGEAI / BẾP XANH MỖI NGÀY</span><h1>Công thức món chay</h1><p>Một chút cảm hứng cho bữa ăn xanh của bạn.</p><Link to="/fridge-scan" className="discovery-scan"><Camera size={17} /> Quét nguyên liệu <ArrowUpRight size={16} /></Link></div>
+      <div className="discovery-cover-content"><span className="discovery-eyebrow"><Leaf size={17} /> BẾP XANH MỖI NGÀY</span><h1>VEGEAI</h1><p>Món chay ngon, bữa ăn lành.<br />Cảm hứng từ căn bếp Việt của bạn.</p><div className="discovery-hero-actions"><a href="#cong-thuc" className="discovery-scan">Khám phá công thức <ArrowUpRight size={18} /></a><Link to="/fridge-scan" className="discovery-hero-secondary"><Camera size={18} /> Quét nguyên liệu</Link></div></div>
     </section>
     <div className="discovery-shell">
-      <div className="discovery-toolbar">
+      <div className="discovery-toolbar" id="cong-thuc">
         <label className="discovery-search"><Search size={20} /><input aria-label="Tìm công thức" value={keyword} onChange={event => { setKeyword(event.target.value); setPage(0); }} placeholder="Hôm nay bạn muốn nấu món gì?" />{keyword && <button title="Xóa tìm kiếm" aria-label="Xóa tìm kiếm" onClick={() => { setKeyword(''); setPage(0); }}><X size={16} /></button>}</label>
         <Link to="/ai-chef" className="discovery-chef"><Zap size={17} /> Hỏi AI Bếp Trưởng <ArrowUpRight size={16} /></Link>
       </div>
@@ -80,7 +80,7 @@ export function RecipeDiscoveryPage() {
           <div className="discovery-filter-heading"><h2><SlidersHorizontal size={16} /> Bộ lọc</h2><button onClick={reset}>Đặt lại</button></div>
           <label className="discovery-field">Kết hợp thẻ<select value={mode} onChange={event => { setMode(event.target.value as 'AND' | 'OR'); setPage(0); }}><option value="AND">Tất cả thẻ đã chọn</option><option value="OR">Bất kỳ thẻ đã chọn</option></select></label>
           {tagError && <p role="alert" className="discovery-error">{tagError}</p>}
-          {Object.entries(tags).map(([group, values]) => values?.length ? <details key={group} open={group === 'dietaryType' || group === 'nutritionGoal'} className="discovery-filter-group"><summary>{groups[group] || group}<span>{values.length}</span></summary><div>{values.map(tag => <label key={tag.code} className="discovery-checkbox"><input type="checkbox" checked={included.includes(tag.code)} onChange={() => toggle(tag.code, false)} /><span>{tag.name}</span></label>)}</div></details> : null)}
+          {Object.entries(tags).map(([group, values]) => values?.length ? <details key={group} open={group === 'dietaryType'} className="discovery-filter-group"><summary>{groups[group] || group}<span>{values.length}</span></summary><div>{values.map(tag => <label key={tag.code} className="discovery-checkbox"><input type="checkbox" checked={included.includes(tag.code)} onChange={() => toggle(tag.code, false)} /><span>{tag.name}</span></label>)}</div></details> : null)}
           <details className="discovery-filter-group"><summary>Thời gian & dinh dưỡng</summary><div className="discovery-numeric"><label className="discovery-field">Thời gian tối đa (phút)<input type="number" min="1" value={time} onChange={event => { setTime(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Calo tối đa<input type="number" min="1" value={calories} onChange={event => { setCalories(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Đạm tối thiểu (g)<input type="number" min="0" value={protein} onChange={event => { setProtein(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Độ khó<select value={difficulty} onChange={event => { setDifficulty(event.target.value); setPage(0); }}><option value="">Tất cả</option><option value="EASY">Dễ</option><option value="MEDIUM">Vừa</option><option value="HARD">Khó</option></select></label></div></details>
           <details className="discovery-filter-group"><summary>Loại trừ thẻ</summary><div>{availableTags.map(tag => <label key={tag.code} className="discovery-checkbox"><input type="checkbox" aria-label={'Loại trừ ' + tag.name} checked={excluded.includes(tag.code)} onChange={() => toggle(tag.code, true)} /><span>{tag.name}</span></label>)}</div></details>
           <div className="discovery-sidebar-note"><CheckCheck size={18} /><div><strong>Nấu ngon, ăn lành</strong><p>Kiểm tra thành phần để chọn món phù hợp với chế độ ăn của bạn.</p></div></div>
@@ -93,6 +93,11 @@ export function RecipeDiscoveryPage() {
           {!loading && !error && !data?.items.length && <div role="status" className="discovery-empty"><Soup size={36} /><h3>Chưa có món phù hợp</h3><p>Thử đổi từ khóa hoặc giảm bớt bộ lọc.</p><button onClick={reset}>Đặt lại bộ lọc</button></div>}
           {!error && <div className={'recipe-grid ' + (loading && data ? 'is-loading' : '')}>{data?.items.map(recipe => <RecipeCard key={recipe.recipeId} recipe={recipe} />)}</div>}
           {data && data.totalPages > 1 && <nav aria-label="Phân trang công thức" className="discovery-pagination"><button title="Trang trước" aria-label="Trang trước" disabled={loading || data.first} onClick={() => setPage(value => value - 1)}><ChevronLeft size={20} /></button><span>Trang {data.page + 1} / {data.totalPages}</span><button title="Trang sau" aria-label="Trang sau" disabled={loading || data.last} onClick={() => setPage(value => value + 1)}><ChevronRight size={20} /></button></nav>}
+      <section className="discovery-journal" aria-labelledby="discovery-journal-title"><div className="discovery-journal-heading"><span className="discovery-section-label">CHUYỆN TỪ CĂN BẾP</span><h2 id="discovery-journal-title">Thêm cảm hứng, thêm vị ngon</h2><p>Cùng nấu, cùng chia sẻ một lối sống xanh.</p></div><div className="discovery-journal-grid">
+        <Link to="/videos"><div className="discovery-journal-photo"><img src="/images/tofu-tomato.png" alt="Đậu phụ sốt cà chua với rau thơm" loading="lazy" /><span><Play size={19} /></span></div><div><small>VIDEO BẾP CHAY</small><h3>Vào bếp cùng nhau <ArrowUpRight size={19} /></h3><p>Xem video, tìm cảm hứng cho bữa ăn tiếp theo.</p></div></Link>
+        <Link to="/blog"><div className="discovery-journal-photo"><img src="/images/vegan-tofu-meal.png" alt="Bữa ăn thực vật với đậu phụ và rau củ" loading="lazy" /><span><BookOpen size={19} /></span></div><div><small>BLOG CỘNG ĐỒNG</small><h3>Chuyện bếp, chuyện xanh <ArrowUpRight size={19} /></h3><p>Đọc những chia sẻ và kể câu chuyện của bạn.</p></div></Link>
+        <Link to="/questions"><div className="discovery-journal-photo"><img src="/images/fresh-vegetables.png" alt="Rau củ tươi nhiều màu sắc" loading="lazy" /><span><MessageCircle size={19} /></span></div><div><small>HỎI & ĐÁP</small><h3>Bạn hỏi, bếp trả lời <ArrowUpRight size={19} /></h3><p>Gửi thắc mắc về nấu ăn và dinh dưỡng thực vật.</p></div></Link>
+      </div></section>
         </section>
       </div>
     </div>

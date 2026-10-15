@@ -20,6 +20,12 @@ import { MyBlogPostsPage } from './pages/MyBlogPostsPage';
 import { BlogPostStatusPage } from './pages/BlogPostStatusPage';
 import { AdminBlogPage } from './pages/AdminBlogPage';
 import { RestaurantsPage } from './pages/RestaurantsPage';
+import { QuestionsPage, QuestionDetailPage } from './pages/QuestionsPage';
+import { VideosPage } from './pages/VideosPage';
+import { VideoDetailPage } from './pages/VideoDetailPage';
+import { AdminQuestionsPage, AdminQuestionDetailPage } from './pages/AdminQuestionsPage';
+import { AdminVideosPage } from './pages/AdminVideosPage';
+import { AdminVideoEditorPage } from './pages/AdminVideoEditorPage';
 
 export const App: React.FC = () => {
   return (
@@ -48,6 +54,18 @@ export const App: React.FC = () => {
           <Route path="/admin/blog" element={<AdminBlogPage />} />
           <Route path="/admin/blog/:id" element={<BlogPostStatusPage adminMode />} />
           <Route path="/restaurants" element={<RestaurantsPage />} />
+          <Route path="/questions" element={<QuestionsPage />} />
+          <Route path="/questions/mine" element={<QuestionsPage mine />} />
+          <Route path="/questions/mine/:id" element={<QuestionDetailPage mine />} />
+          <Route path="/questions/:id" element={<QuestionDetailPage />} />
+          <Route path="/videos" element={<VideosPage />} />
+          <Route path="/videos/saved" element={<VideosPage saved />} />
+          <Route path="/videos/:id" element={<VideoDetailPage />} />
+          <Route path="/admin/questions" element={<AdminQuestionsPage />} />
+          <Route path="/admin/questions/:id" element={<AdminQuestionDetailPage />} />
+          <Route path="/admin/videos" element={<AdminVideosPage />} />
+          <Route path="/admin/videos/new" element={<AdminVideoEditorPage />} />
+          <Route path="/admin/videos/:id/edit" element={<AdminVideoEditorPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

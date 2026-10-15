@@ -248,4 +248,6 @@ Dashboard hiển thị mục tiêu dinh dưỡng từ `/api/nutrition/profile`, 
 
 Blog đã kết nối API với luồng bản nháp → chờ duyệt → xuất bản/từ chối. Người dùng viết tại `/blog/write`, quản lý tại `/blog/my-posts`; admin duyệt tại `/admin/blog`. Chỉ bài đã duyệt xuất hiện trên Blog công khai. Xem `docs/blog-workflow.md` để biết API và quy tắc sửa/gửi lại.
 
+Hỏi đáp tại `/questions` và Video tại `/videos` đã nối API database. User gửi/theo dõi câu hỏi, bình luận và lưu video; admin quản lý tại `/admin/questions` và `/admin/videos`. Có tìm kiếm, phân trang, xác nhận xóa và xử lý version khi cập nhật. Xem `docs/community-screens.md` để biết đầy đủ các màn hình và kiểm tra.
+
 Thực đơn tuần, nhật ký ăn uống, danh sách đi chợ đồng bộ và lưu công thức chưa có API trong bản backend này. Google login chưa có API. Kiểm thử tự động dùng fixture cho các màn hình yêu cầu đăng nhập; không ghi hoặc xóa dữ liệu thật khi kiểm thử. Prompt và đường dẫn ba ảnh món ăn mới nằm trong `docs/ui-image-update.md`.

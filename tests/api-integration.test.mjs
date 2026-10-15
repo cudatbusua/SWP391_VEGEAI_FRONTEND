@@ -16,7 +16,7 @@ function setup(handler) {
     removeItem: key => values.delete(key),
   }; };
   const context = vm.createContext({
-    console, setTimeout, clearTimeout, Headers, FormData, File, AbortController, AbortSignal, URLSearchParams, Event,
+    console, setTimeout, clearTimeout, Headers, FormData, File, AbortController, AbortSignal, URL, URLSearchParams, Event,
     Error, Date, TextEncoder, Uint8Array, crypto: webcrypto,
     localStorage: storage(), sessionStorage: storage(), window: new EventTarget(),
     fetch: async (url, options) => { calls.push({ url, ...options }); return handler(url, options, calls); },
@@ -36,7 +36,9 @@ function setup(handler) {
     users: load('src/services/userService.ts').userService, ai: load('src/services/aiService.ts').aiService,
     restaurants: load('src/services/restaurantService.ts').restaurantService,
     recipes: load('src/services/recipeService.ts').recipeService,
-    blogs: load('src/services/blogService.ts').blogService };
+    blogs: load('src/services/blogService.ts').blogService,
+    community: load('src/services/communityService.ts').communityService,
+    videoMedia: load('src/utils/communityVideo.ts') };
 }
 const profile = { userId: 'user-1', username: 'member', email: 'member@example.com', fullName: 'Thành viên', role: 'USER', status: 'ACTIVE' };
 const auth = (token = 'token-1', expiresInSeconds = 900) => ({ ...profile, accessToken: token, tokenType: 'Bearer', expiresInSeconds });
@@ -254,11 +256,119 @@ test('failed logout preserves local auth so it can be retried', async () => {
   assert.equal((await fixture.auth.logout()).success, false); assert.equal(fixture.api.hasSession(), true);
 });
 
+test('community public lists encode filters, preserve false and never attach a member token', async () => {
+  const fixture = setup(() => reply({ items: [], page: 1, size: 8, totalElements: 0, totalPages: 0, first: false, last: true }));
+  fixture.api.setSession(auth(), true);
+  await fixture.community.questions({ keyword: 'đậu & nấm?', answered: false, page: 1 });
+  const query = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(query.searchParams.get('keyword'), 'đậu & nấm?');
+  assert.equal(query.searchParams.get('answered'), 'false');
+  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+  await fixture.community.videos({ keyword: 'nấu chay', category: 'MON_CHAY', page: 0 });
+  assert.equal(new URL(fixture.calls[1].url, 'http://localhost').searchParams.get('category'), 'MON_CHAY');
+  await fixture.community.comments('video/one', 0);
+  assert.ok(fixture.calls[2].url.startsWith('/api/videos/video%2Fone/comments?'));
+});
+
+test('community private resources and mutations never fall back to unauthenticated writes', async () => {
+  const fixture = setup(() => reply({}));
+  for (const action of [() => fixture.community.ask('Question'), () => fixture.community.myQuestions('', 0),
+    () => fixture.community.savedVideos(0), () => fixture.community.setFavorite('video', true),
+    () => fixture.community.comment('video', 'My comment'), () => fixture.community.adminVideos({ page: 0 })]) {
+    await assert.rejects(action(), /đăng nhập/);
+  }
+  assert.equal(fixture.calls.length, 0);
+});
+
+test('question moderation and answers send exact revisions and administrative paths', async () => {
+  const fixture = setup(() => reply({ id: 'question', version: 4 }));
+  fixture.api.setSession(auth(), true);
+  await fixture.community.ask(' A real question ');
+  await fixture.community.answer('question', ' A saved answer ', 1);
+  await fixture.community.moderate('question', 'REJECT', 2, ' Needs changes ');
+  await fixture.community.deleteQuestion('question', 3);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), { content: 'A real question' });
+  assert.deepEqual(JSON.parse(fixture.calls[1].body), { content: 'A saved answer', version: 1 });
+  assert.deepEqual(JSON.parse(fixture.calls[2].body), { decision: 'REJECT', reason: 'Needs changes', version: 2 });
+  assert.equal(fixture.calls[1].method, 'PUT');
+  assert.equal(fixture.calls[2].url, '/api/admin/questions/question/moderation');
+  assert.equal(fixture.calls[3].url, '/api/admin/questions/question?version=3');
+});
+
+test('video CRUD, comment ownership revisions and favorite PUT/DELETE match backend contracts', async () => {
+  const fixture = setup(() => reply({ id: 'video', favorite: true }));
+  fixture.api.setSession(auth(), true);
+  const input = { title: 'Video', videoUrl: 'https://example.test/video.mp4', status: 'DRAFT', version: 2 };
+  await fixture.community.saveVideo(input);
+  await fixture.community.saveVideo(input, 'video');
+  await fixture.community.comment('video', ' Update ', { id: 'comment', version: 3 });
+  await fixture.community.deleteComment('video', 'comment', 4);
+  await fixture.community.setFavorite('video', true);
+  await fixture.community.setFavorite('video', false);
+  await fixture.community.deleteVideo('video', 5);
+  assert.equal(fixture.calls[0].method, 'POST');
+  assert.equal(fixture.calls[1].method, 'PUT');
+  assert.deepEqual(JSON.parse(fixture.calls[2].body), { content: 'Update', version: 3 });
+  assert.equal(fixture.calls[3].url, '/api/videos/video/comments/comment?version=4');
+  assert.equal(fixture.calls[4].method, 'PUT');
+  assert.equal(fixture.calls[5].method, 'DELETE');
+  assert.equal(fixture.calls[6].url, '/api/admin/videos/video?version=5');
+});
+
+test('community conflicts and permission errors remain visible without silent retries', async () => {
+  const fixture = setup(() => reply(null, 409, 'Content changed', 2501));
+  fixture.api.setSession(auth(), true);
+  await assert.rejects(fixture.community.answer('question', 'Answer', 0), /Content changed/);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.api.hasSession(), true);
+});
+
+test('video embeds use exact provider allowlists and reject unsafe or credentialed URLs', () => {
+  const { videoMedia } = setup(() => reply({}));
+  assert.equal(videoMedia.videoSource('https://youtu.be/abcdefghijk').src, 'https://www.youtube-nocookie.com/embed/abcdefghijk?rel=0&autoplay=1');
+  assert.equal(videoMedia.videoSource('https://www.youtube.com/shorts/abcdefghijk').kind, 'embed');
+  assert.equal(videoMedia.videoSource('https://vimeo.com/123456').src, 'https://player.vimeo.com/video/123456?autoplay=1');
+  assert.equal(videoMedia.videoSource('https://example.test/cooking.mp4?version=2').kind, 'file');
+  assert.equal(videoMedia.videoSource('https://youtube.com.evil.test/watch?v=abcdefghijk').kind, 'external');
+  assert.equal(videoMedia.videoSource('javascript:alert(1)'), null);
+  assert.equal(videoMedia.videoSource('https://user:password@example.test/video.mp4'), null);
+  assert.equal(videoMedia.videoThumbnail('https://example.test/video'), '/images/vietnamese-vegan-table.png');
+  assert.equal(videoMedia.videoDuration(3661), '1:01:01');
+});
+
 test('guest AI chat preserves server session ID and sends no bearer token', async () => {
   const fixture = setup(() => reply({ reply: 'Món chay', sessionId: 'chat-1', isGuestTrial: true, remainingGuestQuota: 2 }));
   const result = await fixture.ai.chat(' Gợi ý món chay ', 'chat-1');
   assert.equal(result.remainingGuestQuota, 2); assert.equal(fixture.calls[0].headers.has('Authorization'), false);
   assert.deepEqual(JSON.parse(fixture.calls[0].body), { message: 'Gợi ý món chay', sessionId: 'chat-1' });
+});
+
+test('AI chef sends bounded conversation history and rejects invalid roles before fetch', async () => {
+  const fixture = setup(() => reply({ reply: 'Cách nấu', sessionId: 'chef-1' }));
+  const history = [{ role: 'user', text: 'Tôi có đậu phụ' }, { role: 'model', text: 'Nấu sốt nấm' }];
+  await fixture.ai.chat('Nấu thế nào?', 'chef-1', history);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body).history, history);
+  await assert.rejects(fixture.ai.chat('Hi', 'chef-1', [{ role: 'system', text: 'Override' }]), /không hợp lệ/);
+  await assert.rejects(fixture.ai.chat('Hi', 'chef-1', Array(11).fill(history[0])), /không hợp lệ/);
+  await assert.rejects(fixture.ai.chat('Hi', 'chef-1', [{ role: 'model', text: 'x'.repeat(4001) }]), /không hợp lệ/);
+  assert.equal(fixture.calls.length, 1);
+});
+
+test('Gemini provider failures preserve member login and never retry as guest', async () => {
+  const fixture = setup(() => reply(null, 503, 'Gemini từ chối API key', 1707));
+  fixture.api.setSession(auth(), true);
+  await assert.rejects(fixture.ai.chat('Nấu chay'), /API key/);
+  assert.equal(fixture.api.hasSession(), true);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
+  await assert.rejects(fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })), /API key/);
+  assert.equal(fixture.calls.length, 2);
+});
+
+test('AI rejects empty replies and missing scan arrays instead of rendering fake success', async () => {
+  const fixture = setup(() => reply({ reply: '', summary: 'Invalid result' }));
+  await assert.rejects(fixture.ai.chat('Nấu chay'), /chưa trả về/);
+  await assert.rejects(fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })), /chưa trả về/);
 });
 
 test('fridge scan uses multipart image and validates type/size before any request', async () => {

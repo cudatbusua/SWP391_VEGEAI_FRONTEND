@@ -10,7 +10,7 @@ export const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const requestedPath: unknown = location.state?.from;
-  const destination = typeof requestedPath === 'string' && /^\/(?:blog|admin\/blog)(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
+  const destination = typeof requestedPath === 'string' && /^\/(?:blog|questions|videos|admin\/(?:blog|questions|videos))(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
     ? requestedPath : '/dashboard';
 
   const [formData, setFormData] = useState({

@@ -65,7 +65,7 @@ export function OverviewTab() {
     setShopping(previous => [...previous, { id: crypto.randomUUID(), name: itemName.trim(), checked: false }]); setItemName('');
   };
   return <div className="dashboard-overview">
-    <div className="dashboard-greeting"><div><span className="dashboard-eyebrow">KHÔNG GIAN CỦA BẠN</span><h1>Chào {user?.name || 'bạn'}, hôm nay ăn xanh nhé!</h1><p>Một bữa ngon, một thói quen tốt.</p></div><Link to="/ai-chef" className="dashboard-assistant"><ChefHat size={19} /> Hỏi AI Bếp Trưởng <ArrowUpRight size={17} /></Link></div>
+    <div className="dashboard-greeting"><div><span className="dashboard-eyebrow"><Leaf size={15} /> CĂN BẾP CỦA BẠN</span><h1>Chào {user?.name || 'bạn'}!</h1><p>Hôm nay, mình ăn xanh nhé.</p></div><Link to="/ai-chef" className="dashboard-assistant"><ChefHat size={19} /> Hỏi AI Bếp Trưởng <ArrowUpRight size={17} /></Link></div>
     {errors.length > 0 && <div role="alert" className="dashboard-error">{[...new Set(errors)].map(message => <p key={message}>{message}</p>)}<button onClick={() => setAttempt(value => value + 1)}><RefreshCw size={15} /> Thử lại</button></div>}
     <section className="dashboard-targets"><div className="dashboard-section-heading"><h2>Mục tiêu mỗi ngày</h2><Link to="/nutrition">Điều chỉnh <ArrowUpRight size={15} /></Link></div>
       <div className="dashboard-stats">{stats.map(stat => <div key={stat.label} className={'dashboard-stat ' + stat.color}><div>{stat.icon}<span>{stat.label}</span></div><p>{loading ? '--' : stat.value != null ? Math.round(stat.value).toLocaleString('vi-VN') : '--'}<span>{stat.unit}</span></p><div className="dashboard-stat-line" /></div>)}</div>

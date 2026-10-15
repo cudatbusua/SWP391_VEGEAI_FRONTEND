@@ -38,6 +38,10 @@ export type UpdateUserProfile = Partial<Pick<UserProfile,
   'fullName' | 'phoneNumber' | 'dateOfBirth' | 'gender' | 'address' |
   'dietaryPreferences' | 'allergies' | 'heightCm' | 'weightKg' | 'dailyCalorieTarget'
 >>;
+export interface AiChatMessage {
+  role: 'user' | 'model';
+  text: string;
+}
 export interface AiChatResponse {
   reply: string;
   sessionId: string;

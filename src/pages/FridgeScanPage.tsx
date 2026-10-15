@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera, ChefHat } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
 import { aiService } from '../services/aiService';
@@ -46,7 +47,7 @@ export function FridgeScanPage() {
     <form onSubmit={scan} className="bg-white rounded-3xl border border-gray-200 p-6 space-y-4">
       <label htmlFor="fridge-image" className="block text-sm font-semibold">Ảnh JPG, PNG hoặc WEBP (tối đa 5 MB)</label>
       <input id="fridge-image" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => {
-        setImage(event.target.files?.[0] || null); setResult(null); setError('');
+        setImage(event.target.files?.[0] || null); setResult(null); setError(''); setMessage('');
       }} className="block w-full text-sm file:mr-4 file:rounded-xl file:border-0 file:bg-emerald-50 file:p-3 file:text-emerald-800" />
       {preview && <img src={preview} alt="Ảnh nguyên liệu đã chọn" className="max-h-80 rounded-2xl object-contain mx-auto" />}
       {error && <p role="alert" className="text-red-600 text-sm">{error}</p>}
@@ -65,7 +66,11 @@ export function FridgeScanPage() {
         {item.storageTip && <p className="text-emerald-800">{item.storageTip}</p>}
       </article>)}</div>
       {!!result.suggestedRecipes?.length && <div><h3 className="font-bold mb-2">Món chay được gợi ý</h3><ul className="list-disc pl-5">{result.suggestedRecipes.map((recipe, index) => <li key={index}>{recipe}</li>)}</ul></div>}
-      {isAuthenticated && <Button type="button" isLoading={saving} onClick={saveToFridge}>Lưu nguyên liệu vào tủ lạnh</Button>}
+      {!result.ingredients.length && <p className="text-sm text-gray-500">Không nhận diện được nguyên liệu. Bạn có thể chọn ảnh rõ hơn và thử lại.</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        {isAuthenticated && !!result.ingredients.length && <Button type="button" isLoading={saving} onClick={saveToFridge}>Lưu nguyên liệu vào tủ lạnh</Button>}
+        {result.ingredients.some(item => item.isVegetarian && item.freshness !== 'SPOILED') && <Link to="/ai-chef" state={{ ingredients: result.ingredients.filter(item => item.isVegetarian && item.freshness !== 'SPOILED').map(item => item.name) }} className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 border border-emerald-200 rounded-lg px-4 py-3"><ChefHat size={18} /> Gợi ý cách nấu</Link>}
+      </div>
     </section>}
   </div></MainLayout>;
 }

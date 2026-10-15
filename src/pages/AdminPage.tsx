@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { ShieldCheck, Search, Activity, BookOpen } from 'lucide-react';
+import { ShieldCheck, Search, Activity, BookOpen, CircleHelp, Video } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -53,7 +53,7 @@ export function AdminPage() {
   return <MainLayout><div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div><p className="text-xs font-bold text-emerald-700 uppercase">Super Admin Control Center</p><h1 className="text-3xl font-extrabold flex items-center gap-2"><ShieldCheck className="text-emerald-600" />Quản trị hệ thống</h1></div>
-      <div className="flex gap-3 items-center"><Link to="/admin/blog" className="inline-flex gap-2 items-center text-sm font-semibold text-emerald-700"><BookOpen size={17} /> Duyệt Blog</Link><Button variant="outline" onClick={load}>Làm mới</Button></div>
+      <div className="flex flex-wrap gap-4 items-center"><Link to="/admin/blog" className="inline-flex gap-2 items-center text-sm font-semibold text-emerald-700"><BookOpen size={17} /> Duyệt Blog</Link><Link to="/admin/questions" className="inline-flex gap-2 items-center text-sm font-semibold text-emerald-700"><CircleHelp size={17} /> Hỏi đáp</Link><Link to="/admin/videos" className="inline-flex gap-2 items-center text-sm font-semibold text-emerald-700"><Video size={17} /> Video</Link><Button variant="outline" onClick={load}>Làm mới</Button></div>
     </div>
     {error && <p role="alert" className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}
     {message && <p role="status" className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-800">{message}</p>}

@@ -9,7 +9,7 @@ export interface Place {
 interface BackendPlace {
   placeId: string; name: string; latitude: number; longitude: number; distanceKm?: number;
   address?: string; category: PlaceCategory; rating?: number; isOpenNow?: boolean; openNow?: boolean;
-  photoUrl?: string; googleMapsUrl?: string;
+  photoUrl?: string; googleMapsUrl?: string; isVerified?: boolean;
 }
 function mapPlaces(values: BackendPlace[]): Place[] {
   return values.filter(value => Number.isFinite(value.latitude) && Number.isFinite(value.longitude)).map(value => ({
@@ -18,6 +18,12 @@ function mapPlaces(values: BackendPlace[]): Place[] {
     rating: value.rating, openNow: value.isOpenNow ?? value.openNow, photoUrl: value.photoUrl, googleMapsUrl: value.googleMapsUrl,
     isSample: value.placeId.startsWith('mock_'),
   })).sort((a, b) => a.distance - b.distance);
+}
+function mapVerifiedRestaurants(values: BackendPlace[]): Place[] {
+  return mapPlaces(values.filter(value =>
+    value.isVerified === true
+    && value.category === 'RESTAURANT'
+    && !value.placeId.startsWith('mock_')));
 }
 export const restaurantService = {
   async categories(): Promise<{ category: PlaceCategory; displayName: string }[]> {
@@ -37,5 +43,20 @@ export const restaurantService = {
     const response = await apiRequest<BackendPlace[]>('/places/nearby?' + params, { auth: 'none', timeoutMs: 45000 });
     if (!response.data) throw new Error('Không thể tìm địa điểm quanh bạn.');
     return mapPlaces(response.data);
+  },
+  // Dedicated map feed: the backend returns only Google-classified restaurant candidates, never demo fallback data.
+  async verifiedRestaurantsNearby(center: Coordinates, radius = 5): Promise<Place[]> {
+    const params = new URLSearchParams({ lat: String(center.lat), lng: String(center.lon), radius: String(radius * 1000) });
+    const response = await apiRequest<BackendPlace[]>('/places/verified/nearby?' + params, { auth: 'none', timeoutMs: 45000 });
+    if (!response.data) throw new Error('Máy chủ không trả về danh sách quán chay đã lọc.');
+    return mapVerifiedRestaurants(response.data);
+  },
+  // Search feed applies the same strict verification rule as nearby map results.
+  async searchVerifiedRestaurants(query: string, center?: Coordinates, radius = 10): Promise<Place[]> {
+    const params = new URLSearchParams({ query: query.trim(), radius: String(radius * 1000) });
+    if (center) { params.set('lat', String(center.lat)); params.set('lng', String(center.lon)); }
+    const response = await apiRequest<BackendPlace[]>('/places/verified/search?' + params, { auth: 'none', timeoutMs: 45000 });
+    if (!response.data) throw new Error('Máy chủ không trả về kết quả quán chay đã lọc.');
+    return mapVerifiedRestaurants(response.data);
   },
 };

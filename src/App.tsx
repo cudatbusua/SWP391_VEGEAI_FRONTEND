@@ -16,6 +16,7 @@ import { AdminPage } from './pages/AdminPage';
 import { MealPlansPage } from './pages/MealPlansPage';
 import { AdminRecipesPage } from './pages/AdminRecipesPage';
 import { PersonalFeatureBoundary } from './components/PersonalFeatureBoundary';
+import { AdminFeatureBoundary } from './components/AdminFeatureBoundary';
 import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { BlogPage, BlogDetailPage } from './pages/BlogPage';
@@ -51,30 +52,30 @@ export const App: React.FC = () => {
           <Route path="/nutrition" element={<PersonalFeatureBoundary><NutritionCalculatorPage /></PersonalFeatureBoundary>} />
           <Route path="/meal-plans" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
           <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/admin/users" element={<AdminPage accountsOnly />} />
-          <Route path="/admin/recipes" element={<AdminRecipesPage />} />
+          <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
+          <Route path="/admin/recipes" element={<AdminFeatureBoundary><AdminRecipesPage /></AdminFeatureBoundary>} />
           <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/write" element={<BlogEditorPage />} />
-          <Route path="/blog/my-posts" element={<MyBlogPostsPage />} />
-          <Route path="/blog/my-posts/:id/edit" element={<BlogEditorPage />} />
-          <Route path="/blog/my-posts/:id" element={<BlogPostStatusPage />} />
+          <Route path="/blog/write" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />
+          <Route path="/blog/my-posts" element={<PersonalFeatureBoundary><MyBlogPostsPage /></PersonalFeatureBoundary>} />
+          <Route path="/blog/my-posts/:id/edit" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />
+          <Route path="/blog/my-posts/:id" element={<PersonalFeatureBoundary><BlogPostStatusPage /></PersonalFeatureBoundary>} />
           <Route path="/blog/:id" element={<BlogDetailPage />} />
-          <Route path="/admin/blog" element={<AdminBlogPage />} />
-          <Route path="/admin/blog/:id" element={<BlogPostStatusPage adminMode />} />
+          <Route path="/admin/blog" element={<AdminFeatureBoundary><AdminBlogPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/blog/:id" element={<AdminFeatureBoundary><BlogPostStatusPage adminMode /></AdminFeatureBoundary>} />
           <Route path="/restaurants" element={<RestaurantsPage />} />
           <Route path="/questions" element={<QuestionsPage />} />
-          <Route path="/questions/mine" element={<QuestionsPage mine />} />
-          <Route path="/questions/mine/:id" element={<QuestionDetailPage mine />} />
+          <Route path="/questions/mine" element={<PersonalFeatureBoundary><QuestionsPage mine /></PersonalFeatureBoundary>} />
+          <Route path="/questions/mine/:id" element={<PersonalFeatureBoundary><QuestionDetailPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/:id" element={<QuestionDetailPage />} />
-          <Route path="/videos" element={<VideosPage />} />
-          <Route path="/videos/saved" element={<VideosPage saved />} />
-          <Route path="/videos/:id" element={<VideoDetailPage />} />
-          <Route path="/admin/questions" element={<AdminQuestionsPage />} />
-          <Route path="/admin/questions/:id" element={<AdminQuestionDetailPage />} />
-          <Route path="/admin/videos" element={<AdminVideosPage />} />
-          <Route path="/admin/videos/new" element={<AdminVideoEditorPage />} />
-          <Route path="/admin/videos/:id/edit" element={<AdminVideoEditorPage />} />
+          <Route path="/videos" element={<PersonalFeatureBoundary><VideosPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/saved" element={<PersonalFeatureBoundary><VideosPage saved /></PersonalFeatureBoundary>} />
+          <Route path="/videos/:id" element={<PersonalFeatureBoundary><VideoDetailPage /></PersonalFeatureBoundary>} />
+          <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/videos" element={<AdminFeatureBoundary><AdminVideosPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/videos/new" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/videos/:id/edit" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

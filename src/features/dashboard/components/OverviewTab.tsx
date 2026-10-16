@@ -1,456 +1,93 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Sparkles,
-  Camera,
-  ShoppingBag,
-  Check,
-  Plus,
-  ArrowRight,
-  Bookmark,
-  Droplets,
-  ExternalLink,
-  Leaf
-} from 'lucide-react';
+import { ArrowUpRight, Camera, ChefHat, Droplets, Plus, Minus, RotateCcw, ShoppingBag, X, Snowflake, Flame, Wheat, Activity, Leaf, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useDemoState } from '../../../hooks/useDemoState';
-import { RECIPES } from '../../../data/mockData';
+import { recipeService } from '../../../services/recipeService';
+import { nutritionService } from '../../../services/nutritionService';
+import { fridgeService } from '../../../services/fridgeService';
+import { ApiError, errorMessage } from '../../../services/apiClient';
+import { RecipeCard } from '../../../components/RecipeCard';
+import { SavedMealPlans } from '../../../components/SavedMealPlans';
+import type { RecipeSummary } from '../../../types/recipe';
+import type { FridgeSummary, NutritionProfile } from '../../../types/api';
+import '../../../styles/discovery.css';
+import '../../../styles/dashboard.css';
 
-export const OverviewTab: React.FC = () => {
+type ShoppingItem = { id: string; name: string; checked: boolean };
+function readLocal<T>(key: string, fallback: T, validate: (value: unknown) => boolean): T {
+  try { const value = JSON.parse(localStorage.getItem(key) || 'null'); return validate(value) ? value : fallback; }
+  catch { return fallback; }
+}
+
+export function OverviewTab() {
   const { user } = useAuth();
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const [hydration, setHydration] = useDemoState('hydration-tracker', { date: todayKey, milliliters: 1200 });
-  const waterMl = hydration.date === todayKey ? hydration.milliliters : 0;
-  const [shoppingItems, setShoppingItems] = useDemoState('grocery-list', [
-    { id: 1, name: 'Đậu hũ non', amount: '2 miếng', checked: false },
-    { id: 2, name: 'Cà chua chín', amount: '4 quả', checked: false },
-    { id: 3, name: 'Rau cải xanh', amount: '1 bó', checked: true },
-    { id: 4, name: 'Gạo lứt', amount: '500 g', checked: false }
-  ]);
-  const [savedRecipes, setSavedRecipes] = useDemoState<string[]>('saved-recipes', []);
-
-  const handleAddWater = () => {
-    // Hydration is a local demo counter and automatically starts a fresh count on a new date.
-    setHydration({ date: todayKey, milliliters: Math.min(3000, waterMl + 250) });
+  const [recipes, setRecipes] = useState<RecipeSummary[]>([]);
+  const [nutrition, setNutrition] = useState<NutritionProfile | null>(null);
+  const [fridge, setFridge] = useState<FridgeSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [attempt, setAttempt] = useState(0);
+  const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const waterKey = 'vegeai:water:' + user?.id + ':' + day;
+  const shoppingKey = 'vegeai:shopping:' + user?.id;
+  const [waterMl, setWaterMl] = useState(() => readLocal(waterKey, 0, value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5000));
+  const [shopping, setShopping] = useState<ShoppingItem[]>(() => readLocal(shoppingKey, [], value => Array.isArray(value) && value.every(item => item && typeof item.id === 'string' && typeof item.name === 'string' && typeof item.checked === 'boolean')));
+  const [itemName, setItemName] = useState('');
+  useEffect(() => {
+    const controller = new AbortController(); setLoading(true); setErrors([]);
+    Promise.allSettled([
+      nutritionService.getProfile(controller.signal),
+      fridgeService.summary(),
+      recipeService.filter({ page: 0, size: 3, sortBy: 'protein', sortDirection: 'desc' }, controller.signal),
+    ]).then(([profileResult, fridgeResult, recipeResult]) => {
+      if (controller.signal.aborted) return;
+      const nextErrors: string[] = [];
+      if (profileResult.status === 'fulfilled') setNutrition(profileResult.value);
+      else if (!(profileResult.reason instanceof ApiError && profileResult.reason.status === 404)) nextErrors.push(errorMessage(profileResult.reason));
+      if (fridgeResult.status === 'fulfilled') setFridge(fridgeResult.value);
+      else nextErrors.push(errorMessage(fridgeResult.reason));
+      if (recipeResult.status === 'fulfilled') setRecipes(recipeResult.value.items);
+      else nextErrors.push(errorMessage(recipeResult.reason));
+      setErrors(nextErrors); setLoading(false);
+    });
+    return () => controller.abort();
+  }, [user?.id, attempt]);
+  useEffect(() => { localStorage.setItem(waterKey, JSON.stringify(waterMl)); }, [waterKey, waterMl]);
+  useEffect(() => { localStorage.setItem(shoppingKey, JSON.stringify(shopping)); }, [shoppingKey, shopping]);
+  const targets = nutrition?.targets;
+  const stats = [
+    { label: 'Năng lượng', value: targets?.dailyCaloriesTarget, unit: 'kcal', icon: <Flame size={18} />, color: 'energy' },
+    { label: 'Chất đạm', value: targets?.proteinTargetG, unit: 'g', icon: <Activity size={18} />, color: 'protein' },
+    { label: 'Tinh bột', value: targets?.carbsTargetG, unit: 'g', icon: <Wheat size={18} />, color: 'carbs' },
+    { label: 'Chất xơ', value: targets?.fiberTargetG, unit: 'g', icon: <Leaf size={18} />, color: 'fiber' },
+  ];
+  const addShoppingItem = (event: React.FormEvent) => {
+    event.preventDefault(); if (!itemName.trim()) return;
+    setShopping(previous => [...previous, { id: crypto.randomUUID(), name: itemName.trim(), checked: false }]); setItemName('');
   };
-
-  const toggleShoppingItem = (id: number) => {
-    setShoppingItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, checked: !item.checked } : item))
-    );
-  };
-
-  const toggleSaveRecipe = (id: string) => {
-    setSavedRecipes((currentIds) => currentIds.includes(id)
-      ? currentIds.filter((savedId) => savedId !== id)
-      : [...currentIds, id]);
-  };
-
-  const checkedCount = shoppingItems.filter((i) => i.checked).length;
-
-  return (
-    <div className="space-y-8 animate-in fade-in duration-200">
-      
-      {/* Greeting Header (Image 1) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-            Chào {user?.name || 'bạn'}, hôm nay mình ăn xanh nhé!
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Một ngày đủ chất, nhẹ nhàng — gợi ý sẽ cá nhân hóa theo hồ sơ dinh dưỡng của bạn.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:items-end">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Vegan • Thuần chay</span>
-          </div>
-          <span className="text-xs text-gray-400 mt-1">Duy trì cân nặng & sức khỏe</span>
-        </div>
+  return <div className="dashboard-overview">
+    <div className="dashboard-greeting"><div><span className="dashboard-eyebrow"><Leaf size={15} /> CĂN BẾP CỦA BẠN</span><h1>Chào {user?.name || 'bạn'}!</h1><p>Hôm nay, mình ăn xanh nhé.</p></div><Link to="/ai-chef" className="dashboard-assistant"><ChefHat size={19} /> Hỏi AI Bếp Trưởng <ArrowUpRight size={17} /></Link></div>
+    {errors.length > 0 && <div role="alert" className="dashboard-error">{[...new Set(errors)].map(message => <p key={message}>{message}</p>)}<button onClick={() => setAttempt(value => value + 1)}><RefreshCw size={15} /> Thử lại</button></div>}
+    <section className="dashboard-targets"><div className="dashboard-section-heading"><h2>Mục tiêu mỗi ngày</h2><Link to="/nutrition">Điều chỉnh <ArrowUpRight size={15} /></Link></div>
+      <div className="dashboard-stats">{stats.map(stat => <div key={stat.label} className={'dashboard-stat ' + stat.color}><div>{stat.icon}<span>{stat.label}</span></div><p>{loading ? '--' : stat.value != null ? Math.round(stat.value).toLocaleString('vi-VN') : '--'}<span>{stat.unit}</span></p><div className="dashboard-stat-line" /></div>)}</div>
+      {!loading && !nutrition && <p className="dashboard-setup">Bạn chưa thiết lập mục tiêu dinh dưỡng. <Link to="/nutrition">Tạo hồ sơ <ArrowUpRight size={13} /></Link></p>}
+    </section>
+    <div className="dashboard-columns">
+      <div className="dashboard-main">
+        <SavedMealPlans />
+        <section><div className="dashboard-section-heading"><div><span className="dashboard-eyebrow">MÓN NGON TỪ THỰC VẬT</span><h2>Cảm hứng cho bữa ăn</h2></div><Link to="/">Khám phá thêm <ArrowUpRight size={15} /></Link></div>
+          <div className="dashboard-food-banner"><img src="/images/vietnamese-vegan-table.png" alt="Bữa cơm chay với gỏi cuốn, đậu phụ và rau xanh" /><div><span>BẾP XANH VIỆT NAM</span><h3>Bữa chay trọn vị.</h3><Link to="/">Chọn món cho hôm nay <ArrowUpRight size={16} /></Link></div></div>
+          {loading && <p role="status" className="dashboard-muted">Đang tìm món ngon...</p>}
+          <div className="recipe-grid dashboard-recipe-grid">{recipes.map(recipe => <RecipeCard key={recipe.recipeId} recipe={recipe} />)}</div>
+          {!loading && !recipes.length && <p className="dashboard-muted">Chưa có công thức. <Link to="/">Khám phá món chay</Link></p>}
+        </section>
+        <section className="dashboard-fridge"><div className="dashboard-section-heading"><h2><Snowflake size={18} /> Tủ lạnh của bạn</h2><Link to="/fridge">Mở tủ lạnh <ArrowUpRight size={15} /></Link></div><div className="dashboard-fridge-data"><div><strong>{fridge?.totalActiveItems ?? '--'}</strong><span>Nguyên liệu đang có</span></div><div><strong className="text-emerald-700">{fridge?.freshCount ?? '--'}</strong><span>Còn tươi</span></div><div><strong className="text-amber-700">{fridge?.expiringSoonCount ?? '--'}</strong><span>Nên dùng sớm</span></div></div>{fridge?.urgentWarnings?.slice(0, 2).map(warning => <p className="dashboard-warning" key={warning}>{warning}</p>)}</section>
       </div>
-
-      {/* Section 1: Dinh dưỡng hôm nay (Image 1) */}
-      <div className="bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xs">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-gray-900">Dinh dưỡng hôm nay</h2>
-          <Link to="/onboarding" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer">
-            <span>Xem nhật ký</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-6 items-center">
-          
-          {/* Circular Chart: 58% đã nạp */}
-          <div className="lg:col-span-3 flex items-center gap-4">
-            <div className="relative w-20 h-20 shrink-0">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-gray-100"
-                  strokeWidth="3.5"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-emerald-600 transition-all duration-700"
-                  strokeDasharray="58, 100"
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-base font-extrabold text-gray-900 leading-none">58%</span>
-                <span className="text-[10px] text-gray-400 mt-0.5">đã nạp</span>
-              </div>
-            </div>
-
-            <div>
-              <div className="text-xs text-gray-400 font-medium">Năng lượng đã nạp</div>
-              <div className="text-2xl font-extrabold text-gray-900 leading-tight">1,250 <span className="text-xs font-normal text-gray-500">kcal</span></div>
-              <div className="text-[11px] text-gray-400">Mục tiêu 2,150 kcal / ngày</div>
-              <div className="text-xs font-semibold text-emerald-600 mt-0.5">Còn 900 kcal cho hôm nay</div>
-            </div>
-          </div>
-
-          {/* Đạm thực vật */}
-          <div className="lg:col-span-2 space-y-1.5">
-            <div className="text-xs text-gray-500 font-medium">Đạm thực vật</div>
-            <div className="text-xl font-bold text-gray-900">
-              72 <span className="text-xs text-gray-400 font-normal">/ 134 g</span>
-            </div>
-            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-emerald-600 h-full rounded-full" style={{ width: '54%' }} />
-            </div>
-            <div className="text-[11px] text-gray-400">54% mục tiêu</div>
-          </div>
-
-          {/* Tinh bột */}
-          <div className="lg:col-span-2 space-y-1.5">
-            <div className="text-xs text-gray-500 font-medium">Tinh bột</div>
-            <div className="text-xl font-bold text-gray-900">
-              154 <span className="text-xs text-gray-400 font-normal">/ 268 g</span>
-            </div>
-            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-amber-500 h-full rounded-full" style={{ width: '57%' }} />
-            </div>
-            <div className="text-[11px] text-gray-400">57% mục tiêu</div>
-          </div>
-
-          {/* Chất béo */}
-          <div className="lg:col-span-2 space-y-1.5">
-            <div className="text-xs text-gray-500 font-medium">Chất béo</div>
-            <div className="text-xl font-bold text-gray-900">
-              41 <span className="text-xs text-gray-400 font-normal">/ 60 g</span>
-            </div>
-            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-              <div className="bg-teal-600 h-full rounded-full" style={{ width: '68%' }} />
-            </div>
-            <div className="text-[11px] text-gray-400">68% mục tiêu</div>
-          </div>
-
-          {/* Nước uống */}
-          <div className="lg:col-span-3 bg-gray-50 border border-gray-100 rounded-2xl p-3.5 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
-                <Droplets className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] text-gray-400 font-medium">Nước uống</div>
-                <div className="text-sm font-bold text-gray-900">
-                  {(waterMl / 1000).toFixed(1)} <span className="text-xs text-gray-400 font-normal">/ 2 lít</span>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={handleAddWater}
-              className="px-2.5 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-700 rounded-lg shadow-2xs transition cursor-pointer flex items-center gap-1"
-            >
-              <Plus className="w-3.5 h-3.5 text-emerald-600" />
-              <span>+ 250 ml</span>
-            </button>
-          </div>
-
-        </div>
-
-        {/* Bottom Banner tip */}
-        <div className="mt-6 pt-4 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-600">
-          <Leaf className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>
-            Bạn đang đi đúng hướng. Bổ sung đậu lăng vào bữa tối để tăng đạm thực vật và giữ cân bằng dinh dưỡng.
-          </span>
-        </div>
-      </div>
-
-      {/* Main Grid: Left 8 cols / Right 4 cols (Image 1) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
-        {/* Left Column (8 cols) */}
-        <div className="lg:col-span-8 space-y-8">
-          
-          {/* Bữa ăn của bạn hôm nay */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xs">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900">Bữa ăn của bạn hôm nay</h2>
-              <button className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer">
-                <span>Kế hoạch tuần</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              
-              {/* Meal 1: Bữa sáng */}
-              <div className="rounded-2xl border border-gray-100 overflow-hidden bg-gray-50 flex flex-col justify-between">
-                <div>
-                  <div className="p-3 pb-2 flex items-center justify-between text-xs text-gray-500">
-                    <span className="font-bold text-gray-700">Bữa sáng</span>
-                    <span>07:30</span>
-                  </div>
-                  <div className="aspect-[16/10] overflow-hidden bg-gray-200">
-                    <img
-                      src="https://images.unsplash.com/photo-1517673132405-a56a62b18caf?auto=format&fit=crop&w=600&q=80"
-                      alt="Yến mạch chuối & chia"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-3">
-                    <h3 className="text-xs font-bold text-gray-900 line-clamp-1 mb-1">
-                      Yến mạch chuối & chia
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="p-3 pt-0 flex items-center justify-between text-xs">
-                  <span className="font-semibold text-gray-700">450 kcal</span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                    <Check className="w-3 h-3" /> Đã ăn
-                  </span>
-                </div>
-              </div>
-
-              {/* Meal 2: Bữa trưa */}
-              <div className="rounded-2xl border border-gray-100 overflow-hidden bg-gray-50 flex flex-col justify-between">
-                <div>
-                  <div className="p-3 pb-2 flex items-center justify-between text-xs text-gray-500">
-                    <span className="font-bold text-gray-700">Bữa trưa</span>
-                    <span>12:00</span>
-                  </div>
-                  <div className="aspect-[16/10] overflow-hidden bg-gray-200">
-                    <img
-                      src="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80"
-                      alt="Salad bơ quinoa"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-3">
-                    <h3 className="text-xs font-bold text-gray-900 line-clamp-1 mb-1">
-                      Salad bơ quinoa
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="p-3 pt-0 flex items-center justify-between text-xs">
-                  <span className="font-semibold text-gray-700">650 kcal</span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                    <Check className="w-3 h-3" /> Đã ăn
-                  </span>
-                </div>
-              </div>
-
-              {/* Meal 3: Bữa tối */}
-              <div className="rounded-2xl border border-gray-100 overflow-hidden bg-gray-50 flex flex-col justify-between">
-                <div>
-                  <div className="p-3 pb-2 flex items-center justify-between text-xs text-gray-500">
-                    <span className="font-bold text-gray-700">Bữa tối</span>
-                    <span>18:30</span>
-                  </div>
-                  <div className="aspect-[16/10] overflow-hidden bg-gray-200">
-                    <img
-                      src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80"
-                      alt="Cơm gạo lứt cuộn rong biển"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-3">
-                    <h3 className="text-xs font-bold text-gray-900 line-clamp-1 mb-1">
-                      Cơm gạo lứt cuộn rong biển
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="p-3 pt-0 flex items-center justify-between text-xs">
-                  <span className="font-semibold text-gray-700">700 kcal</span>
-                  <span className="text-[11px] font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md">
-                    Sắp tới
-                  </span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Bữa phụ footer */}
-            <div className="mt-5 p-3.5 bg-gray-50 rounded-2xl flex flex-col sm:flex-row items-center justify-between text-xs text-gray-600 gap-2">
-              <div className="flex items-center gap-2">
-                <Leaf className="w-4 h-4 text-emerald-600" />
-                <span>Bữa phụ: Sữa đậu nành & trái cây • Đã ăn 150 / 350 kcal</span>
-              </div>
-              <span className="font-bold text-emerald-800">2,150 kcal / ngày</span>
-            </div>
-          </div>
-
-          {/* Gợi ý dành riêng cho Minh */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-              <h2 className="text-lg font-bold text-gray-900">Gợi ý dành riêng cho Minh</h2>
-              <Link to="/" className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1">
-                <span>Khám phá thêm</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            <div className="text-xs text-gray-500 flex items-center gap-1.5 mb-6">
-              <Check className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Thuần chay • Đã lọc Đậu phộng (Lạc), Hải sản chay giả và Nấm mỡ</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              {RECIPES.slice(0, 3).map((recipe) => (
-                <article key={recipe.id} className="rounded-2xl border border-gray-100 overflow-hidden bg-white hover:shadow-md transition">
-                  <div className="relative aspect-[16/11] bg-gray-100 overflow-hidden">
-                    <Link to={`/recipe/${recipe.id}`}><img src={recipe.image} alt={recipe.title} className="w-full h-full object-cover hover:scale-105 transition duration-500" /></Link>
-                    <button
-                      type="button"
-                      aria-label={savedRecipes.includes(recipe.id) ? `Bỏ lưu ${recipe.title}` : `Lưu ${recipe.title}`}
-                      onClick={() => toggleSaveRecipe(recipe.id)}
-                      className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-gray-700 flex items-center justify-center shadow-xs"
-                    >
-                      <Bookmark className={`w-4 h-4 ${savedRecipes.includes(recipe.id) ? 'text-emerald-600 fill-emerald-600' : ''}`} />
-                    </button>
-                  </div>
-                  <div className="p-4">
-                    <Link to={`/recipe/${recipe.id}`} className="font-bold text-gray-900 text-xs mb-1 line-clamp-1 hover:text-emerald-700">{recipe.title}</Link>
-                    <div className="text-[11px] text-gray-400 mb-3">{recipe.badge} · {recipe.difficulty}</div>
-                    <div className="flex items-center justify-between text-[11px] font-medium text-gray-600 pt-2 border-t border-gray-50">
-                      <span>{recipe.calories} kcal</span>
-                      <span>{recipe.protein} g đạm</span>
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-gray-400 mt-1">
-                      <span>⏱ {recipe.cookTime} phút</span>
-                      <span>1 khẩu phần</span>
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-
-          </div>
-
-        </div>
-
-        {/* Right Column (4 cols) (Image 1) */}
-        <div className="lg:col-span-4 space-y-6">
-          
-          {/* Card 1: AI Bếp Trưởng (Dark green) */}
-          <div className="bg-[#03543f] text-white rounded-3xl p-6 sm:p-7 shadow-sm relative overflow-hidden">
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-300 mb-3">
-              <Sparkles className="w-4 h-4" />
-              <span>AI Bếp Trưởng</span>
-            </div>
-
-            <h3 className="text-xl font-extrabold mb-2 leading-snug">
-              Tối nay ăn gì? Để AI giúp bạn.
-            </h3>
-
-            <p className="text-xs text-emerald-100/90 leading-relaxed mb-6 font-light">
-              Gợi ý món thuần chay từ nguyên liệu sẵn có, phù hợp mục tiêu và dị ứng của bạn.
-            </p>
-
-            <Link
-              to="/ai-assistant"
-              className="w-full py-3 bg-white text-[#03543f] hover:bg-emerald-50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-2xs"
-            >
-              <span>Trò chuyện với AI</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          {/* Card 2: Quét Tủ Lạnh */}
-          <Link
-            to="/ai-assistant"
-            className="bg-white rounded-3xl border border-gray-100 p-6 shadow-2xs hover:shadow-md transition group flex items-start justify-between"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <Camera className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 group-hover:text-emerald-700 transition">
-                  Quét Tủ Lạnh
-                </h3>
-                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                  Chụp nguyên liệu, tìm món ngon. Tận dụng những gì bạn đang có.
-                </p>
-              </div>
-            </div>
-
-            <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 transition shrink-0 ml-2 mt-1" />
-          </Link>
-
-          {/* Card 3: Danh sách đi chợ */}
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-2xs">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-bold text-gray-900">Danh sách đi chợ</h3>
-              <span className="text-xs text-gray-400">
-                Cho kế hoạch hôm nay • <strong className="text-emerald-700">{checkedCount} / {shoppingItems.length} đã mua</strong>
-              </span>
-            </div>
-
-            <div className="space-y-3 mb-5">
-              {shoppingItems.map((item) => (
-              <label
-                key={item.id}
-                className="flex items-center justify-between p-2.5 rounded-xl hover:bg-gray-50 transition cursor-pointer select-none text-xs"
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={item.checked}
-                    onChange={() => toggleShoppingItem(item.id)}
-                    className="w-4 h-4 rounded text-emerald-600 border-gray-300 focus:ring-emerald-500"
-                  />
-                    <span className={item.checked ? 'line-through text-gray-400' : 'text-gray-800 font-medium'}>
-                      {item.name}
-                    </span>
-                  </div>
-                  <span className="text-gray-400">{item.amount}</span>
-              </label>
-              ))}
-            </div>
-
-            <div className="text-[11px] text-gray-400 mb-4 text-center">
-              Danh sách dùng chung với trang đi chợ và kế hoạch tuần.
-            </div>
-
-            <Link
-              to="/grocery-list"
-              className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2"
-            >
-              <ShoppingBag className="w-3.5 h-3.5" />
-              <span>Xem danh sách đầy đủ</span>
-            </Link>
-          </div>
-
-        </div>
-
-      </div>
-
+      <aside className="dashboard-side">
+        <Link to="/fridge-scan" className="dashboard-scan-link"><img src="/images/fresh-vegetables.png" alt="Rau củ tươi để quét nguyên liệu tủ lạnh" /><div><span><Camera size={16} /> AI QUÉT TỦ LẠNH</span><h3>Bạn có gì trong bếp?</h3><p>Chọn ảnh nguyên liệu</p><ArrowUpRight size={20} /></div></Link>
+        <section className="dashboard-water"><div className="dashboard-section-heading"><h2><Droplets size={18} /> Nước hôm nay</h2><button title="Đặt lại lượng nước" aria-label="Đặt lại lượng nước" onClick={() => setWaterMl(0)}><RotateCcw size={15} /></button></div><p className="dashboard-water-total">{(waterMl / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}<span>lít đã uống</span></p><div className="dashboard-water-track"><div style={{ width: Math.min(100, waterMl / 2000 * 100) + '%' }} /></div><div className="dashboard-water-controls"><span>250 ml / lần</span><div><button title="Bớt 250 ml" aria-label="Bớt 250 ml" disabled={!waterMl} onClick={() => setWaterMl(value => Math.max(0, value - 250))}><Minus size={17} /></button><button title="Thêm 250 ml" aria-label="Thêm 250 ml" disabled={waterMl >= 5000} onClick={() => setWaterMl(value => Math.min(5000, value + 250))}><Plus size={17} /></button></div></div></section>
+        <section className="dashboard-shopping"><div className="dashboard-section-heading"><h2><ShoppingBag size={17} /> Ghi chú đi chợ</h2><span>{shopping.filter(item => item.checked).length}/{shopping.length}</span></div><form onSubmit={addShoppingItem}><input aria-label="Nguyên liệu cần mua" maxLength={100} value={itemName} onChange={event => setItemName(event.target.value)} placeholder="Thêm nguyên liệu..." /><button type="submit" title="Thêm vào danh sách" aria-label="Thêm vào danh sách" disabled={!itemName.trim()}><Plus size={17} /></button></form><ul>{shopping.map(item => <li key={item.id}><label><input type="checkbox" checked={item.checked} onChange={() => setShopping(previous => previous.map(value => value.id === item.id ? { ...value, checked: !value.checked } : value))} /><span className={item.checked ? 'is-done' : ''}>{item.name}</span></label><button title="Bỏ nguyên liệu" aria-label={'Bỏ ' + item.name} onClick={() => setShopping(previous => previous.filter(value => value.id !== item.id))}><X size={14} /></button></li>)}</ul>{!shopping.length && <p>Danh sách đang trống.</p>}</section>
+      </aside>
     </div>
-  );
-};
+  </div>;
+}

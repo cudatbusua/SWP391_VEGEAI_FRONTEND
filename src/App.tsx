@@ -7,32 +7,30 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { RecipeDiscoveryPage } from './pages/RecipeDiscoveryPage';
 import { RecipeDetailPage } from './pages/RecipeDetailPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { useAuth } from './hooks/useAuth';
-import { WorkspacePage } from './pages/WorkspacePages';
-import { MainLayout } from './layouts/MainLayout';
-
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  // Wait for refresh-cookie restoration before deciding whether the dashboard is public.
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Đang kiểm tra phiên đăng nhập...</div>;
-  }
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
-};
-
-const AdminRoute: React.FC = () => {
-  const { user, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Đang kiểm tra phiên đăng nhập...</div>;
-  }
-
-  // Admin preview is started from the shared layout; real customer accounts stay denied.
-  return user?.role === 'admin'
-    ? <WorkspacePage kind="admin" />
-    : <MainLayout><div className="mx-auto max-w-2xl px-4 py-20 text-center"><h1 className="text-2xl font-bold">Bạn không có quyền truy cập</h1><p className="mt-2 text-slate-600">Khu vực quản trị chỉ dành cho tài khoản admin. Trong môi trường phát triển, dùng nút Demo Admin ở thanh trạng thái để xem bản minh họa.</p></div></MainLayout>;
-};
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
+import { AiChatPage } from './pages/AiChatPage';
+import { FridgeScanPage } from './pages/FridgeScanPage';
+import { FridgeInventoryPage } from './pages/FridgeInventoryPage';
+import { NutritionCalculatorPage } from './pages/NutritionCalculatorPage';
+import { AdminPage } from './pages/AdminPage';
+import { MealPlansPage } from './pages/MealPlansPage';
+import { AdminRecipesPage } from './pages/AdminRecipesPage';
+import { PersonalFeatureBoundary } from './components/PersonalFeatureBoundary';
+import { AdminFeatureBoundary } from './components/AdminFeatureBoundary';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { BlogPage, BlogDetailPage } from './pages/BlogPage';
+import { BlogEditorPage } from './pages/BlogEditorPage';
+import { MyBlogPostsPage } from './pages/MyBlogPostsPage';
+import { BlogPostStatusPage } from './pages/BlogPostStatusPage';
+import { AdminBlogPage } from './pages/AdminBlogPage';
+import { RestaurantsPage } from './pages/RestaurantsPage';
+import { QuestionsPage, QuestionDetailPage } from './pages/QuestionsPage';
+import { VideosPage } from './pages/VideosPage';
+import { VideoDetailPage } from './pages/VideoDetailPage';
+import { AdminQuestionsPage, AdminQuestionDetailPage } from './pages/AdminQuestionsPage';
+import { AdminVideosPage } from './pages/AdminVideosPage';
+import { AdminVideoEditorPage } from './pages/AdminVideoEditorPage';
 
 export const App: React.FC = () => {
   return (
@@ -41,24 +39,43 @@ export const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<RecipeDiscoveryPage />} />
           <Route path="/recipe/:id" element={<RecipeDetailPage />} />
-          <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="/notifications" element={<ProtectedRoute><WorkspacePage kind="notifications" /></ProtectedRoute>} />
-          <Route path="/grocery-list" element={<ProtectedRoute><WorkspacePage kind="grocery" /></ProtectedRoute>} />
-          <Route path="/meal-plan" element={<ProtectedRoute><WorkspacePage kind="meal-plan" /></ProtectedRoute>} />
-          <Route path="/ai-assistant" element={<ProtectedRoute><WorkspacePage kind="ai" /></ProtectedRoute>} />
-          <Route path="/onboarding" element={<ProtectedRoute><WorkspacePage kind="onboarding" /></ProtectedRoute>} />
-          <Route path="/reviews" element={<ProtectedRoute><WorkspacePage kind="reviews" /></ProtectedRoute>} />
-          <Route path="/saved-recipes" element={<ProtectedRoute><WorkspacePage kind="saved" /></ProtectedRoute>} />
-          <Route path="/blog" element={<WorkspacePage kind="blog" />} />
-          <Route path="/blog/write" element={<ProtectedRoute><WorkspacePage kind="blog-editor" /></ProtectedRoute>} />
-          <Route path="/blog/preview" element={<ProtectedRoute><WorkspacePage kind="blog-preview" /></ProtectedRoute>} />
-          <Route path="/blog/:id" element={<WorkspacePage kind="blog" />} />
-          <Route path="/restaurants" element={<WorkspacePage kind="restaurants" />} />
-          <Route path="/restaurants/:id" element={<WorkspacePage kind="restaurants" />} />
-          <Route path="/admin" element={<AdminRoute />} />
+          <Route path="/dashboard" element={<PersonalFeatureBoundary><DashboardPage /></PersonalFeatureBoundary>} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/change-password" element={<PersonalFeatureBoundary><ChangePasswordPage /></PersonalFeatureBoundary>} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/ai-chef" element={<PersonalFeatureBoundary><AiChatPage /></PersonalFeatureBoundary>} />
+          <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />
+          <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
+          <Route path="/nutrition" element={<PersonalFeatureBoundary><NutritionCalculatorPage /></PersonalFeatureBoundary>} />
+          <Route path="/meal-plans" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
+          <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
+          <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
+          <Route path="/admin/recipes" element={<AdminFeatureBoundary><AdminRecipesPage /></AdminFeatureBoundary>} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/write" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />
+          <Route path="/blog/my-posts" element={<PersonalFeatureBoundary><MyBlogPostsPage /></PersonalFeatureBoundary>} />
+          <Route path="/blog/my-posts/:id/edit" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />
+          <Route path="/blog/my-posts/:id" element={<PersonalFeatureBoundary><BlogPostStatusPage /></PersonalFeatureBoundary>} />
+          <Route path="/blog/:id" element={<BlogDetailPage />} />
+          <Route path="/admin/blog" element={<AdminFeatureBoundary><AdminBlogPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/blog/:id" element={<AdminFeatureBoundary><BlogPostStatusPage adminMode /></AdminFeatureBoundary>} />
+          <Route path="/restaurants" element={<RestaurantsPage />} />
+          <Route path="/questions" element={<QuestionsPage />} />
+          <Route path="/questions/mine" element={<PersonalFeatureBoundary><QuestionsPage mine /></PersonalFeatureBoundary>} />
+          <Route path="/questions/mine/:id" element={<PersonalFeatureBoundary><QuestionDetailPage mine /></PersonalFeatureBoundary>} />
+          <Route path="/questions/:id" element={<QuestionDetailPage />} />
+          <Route path="/videos" element={<PersonalFeatureBoundary><VideosPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/saved" element={<PersonalFeatureBoundary><VideosPage saved /></PersonalFeatureBoundary>} />
+          <Route path="/videos/:id" element={<PersonalFeatureBoundary><VideoDetailPage /></PersonalFeatureBoundary>} />
+          <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/videos" element={<AdminFeatureBoundary><AdminVideosPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/videos/new" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/videos/:id/edit" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

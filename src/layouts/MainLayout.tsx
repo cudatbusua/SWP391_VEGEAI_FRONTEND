@@ -39,15 +39,6 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
 
-  const handleLogout = async () => {
-    const result = await logout();
-    if (result.success) {
-      navigate('/');
-    } else {
-      setLogoutError(result.error || 'Đăng xuất chưa hoàn tất trên máy chủ.');
-    }
-  };
-
   return (
     <div className="vegeai-layout min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
       
@@ -115,7 +106,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       <footer className="bg-white border-t border-gray-100 py-8 text-xs text-gray-500 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 font-semibold text-gray-700">
-            <img src={vegeaiLogo} alt="" className="h-7 w-7 rounded-full object-cover" />
+            <Leaf className="w-4 h-4 text-emerald-600" />
             <span>VEGEAI Vietnam</span>
           </div>
 

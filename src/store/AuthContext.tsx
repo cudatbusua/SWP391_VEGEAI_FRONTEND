@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, LoginFormData, RegisterFormData, ActionResult } from '../types';
 import { authService } from '../services/authService';
 import { AUTH_EXPIRED_EVENT, errorMessage } from '../services/apiClient';
@@ -6,7 +6,6 @@ import { AUTH_EXPIRED_EVENT, errorMessage } from '../services/apiClient';
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  isPreviewSession: boolean;
   isLoading: boolean;
   login: (data: LoginFormData) => Promise<ActionResult<User>>;
   register: (data: RegisterFormData) => Promise<ActionResult<void>>;
@@ -18,25 +17,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// These sample identities exist only in FE state and never create backend credentials.
-const previewUsers: Record<'user' | 'admin', User> = {
-  user: {
-    id: 'fe-preview-user',
-    name: 'VEGEAI Demo User',
-    emailOrPhone: 'demo@vegeai.local',
-    role: 'user'
-  },
-  admin: {
-    id: 'fe-preview-admin',
-    name: 'VEGEAI Demo Admin',
-    emailOrPhone: 'admin@vegeai.local',
-    role: 'admin'
-  }
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isPreviewSession, setIsPreviewSession] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [sessionError, setSessionError] = useState('');
   const [restoreAttempt, setRestoreAttempt] = useState(0);
@@ -55,7 +37,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [restoreAttempt]);
 
   const login = async (data: LoginFormData): Promise<ActionResult<User>> => {
-    authOperationRef.current += 1;
     setIsLoading(true);
     const res = await authService.login(data);
     setIsLoading(false);
@@ -63,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(res.data);
       setSessionError('');
     }
+    return res;
   };
 
   const register = (data: RegisterFormData) => authService.register(data);
@@ -78,7 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         isAuthenticated: !!user,
-        isPreviewSession,
         isLoading,
         login,
         register,

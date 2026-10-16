@@ -16,6 +16,7 @@ import { AdminPage } from './pages/AdminPage';
 import { MealPlansPage } from './pages/MealPlansPage';
 import { AdminRecipesPage } from './pages/AdminRecipesPage';
 import { PersonalFeatureBoundary } from './components/PersonalFeatureBoundary';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { BlogPage, BlogDetailPage } from './pages/BlogPage';
 import { BlogEditorPage } from './pages/BlogEditorPage';
@@ -42,6 +43,7 @@ export const App: React.FC = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/change-password" element={<PersonalFeatureBoundary><ChangePasswordPage /></PersonalFeatureBoundary>} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/ai-chef" element={<PersonalFeatureBoundary><AiChatPage /></PersonalFeatureBoundary>} />
           <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />

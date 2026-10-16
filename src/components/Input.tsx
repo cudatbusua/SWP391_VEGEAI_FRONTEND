@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useState, useId } from 'react';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -19,18 +19,21 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       type = 'text',
       helperText,
       className = '',
+      id,
       ...props
     },
     ref
   ) => {
     const [showPassword, setShowPassword] = useState(false);
+    const generatedId = useId();
+    const inputId = id || generatedId;
     const isPassword = type === 'password';
     const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type;
 
     return (
       <div className="w-full text-left">
         {label && (
-          <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+          <label htmlFor={inputId} className="block text-xs font-semibold text-gray-700 mb-1.5">
             {label}
           </label>
         )}
@@ -43,6 +46,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
 
           <input
+            id={inputId}
+            aria-invalid={!!error}
             ref={ref}
             type={effectiveType}
             className={`

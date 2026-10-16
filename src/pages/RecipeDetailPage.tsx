@@ -1,271 +1,66 @@
-import React from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bookmark, Flame, Clock, Star, Lock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, Clock, Flame, Users, RefreshCw } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
-import { RECIPES } from '../data/mockData';
-import { useAuth } from '../hooks/useAuth';
-import { useDemoState } from '../hooks/useDemoState';
+import { RecipeImage } from '../components/RecipeImage';
+import { VideoPlayer } from '../components/CommunityUi';
+import { recipeService } from '../services/recipeService';
+import { errorMessage } from '../services/apiClient';
+import type { RecipeDetail } from '../types/recipe';
 
-type DemoGroceryItem = { id: number; name: string; amount: string; checked: boolean };
-type DemoWeeklyPlan = Record<string, Record<string, string>>;
-
-export const RecipeDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-
-  const recipe = RECIPES.find((r) => r.id === id) || RECIPES[0];
-  const [savedRecipeIds, setSavedRecipeIds] = useDemoState<string[]>('saved-recipes', []);
-  const [, setGroceries] = useDemoState<DemoGroceryItem[]>('grocery-list', []);
-  const [, setWeeklyPlan] = useDemoState<DemoWeeklyPlan>('weekly-meal-plan', {});
-  const isSaved = savedRecipeIds.includes(recipe.id);
-
-  const handleSave = () => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    // Saved recipes use the same browser-backed demo record as discovery and the saved list.
-    setSavedRecipeIds((currentIds) => currentIds.includes(recipe.id)
-      ? currentIds.filter((savedId) => savedId !== recipe.id)
-      : [...currentIds, recipe.id]);
-  };
-
-  const addIngredientsToGroceryList = () => {
-    setGroceries((currentItems) => {
-      const currentNames = new Set(currentItems.map((item) => item.name.toLocaleLowerCase()));
-      const additions = recipe.ingredients
-        .filter((ingredient) => !currentNames.has(ingredient.name.toLocaleLowerCase()))
-        .map((ingredient, index) => ({
-          id: Date.now() + index,
-          name: ingredient.name,
-          amount: ingredient.amount,
-          checked: false
-        }));
-      return [...currentItems, ...additions];
-    });
-    navigate('/grocery-list');
-  };
-
-  const addRecipeToMealPlan = () => {
-    // This demo action uses the same plan key and structure as the weekly planner page.
-    setWeeklyPlan((currentPlan) => ({
-      ...currentPlan,
-      'Thứ 2': { ...currentPlan['Thứ 2'], 'Bữa trưa': recipe.title }
-    }));
-    navigate('/meal-plan');
-  };
-
-  return (
-    <MainLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-          <Link to="/" className="hover:text-emerald-600 transition flex items-center">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Trang chủ
-          </Link>
-          <span>/</span>
-          <Link to="/" className="hover:text-emerald-600 transition">Khám phá công thức</Link>
-          <span>/</span>
-          <span className="font-medium text-gray-900">Chi tiết món ăn</span>
-        </nav>
-
-        {/* Hero Card */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xs mb-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            
-            {/* Image */}
-            <div className="lg:col-span-6 relative rounded-2xl overflow-hidden shadow-sm aspect-[4/3] bg-gray-100">
-              <img
-                src={recipe.image}
-                alt={recipe.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-4 left-4 flex gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-600 text-white shadow-2xs">
-                  {recipe.badge}
-                </span>
-                {recipe.secondaryBadge && (
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/90 text-gray-800 shadow-2xs">
-                    {recipe.secondaryBadge}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* Info */}
-            <div className="lg:col-span-6 flex flex-col justify-center">
-              <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 mb-2">
-                <Flame className="w-4 h-4 text-orange-500" />
-                <span>{recipe.calories} kcal • Độ khó: {recipe.difficulty}</span>
-              </div>
-
-              <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-3 tracking-tight">
-                {recipe.title}
-              </h1>
-
-              <p className="text-sm text-gray-600 leading-relaxed mb-5">
-                {recipe.description}
-              </p>
-
-              <div className="flex items-center gap-4 text-xs text-gray-600 mb-6 font-medium">
-                <div className="flex items-center gap-1">
-                  <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
-                  <span className="font-bold text-gray-900">{recipe.rating}</span>
-                  <span className="text-gray-400">({recipe.reviewsCount} đánh giá)</span>
-                </div>
-                <span className="text-gray-300">•</span>
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4 text-gray-500" />
-                  <span>{recipe.cookTime} phút</span>
-                </div>
-              </div>
-
-              {/* Macronutrients */}
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
-                  <div className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Protein</div>
-                  <div className="text-base font-bold text-gray-800">{recipe.protein}g</div>
-                </div>
-                <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
-                  <div className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Carb</div>
-                  <div className="text-base font-bold text-gray-800">{recipe.carbs || 24}g</div>
-                </div>
-                <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
-                  <div className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Fat</div>
-                  <div className="text-base font-bold text-gray-800">{recipe.fat || 12}g</div>
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleSave}
-                  className={`px-6 py-3 border border-gray-200 hover:border-gray-400 rounded-xl text-sm font-semibold text-gray-700 bg-white hover:bg-gray-50 transition cursor-pointer flex items-center justify-center gap-2 shadow-2xs ${
-                    isSaved ? 'text-emerald-600 border-emerald-500' : ''
-                  }`}
-                >
-                  <Bookmark className="w-4 h-4" />
-                  <span>{isSaved ? 'Đã lưu món ăn' : 'Lưu món'}</span>
-                </button>
-                <button onClick={addIngredientsToGroceryList} className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800">
-                  Thêm nguyên liệu vào danh sách
-                </button>
-                <button onClick={addRecipeToMealPlan} className="rounded-xl border border-emerald-700 px-5 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">
-                  Lên kế hoạch bữa trưa
-                </button>
-              </div>
-            </div>
-
-          </div>
+export function RecipeDetailPage() {
+  const { id } = useParams();
+  const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController(); setLoading(true); setRecipe(null); setError('');
+    if (!id) { setError('Không tìm thấy công thức.'); setLoading(false); return; }
+    recipeService.detail(id, controller.signal).then(value => { if (!controller.signal.aborted) setRecipe(value); })
+      .catch(reason => { if (!controller.signal.aborted) setError(errorMessage(reason)); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [id, reload]);
+  return <MainLayout><div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <Link to="/" className="inline-flex gap-2 items-center text-sm text-emerald-700 mb-6"><ArrowLeft size={16} /> Công thức món chay</Link>
+    {loading && <p role="status">Đang tải công thức...</p>}
+    {error && <div role="alert"><p className="text-red-700">{error}</p><button onClick={() => setReload(value => value + 1)} className="flex items-center gap-2 mt-4"><RefreshCw size={16} /> Thử lại</button></div>}
+    {recipe && <><div className="grid md:grid-cols-2 gap-8 items-start">
+      <RecipeImage src={recipe.imageUrl} title={recipe.title} detail />
+      <div className="min-w-0">
+        <h1 className="text-3xl font-bold mb-4">{recipe.title}</h1>
+        <p className="text-gray-600 whitespace-pre-line break-words">{recipe.description}</p>
+        <div className="flex flex-wrap gap-5 my-6 text-sm">
+          <span className="flex gap-2 items-center"><Clock size={18} />{recipe.prepTimeMinutes ?? '--'} phút chuẩn bị</span>
+          <span className="flex gap-2 items-center"><Clock size={18} />{recipe.cookTimeMinutes ?? '--'} phút nấu</span>
+          <span className="flex gap-2 items-center"><Users size={18} />{recipe.servings ?? '--'} khẩu phần</span>
         </div>
-
-        {/* Ingredients */}
-        <div className="bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xs mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
-            <div className="flex items-center gap-2 font-bold text-lg text-gray-900">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span>Nguyên liệu cơ bản (2 khẩu phần)</span>
-            </div>
-            <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full font-medium">
-              Đã chuẩn hóa định lượng chuẩn VEGEAI
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {recipe.ingredients.map((item, idx) => (
-              <div key={item.id} className="bg-gray-50 border border-gray-100 rounded-2xl p-4 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-white border border-gray-200 font-bold text-sm text-gray-700 flex items-center justify-center shadow-2xs shrink-0">
-                  {idx + 1}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-gray-900 truncate">{item.name}</div>
-                  <div className="text-xs text-gray-500 truncate">{item.amount}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Cooking Steps Barrier (Image 2) */}
-        {!isAuthenticated ? (
-          <div className="relative bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-2xs p-8 md:p-12">
-            
-            {/* Blurred background preview */}
-            <div className="filter blur-sm select-none pointer-events-none opacity-40 space-y-6">
-              <div className="h-6 bg-gray-200 rounded w-1/3" />
-              <div className="space-y-4">
-                <div className="p-4 border rounded-xl bg-gray-50 flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-gray-300" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 bg-gray-300 rounded w-3/4" />
-                    <div className="h-3 bg-gray-200 rounded w-full" />
-                  </div>
-                </div>
-                <div className="p-4 border rounded-xl bg-gray-50 flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-gray-300" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 bg-gray-300 rounded w-2/3" />
-                    <div className="h-3 bg-gray-200 rounded w-full" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Lock Barrier Modal Card (Image 2) */}
-            <div className="absolute inset-0 flex items-center justify-center p-6 bg-white/75 backdrop-blur-[2px]">
-              <div className="max-w-md w-full text-center">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-500/20">
-                  <Lock className="w-7 h-7" />
-                </div>
-
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Đăng nhập để xem công thức chi tiết
-                </h3>
-
-                <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                  Mở khóa toàn bộ hướng dẫn nấu ăn từng bước, video hướng dẫn trực quan, đánh giá đầy đủ từ cộng đồng và gợi ý món ăn kèm thông minh.
-                </p>
-
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Link
-                    to="/login"
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl transition cursor-pointer shadow-sm text-center"
-                  >
-                    Đăng nhập ngay
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="px-6 py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold text-sm rounded-xl transition cursor-pointer shadow-2xs text-center"
-                  >
-                    Đăng ký tài khoản mới
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        ) : (
-          <div className="bg-white rounded-3xl border border-gray-100 p-6 md:p-8 shadow-2xs space-y-6">
-            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              Hướng dẫn nấu ăn từng bước (Đã mở khóa)
-            </h3>
-            <div className="space-y-4">
-              {(recipe.steps || []).map((step, idx) => (
-                <div key={idx} className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex items-start gap-4">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white font-bold text-sm flex items-center justify-center shrink-0">
-                    {idx + 1}
-                  </div>
-                  <p className="text-sm text-gray-700 leading-relaxed pt-1">{step}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+        <p className="text-sm text-emerald-700">{recipe.tags?.map(tag => tag.name).join(' · ')}</p>
+        <section className="border-t mt-6 pt-5" aria-label="Dinh dưỡng mỗi khẩu phần">
+          <h2 className="text-base font-bold mb-4">Dinh dưỡng mỗi khẩu phần</h2>
+          <p className="flex gap-2 items-center text-emerald-700 font-semibold mb-4"><Flame size={18} />{recipe.calories ?? '--'} kcal</p>
+          <dl className="grid grid-cols-2 gap-4 text-sm">
+            {([['Đạm', recipe.proteinGrams], ['Carbs', recipe.carbsGrams], ['Chất béo', recipe.fatGrams], ['Chất xơ', recipe.fiberGrams]] as const).map(([label, value]) =>
+              <div key={label}><dt className="text-gray-500">{label}</dt><dd className="font-semibold mt-1">{value == null ? 'Chưa có dữ liệu' : value + ' g'}</dd></div>)}
+          </dl>
+        </section>
       </div>
-    </MainLayout>
-  );
-};
+    </div>
+      <div className="grid md:grid-cols-[1fr_2fr] gap-8 mt-10">
+        <section className="min-w-0"><h2 className="text-xl font-bold mb-1">Nguyên liệu</h2>
+          <p className="text-sm text-gray-500 mb-4">Cho cả mẻ{recipe.servings ? ` (${recipe.servings} khẩu phần)` : ''}</p>
+          <ul className="divide-y divide-gray-200">{recipe.ingredients?.map((ingredient, index) =>
+            <li key={ingredient.ingredientId || index} className="py-3 flex justify-between gap-4">
+              <span className="min-w-0 break-words">{ingredient.name}{ingredient.allergenType && <span className="block text-xs text-red-700">Dị nguyên: {ingredient.allergenType}</span>}</span>
+              <span className="text-gray-600 shrink-0">{ingredient.amount} {ingredient.unit}</span>
+            </li>)}</ul>
+        </section>
+        <section className="min-w-0"><h2 className="text-xl font-bold mb-4">Cách nấu</h2><ol className="space-y-6">
+          {recipe.instructions?.map((step, index) => <li key={index}><h3 className="text-sm font-bold text-emerald-700 mb-2">Bước {index + 1}</h3><p className="text-gray-700 whitespace-pre-line">{step}</p></li>)}
+        </ol></section>
+      </div>
+      {!!recipe.videos?.length && <section className="mt-10 border-t pt-8"><h2 className="text-xl font-bold mb-5">Video cách nấu</h2><div className="grid md:grid-cols-2 gap-6">{recipe.videos.map(video => <article key={video.id} className="min-w-0"><h3 className="font-semibold mb-3"><Link to={'/videos/' + video.id}>{video.title}</Link></h3><VideoPlayer video={video} /></article>)}</div></section>}
+    </>}
+  </div></MainLayout>;
+}

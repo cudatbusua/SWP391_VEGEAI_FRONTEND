@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
@@ -8,6 +8,10 @@ import { useAuth } from '../../../hooks/useAuth';
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedPath: unknown = location.state?.from;
+  const destination = typeof requestedPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition)(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
+    ? requestedPath : null;
 
   const [formData, setFormData] = useState({
     emailOrPhone: '',
@@ -24,12 +28,7 @@ export const LoginForm: React.FC = () => {
     const errs: { [key: string]: string } = {};
 
     if (!formData.emailOrPhone.trim()) {
-      errs.emailOrPhone = 'Vui lòng nhập email hoặc username.';
-    } else if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.emailOrPhone.trim()) &&
-      !/^[a-zA-Z0-9_]{4,50}$/.test(formData.emailOrPhone.trim())
-    ) {
-      errs.emailOrPhone = 'Nhập email hoặc username đã đăng ký.';
+      errs.emailOrPhone = 'Vui lòng nhập tên đăng nhập hoặc email.';
     }
 
     if (!formData.password) {
@@ -55,7 +54,7 @@ export const LoginForm: React.FC = () => {
       if (res.success) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate(destination || (res.data?.role === 'admin' ? '/admin' : '/dashboard'), { replace: true });
         }, 800);
       } else {
         setGeneralError(res.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
@@ -98,8 +97,8 @@ export const LoginForm: React.FC = () => {
 
         {/* BE accepts a registered username or email as the login identifier. */}
         <Input
-          label="Email hoặc tên đăng nhập"
-          placeholder="nguyen@gmail.com hoặc username"
+          label="Tên đăng nhập hoặc email"
+          placeholder="nguyen@gmail.com"
           value={formData.emailOrPhone}
           onChange={(e) => {
             setFormData({ ...formData, emailOrPhone: e.target.value });
@@ -172,9 +171,8 @@ export const LoginForm: React.FC = () => {
       <div className="flex justify-center items-center mb-6">
         <button
           type="button"
-          onClick={() => {
-            setGeneralError('Backend hiện chưa cung cấp đăng nhập Google. Vui lòng đăng nhập bằng email/username.');
-          }}
+          disabled
+          title="Đăng nhập Google chưa được hỗ trợ"
           className="flex items-center justify-center gap-2.5
       w-full max-w-[240px] py-3 px-4
       bg-white border border-gray-200

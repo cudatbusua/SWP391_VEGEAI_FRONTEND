@@ -22,12 +22,12 @@ export const ForgotPasswordForm: React.FC = () => {
     setError('');
 
     if (!emailOrPhone.trim()) {
-      setError('Vui lòng nhập email đã đăng ký.');
+      setError('Vui lòng nhập email.');
       return;
     }
 
     if (!isStrictEmail(emailOrPhone)) {
-      setError('Backend yêu cầu email hợp lệ để gửi mã đặt lại mật khẩu.');
+      setError('Email không đúng định dạng.');
       return;
     }
 
@@ -57,7 +57,7 @@ export const ForgotPasswordForm: React.FC = () => {
     setError('');
 
     if (!/^\d{6}$/.test(otp.trim())) {
-      setError('Mã OTP phải gồm đúng 6 chữ số.');
+      setError('Vui lòng nhập mã xác thực OTP hợp lệ.');
       return;
     }
 
@@ -73,21 +73,9 @@ export const ForgotPasswordForm: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // BE verifies the OTP and updates the password in a single reset request.
-      const result = await authService.resetPassword({
-        emailOrPhone,
-        otp,
-        newPassword,
-        confirmPassword
-      });
-      if (result.success) {
-        setStep('success');
-      } else {
-        // BE reports invalid or expired OTPs through the standard ApiResponse message.
-        setError(result.error || 'Không thể đặt lại mật khẩu.');
-      }
-    } catch {
-      setError('Không thể kết nối đến máy chủ.');
+      const result = await authService.resetPassword(emailOrPhone, otp.trim(), newPassword, confirmPassword);
+      if (result.success) setStep('success');
+      else setError(result.error || 'Không thể đặt lại mật khẩu.');
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +122,7 @@ export const ForgotPasswordForm: React.FC = () => {
         <form onSubmit={handleRequestSubmit} className="space-y-4">
           <Input
             label="Email"
+            type="email"
             placeholder="nguyen@gmail.com"
             leftIcon={<Mail className="w-4 h-4" />}
             value={emailOrPhone}
@@ -161,7 +150,9 @@ export const ForgotPasswordForm: React.FC = () => {
         <form onSubmit={handleOtpSubmit} className="space-y-3.5">
           <Input
             label="Mã xác thực OTP (6 chữ số)"
-            placeholder="123456"
+            placeholder="Nhập 6 chữ số"
+            inputMode="numeric"
+            maxLength={6}
             value={otp}
             onChange={(e) => setOtp(e.target.value)}
           />

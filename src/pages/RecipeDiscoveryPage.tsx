@@ -1,393 +1,105 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Camera, Bookmark, Flame, Scale, Clock, SlidersHorizontal, Leaf } from 'lucide-react';
+import { Search, Camera, Clock, ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal, X, Leaf, ArrowUpRight, CheckCheck, Soup, Zap, Play, MessageCircle, BookOpen } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
-import { RECIPES } from '../data/mockData';
-import { useAuth } from '../hooks/useAuth';
-import { useDemoState } from '../hooks/useDemoState';
+import { RecipeCard } from '../components/RecipeCard';
+import '../styles/discovery.css';
+import { recipeService } from '../services/recipeService';
+import { errorMessage } from '../services/apiClient';
+import type { PageResponse } from '../types/api';
+import type { RecipeSummary, RecipeTag } from '../types/recipe';
 
-export const RecipeDiscoveryPage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+const groups: Record<string, string> = { dietaryType: 'Trường phái', cookingMethod: 'Cách chế biến', dishCategory: 'Loại món', nutritionGoal: 'Dinh dưỡng', occasion: 'Hoàn cảnh', dietaryRestriction: 'Kiêng / dị ứng' };
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activePill, setActivePill] = useState('Tất cả');
-  const [savedRecipeIds, setSavedRecipeIds] = useDemoState<string[]>('saved-recipes', []);
-
-  // Filter criteria
-  const [selectedCookTimes, setSelectedCookTimes] = useState<string[]>([]);
-  const [selectedCalories, setSelectedCalories] = useState<string[]>([]);
-  const [selectedMeals, setSelectedMeals] = useState<string[]>([]);
-  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState('popular');
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const pills = ['Tất cả', 'Giàu Protein', 'Low GI', 'Dưới 20 phút', 'Thuần Chay', 'Món Nước'];
-
-  const filteredRecipes = RECIPES.filter((r) => {
-    // Search
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const match =
-        r.title.toLowerCase().includes(q) ||
-        r.description.toLowerCase().includes(q) ||
-        r.ingredients.some((ing) => ing.name.toLowerCase().includes(q));
-      if (!match) return false;
-    }
-
-    // Pill
-    if (activePill !== 'Tất cả') {
-      const matchPill =
-        r.categoryPills.includes(activePill) ||
-        r.badge === activePill ||
-        r.secondaryBadge === activePill;
-      if (!matchPill) return false;
-    }
-
-    // Cook times
-    if (selectedCookTimes.length > 0) {
-      const match = selectedCookTimes.some((t) => {
-        if (t === 'under15') return r.cookTime <= 15;
-        if (t === '15to30') return r.cookTime > 15 && r.cookTime <= 30;
-        if (t === 'over30') return r.cookTime > 30;
-        return true;
-      });
-      if (!match) return false;
-    }
-
-    // Calories
-    if (selectedCalories.length > 0) {
-      const match = selectedCalories.some((c) => {
-        if (c === 'under300') return r.calories < 300;
-        if (c === '300to500') return r.calories >= 300 && r.calories <= 500;
-        if (c === 'over500') return r.calories > 500;
-        return true;
-      });
-      if (!match) return false;
-    }
-
-    // Meal types
-    if (selectedMeals.length > 0 && !selectedMeals.includes(r.mealType)) {
-      return false;
-    }
-
-    // Ingredients
-    if (selectedIngredients.length > 0) {
-      const match = selectedIngredients.some((ing) => r.mainIngredients.includes(ing));
-      if (!match) return false;
-    }
-
-    return true;
-  });
-
-  // Sorting is applied after filters so the count and selected criteria always refer to one result set.
-  const sortedRecipes = useMemo(() => [...filteredRecipes].sort((first, second) => {
-    if (sortBy === 'calories_asc') return first.calories - second.calories;
-    if (sortBy === 'time_asc') return first.cookTime - second.cookTime;
-    return second.rating - first.rating;
-  }), [filteredRecipes, sortBy]);
-  const pageSize = 6;
-  const pageCount = Math.ceil(sortedRecipes.length / pageSize);
-  const visibleRecipes = sortedRecipes.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  // A changed search/filter starts at the first result page instead of leaving an empty later page selected.
+export function RecipeDiscoveryPage() {
+  const [keyword, setKeyword] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [tags, setTags] = useState<Record<string, RecipeTag[]>>({});
+  const [included, setIncluded] = useState<string[]>([]);
+  const [excluded, setExcluded] = useState<string[]>([]);
+  const [mode, setMode] = useState<'AND' | 'OR'>('AND');
+  const [time, setTime] = useState('');
+  const [calories, setCalories] = useState('');
+  const [protein, setProtein] = useState('');
+  const [difficulty, setDifficulty] = useState('');
+  const [sort, setSort] = useState('newest:desc');
+  const [page, setPage] = useState(0);
+  const [data, setData] = useState<PageResponse<RecipeSummary> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [tagError, setTagError] = useState('');
+  const [reload, setReload] = useState(0);
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, activePill, selectedCookTimes, selectedCalories, selectedMeals, selectedIngredients, sortBy]);
-
-  const toggleArrayItem = (arr: string[], setArr: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
-    if (arr.includes(item)) {
-      setArr(arr.filter((i) => i !== item));
-    } else {
-      setArr([...arr, item]);
-    }
+    const controller = new AbortController(); setTagError('');
+    recipeService.tags(controller.signal).then(setTags).catch(reason => { if (!controller.signal.aborted) setTagError(errorMessage(reason)); });
+    return () => controller.abort();
+  }, [reload]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError('');
+    const timer = setTimeout(() => {
+      const [sortBy, sortDirection] = sort.split(':');
+      recipeService.filter({ keyword: keyword.trim() || undefined, includeTagCodes: included, excludeTagCodes: excluded,
+        inclusionMode: mode, maxCookTime: time ? Number(time) : undefined, maxCalories: calories ? Number(calories) : undefined,
+        minProtein: protein ? Number(protein) : undefined, difficulty: difficulty || undefined, sortBy, sortDirection, page, size: 12,
+      }, controller.signal).then(result => { if (!controller.signal.aborted) setData(result); })
+        .catch(reason => { if (!controller.signal.aborted) setError(errorMessage(reason)); })
+        .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    }, 250);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [keyword, included, excluded, mode, time, calories, protein, difficulty, sort, page, reload]);
+  const toggle = (code: string, exclusion: boolean) => {
+    const setter = exclusion ? setExcluded : setIncluded;
+    setter(previous => previous.includes(code) ? previous.filter(value => value !== code) : [...previous, code]); setPage(0);
   };
-
-  const handleResetFilters = () => {
-    setSearchQuery('');
-    setActivePill('Tất cả');
-    setSelectedCookTimes([]);
-    setSelectedCalories([]);
-    setSelectedMeals([]);
-    setSelectedIngredients([]);
-    setSortBy('popular');
-  };
-
-  const handleBookmark = (recipeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    setSavedRecipeIds((currentIds) => currentIds.includes(recipeId)
-      ? currentIds.filter((id) => id !== recipeId)
-      : [...currentIds, recipeId]);
-  };
-
-  return (
-    <MainLayout>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Search & AI Scan Box */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-2xs mb-8">
-          <div className="flex flex-col md:flex-row gap-3 items-center">
-            <div className="relative flex-1 w-full">
-              <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                <Search className="w-5 h-5" />
-              </span>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm kiếm món chay, nguyên liệu, công thức..."
-                className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-              />
-            </div>
-            <button
-              onClick={() => {
-                if (!isAuthenticated) {
-                  navigate('/login');
-                } else {
-                  navigate('/ai-assistant');
-                }
-              }}
-              className="w-full md:w-auto px-6 py-3.5 bg-[#f97316] hover:bg-[#ea580c] text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
-            >
-              <Camera className="w-5 h-5" />
-              <span>AI Quét Tủ Lạnh</span>
-            </button>
-          </div>
-
-          {/* Category Pills */}
-          <div className="flex items-center gap-2.5 mt-5 overflow-x-auto pb-1 text-sm no-scrollbar">
-            {pills.map((pill) => {
-              const isActive = activePill === pill;
-              return (
-                <button
-                  key={pill}
-                  onClick={() => setActivePill(pill)}
-                  className={`whitespace-nowrap px-4 py-2 rounded-full border transition cursor-pointer font-medium ${
-                    isActive
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                      : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  {pill}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Sidebar & Grid */}
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
-          
-          {/* Left Sidebar */}
-          <aside className="w-full lg:w-64 shrink-0 bg-white rounded-2xl border border-gray-100 p-6 shadow-2xs">
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-5">
-              <div className="flex items-center gap-2 font-bold text-gray-900 text-base">
-                <SlidersHorizontal className="w-4 h-4 text-gray-500" />
-                <span>Bộ Lọc</span>
-              </div>
-              <button
-                onClick={handleResetFilters}
-                className="text-xs text-gray-500 hover:text-emerald-600 transition cursor-pointer"
-              >
-                Đặt lại
-              </button>
-            </div>
-
-            {/* Thời gian nấu */}
-            <div className="mb-6">
-              <h4 className="text-sm font-semibold text-gray-800 mb-3">Thời gian nấu</h4>
-              <div className="space-y-2 text-sm text-gray-600">
-                {[
-                  { id: 'under15', label: 'Dưới 15 phút' },
-                  { id: '15to30', label: '15 - 30 phút' },
-                  { id: 'over30', label: 'Trên 30 phút' }
-                ].map((item) => (
-                  <label key={item.id} className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={selectedCookTimes.includes(item.id)}
-                      onChange={() => toggleArrayItem(selectedCookTimes, setSelectedCookTimes, item.id)}
-                      className="rounded text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>{item.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Mức Calo */}
-            <div className="mb-6">
-              <h4 className="text-sm font-semibold text-gray-800 mb-3">Mức Calo</h4>
-              <div className="space-y-2 text-sm text-gray-600">
-                {[
-                  { id: 'under300', label: 'Dưới 300 kcal' },
-                  { id: '300to500', label: '300 - 500 kcal' },
-                  { id: 'over500', label: 'Trên 500 kcal' }
-                ].map((item) => (
-                  <label key={item.id} className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={selectedCalories.includes(item.id)}
-                      onChange={() => toggleArrayItem(selectedCalories, setSelectedCalories, item.id)}
-                      className="rounded text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>{item.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Loại bữa ăn */}
-            <div className="mb-6">
-              <h4 className="text-sm font-semibold text-gray-800 mb-3">Loại bữa ăn</h4>
-              <div className="space-y-2 text-sm text-gray-600">
-                {['Bữa Sáng', 'Bữa Trưa', 'Bữa Tối', 'Ăn Vặt / Tráng Miệng'].map((meal) => (
-                  <label key={meal} className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={selectedMeals.includes(meal)}
-                      onChange={() => toggleArrayItem(selectedMeals, setSelectedMeals, meal)}
-                      className="rounded text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>{meal}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Nguyên liệu chính */}
-            <div>
-              <h4 className="text-sm font-semibold text-gray-800 mb-3">Nguyên liệu chính</h4>
-              <div className="space-y-2 text-sm text-gray-600">
-                {['Đậu hũ & Tàu hũ ky', 'Nấm các loại', 'Rau củ quả tươi', 'Các loại hạt & Đậu gà'].map((ing) => (
-                  <label key={ing} className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={selectedIngredients.includes(ing)}
-                      onChange={() => toggleArrayItem(selectedIngredients, setSelectedIngredients, ing)}
-                      className="rounded text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>{ing}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </aside>
-
-          {/* Right Grid */}
-          <div className="flex-1 w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <div className="text-sm text-gray-600">
-                Hiển thị <span className="font-bold text-gray-900">{filteredRecipes.length}</span> công thức thuần chay
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm">
-                {isAuthenticated && <Link to="/saved-recipes" className="font-semibold text-emerald-700">Món đã lưu ({savedRecipeIds.length})</Link>}
-                <div className="flex items-center gap-2">
-                <span className="text-gray-500">Sắp xếp theo:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                >
-                  <option value="popular">Phổ biến nhất</option>
-                  <option value="calories_asc">Calo thấp nhất</option>
-                  <option value="time_asc">Thời gian nấu nhanh</option>
-                </select>
-                </div>
-              </div>
-            </div>
-
-            {filteredRecipes.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
-                  <Leaf className="w-8 h-8" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-800 mb-2">Không tìm thấy công thức phù hợp</h3>
-                <p className="text-sm text-gray-500 mb-4">Hãy thử tìm từ khóa khác hoặc bỏ chọn một số bộ lọc.</p>
-                <button
-                  onClick={handleResetFilters}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition cursor-pointer"
-                >
-                  Đặt lại bộ lọc
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {visibleRecipes.map((recipe) => (
-                  <div
-                    key={recipe.id}
-                    onClick={() => navigate(`/recipe/${recipe.id}`)}
-                    className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-2xs hover:shadow-md transition group flex flex-col cursor-pointer"
-                  >
-                    <div className="relative aspect-[16/11] overflow-hidden bg-gray-100">
-                      <img
-                        src={recipe.image}
-                        alt={recipe.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                        loading="lazy"
-                      />
-                      <div className="absolute bottom-3 left-3">
-                        <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-600 text-white shadow-2xs">
-                          {recipe.badge}
-                        </span>
-                      </div>
-                      <button
-                        onClick={(e) => handleBookmark(recipe.id, e)}
-                        aria-label={savedRecipeIds.includes(recipe.id) ? `Bỏ lưu ${recipe.title}` : `Lưu ${recipe.title}`}
-                        className={`absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-gray-700 flex items-center justify-center shadow-sm transition cursor-pointer ${
-                          savedRecipeIds.includes(recipe.id) ? 'text-emerald-600 fill-emerald-600' : ''
-                        }`}
-                      >
-                        <Bookmark className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="p-5 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-base hover:text-emerald-600 transition line-clamp-1 mb-1.5">
-                          {recipe.title}
-                        </h3>
-                        <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed mb-4">
-                          {recipe.description}
-                        </p>
-                      </div>
-
-                      <div className="pt-3 border-t border-gray-50 flex items-center justify-between text-xs text-gray-600 font-medium">
-                        <div className="flex items-center gap-1">
-                          <Flame className="w-4 h-4 text-orange-500" />
-                          <span>{recipe.calories} kcal</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Scale className="w-4 h-4 text-emerald-600" />
-                          <span>{recipe.protein}g Protein</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4 text-gray-500" />
-                          <span>{recipe.cookTime} phút</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Pagination only appears when the loaded recipe collection actually has more than one page. */}
-            {pageCount > 1 && <nav aria-label="Phân trang công thức" className="mt-10 flex items-center justify-center gap-2">
-              <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => page - 1)} className="h-10 rounded-lg border px-3 text-sm disabled:opacity-40">Trang trước</button>
-              {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => <button type="button" key={page} aria-current={currentPage === page ? 'page' : undefined} onClick={() => setCurrentPage(page)} className={`h-10 w-10 rounded-lg text-sm font-semibold ${currentPage === page ? 'bg-emerald-700 text-white' : 'border bg-white text-slate-700'}`}>{page}</button>)}
-              <button type="button" disabled={currentPage === pageCount} onClick={() => setCurrentPage((page) => page + 1)} className="h-10 rounded-lg border px-3 text-sm disabled:opacity-40">Trang sau</button>
-            </nav>}
-          </div>
-
-        </div>
-
+  const reset = () => { setKeyword(''); setIncluded([]); setExcluded([]); setMode('AND'); setTime(''); setCalories(''); setProtein(''); setDifficulty(''); setSort('newest:desc'); setPage(0); };
+  const activeCount = included.length + excluded.length + [time, calories, protein, difficulty].filter(Boolean).length;
+  const availableTags = Object.values(tags).flat();
+  const quickFilters = [
+    { name: 'Tất cả', code: '', icon: <Leaf size={16} /> },
+    { name: 'Giàu đạm', code: 'HIGH_PROTEIN', icon: <Zap size={16} /> },
+    { name: 'Nấu nhanh', code: 'QUICK_15', icon: <Clock size={16} /> },
+    { name: 'Thuần chay', code: 'VEGAN', icon: <Leaf size={16} /> },
+    { name: 'Món canh', code: 'SOUP', icon: <Soup size={16} /> },
+  ].filter(item => !item.code || availableTags.some(tag => tag.code === item.code));
+  return <MainLayout><div className="discovery-page">
+    <section className="discovery-cover">
+      <img src="/images/vietnamese-vegan-table.png" alt="Mâm cơm chay Việt Nam với đậu phụ, nấm, gỏi cuốn và rau xanh" fetchPriority="high" />
+      <div className="discovery-cover-shade" />
+      <div className="discovery-cover-content"><span className="discovery-eyebrow"><Leaf size={17} /> BẾP XANH MỖI NGÀY</span><h1>VEGEAI</h1><p>Món chay ngon, bữa ăn lành.<br />Cảm hứng từ căn bếp Việt của bạn.</p><div className="discovery-hero-actions"><a href="#cong-thuc" className="discovery-scan">Khám phá công thức <ArrowUpRight size={18} /></a><Link to="/fridge-scan" className="discovery-hero-secondary"><Camera size={18} /> Quét nguyên liệu</Link></div></div>
+    </section>
+    <div className="discovery-shell">
+      <div className="discovery-toolbar" id="cong-thuc">
+        <label className="discovery-search"><Search size={20} /><input aria-label="Tìm công thức" value={keyword} onChange={event => { setKeyword(event.target.value); setPage(0); }} placeholder="Hôm nay bạn muốn nấu món gì?" />{keyword && <button title="Xóa tìm kiếm" aria-label="Xóa tìm kiếm" onClick={() => { setKeyword(''); setPage(0); }}><X size={16} /></button>}</label>
+        <Link to="/ai-chef" className="discovery-chef"><Zap size={17} /> Hỏi AI Bếp Trưởng <ArrowUpRight size={16} /></Link>
       </div>
-    </MainLayout>
-  );
-};
+      <div className="discovery-quick-filters">{quickFilters.map(item => <button key={item.name} className={(!item.code ? !included.length : included.includes(item.code)) ? 'is-active' : ''} onClick={() => { if (!item.code) setIncluded([]); else setIncluded(previous => previous.includes(item.code) ? previous.filter(value => value !== item.code) : [...previous, item.code]); setPage(0); }}>{item.icon}{item.name}</button>)}</div>
+      <div className="discovery-grid">
+        <button onClick={() => setFiltersOpen(value => !value)} aria-expanded={filtersOpen} aria-controls="recipe-filters" className="discovery-filter-toggle"><SlidersHorizontal size={17} />{filtersOpen ? 'Ẩn bộ lọc' : 'Bộ lọc'}{activeCount > 0 && <span>{activeCount}</span>}</button>
+        <aside id="recipe-filters" className={'discovery-filters ' + (filtersOpen ? 'is-open' : '')}>
+          <div className="discovery-filter-heading"><h2><SlidersHorizontal size={16} /> Bộ lọc</h2><button onClick={reset}>Đặt lại</button></div>
+          <label className="discovery-field">Kết hợp thẻ<select value={mode} onChange={event => { setMode(event.target.value as 'AND' | 'OR'); setPage(0); }}><option value="AND">Tất cả thẻ đã chọn</option><option value="OR">Bất kỳ thẻ đã chọn</option></select></label>
+          {tagError && <p role="alert" className="discovery-error">{tagError}</p>}
+          {Object.entries(tags).map(([group, values]) => values?.length ? <details key={group} open={group === 'dietaryType'} className="discovery-filter-group"><summary>{groups[group] || group}<span>{values.length}</span></summary><div>{values.map(tag => <label key={tag.code} className="discovery-checkbox"><input type="checkbox" checked={included.includes(tag.code)} onChange={() => toggle(tag.code, false)} /><span>{tag.name}</span></label>)}</div></details> : null)}
+          <details className="discovery-filter-group"><summary>Thời gian & dinh dưỡng</summary><div className="discovery-numeric"><label className="discovery-field">Thời gian tối đa (phút)<input type="number" min="1" value={time} onChange={event => { setTime(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Calo tối đa<input type="number" min="1" value={calories} onChange={event => { setCalories(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Đạm tối thiểu (g)<input type="number" min="0" value={protein} onChange={event => { setProtein(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Độ khó<select value={difficulty} onChange={event => { setDifficulty(event.target.value); setPage(0); }}><option value="">Tất cả</option><option value="EASY">Dễ</option><option value="MEDIUM">Vừa</option><option value="HARD">Khó</option></select></label></div></details>
+          <details className="discovery-filter-group"><summary>Loại trừ thẻ</summary><div>{availableTags.map(tag => <label key={tag.code} className="discovery-checkbox"><input type="checkbox" aria-label={'Loại trừ ' + tag.name} checked={excluded.includes(tag.code)} onChange={() => toggle(tag.code, true)} /><span>{tag.name}</span></label>)}</div></details>
+          <div className="discovery-sidebar-note"><CheckCheck size={18} /><div><strong>Nấu ngon, ăn lành</strong><p>Kiểm tra thành phần để chọn món phù hợp với chế độ ăn của bạn.</p></div></div>
+        </aside>
+        <section className="discovery-results" aria-busy={loading}>
+          <div className="discovery-results-heading"><div><span className="discovery-section-label">CẢM HỨNG CHO BỮA ĂN</span><h2>{keyword ? 'Kết quả tìm kiếm' : 'Món ngon đáng thử'}<span>{data?.totalElements ?? 0}</span></h2></div><select aria-label="Sắp xếp công thức" value={sort} onChange={event => { setSort(event.target.value); setPage(0); }}><option value="newest:desc">Mới nhất</option><option value="calories:asc">Calo thấp nhất</option><option value="cookTime:asc">Nấu nhanh nhất</option><option value="protein:desc">Đạm cao nhất</option></select></div>
+          {(included.length > 0 || excluded.length > 0) && <div className="discovery-active-tags">{[...included.map(code => ({ code, exclusion: false })), ...excluded.map(code => ({ code, exclusion: true }))].map(item => <button key={(item.exclusion ? 'exclude-' : '') + item.code} onClick={() => toggle(item.code, item.exclusion)}>{item.exclusion ? 'Loại trừ: ' : ''}{availableTags.find(tag => tag.code === item.code)?.name || item.code}<X size={13} /></button>)}</div>}
+          {loading && !data && <div className="recipe-grid" role="status" aria-label="Đang tải công thức">{[0, 1, 2].map(value => <div className="recipe-skeleton" key={value}><div /><span /><span /></div>)}</div>}
+          {error && <div role="alert" className="discovery-empty"><RefreshCw size={28} /><h3>Chưa thể tải món ăn</h3><p>{error}</p><button onClick={() => setReload(value => value + 1)}>Thử lại</button></div>}
+          {!loading && !error && !data?.items.length && <div role="status" className="discovery-empty"><Soup size={36} /><h3>Chưa có món phù hợp</h3><p>Thử đổi từ khóa hoặc giảm bớt bộ lọc.</p><button onClick={reset}>Đặt lại bộ lọc</button></div>}
+          {!error && <div className={'recipe-grid ' + (loading && data ? 'is-loading' : '')}>{data?.items.map(recipe => <RecipeCard key={recipe.recipeId} recipe={recipe} />)}</div>}
+          {data && data.totalPages > 1 && <nav aria-label="Phân trang công thức" className="discovery-pagination"><button title="Trang trước" aria-label="Trang trước" disabled={loading || data.first} onClick={() => setPage(value => value - 1)}><ChevronLeft size={20} /></button><span>Trang {data.page + 1} / {data.totalPages}</span><button title="Trang sau" aria-label="Trang sau" disabled={loading || data.last} onClick={() => setPage(value => value + 1)}><ChevronRight size={20} /></button></nav>}
+      <section className="discovery-journal" aria-labelledby="discovery-journal-title"><div className="discovery-journal-heading"><span className="discovery-section-label">CHUYỆN TỪ CĂN BẾP</span><h2 id="discovery-journal-title">Thêm cảm hứng, thêm vị ngon</h2><p>Cùng nấu, cùng chia sẻ một lối sống xanh.</p></div><div className="discovery-journal-grid">
+        <Link to="/videos"><div className="discovery-journal-photo"><img src="/images/tofu-tomato.png" alt="Đậu phụ sốt cà chua với rau thơm" loading="lazy" /><span><Play size={19} /></span></div><div><small>VIDEO BẾP CHAY</small><h3>Vào bếp cùng nhau <ArrowUpRight size={19} /></h3><p>Xem video, tìm cảm hứng cho bữa ăn tiếp theo.</p></div></Link>
+        <Link to="/blog"><div className="discovery-journal-photo"><img src="/images/vegan-tofu-meal.png" alt="Bữa ăn thực vật với đậu phụ và rau củ" loading="lazy" /><span><BookOpen size={19} /></span></div><div><small>BLOG CỘNG ĐỒNG</small><h3>Chuyện bếp, chuyện xanh <ArrowUpRight size={19} /></h3><p>Đọc những chia sẻ và kể câu chuyện của bạn.</p></div></Link>
+        <Link to="/questions"><div className="discovery-journal-photo"><img src="/images/fresh-vegetables.png" alt="Rau củ tươi nhiều màu sắc" loading="lazy" /><span><MessageCircle size={19} /></span></div><div><small>HỎI & ĐÁP</small><h3>Bạn hỏi, bếp trả lời <ArrowUpRight size={19} /></h3><p>Gửi thắc mắc về nấu ăn và dinh dưỡng thực vật.</p></div></Link>
+      </div></section>
+        </section>
+      </div>
+    </div>
+  </div></MainLayout>;
+}

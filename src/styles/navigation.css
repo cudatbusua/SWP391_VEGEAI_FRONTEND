@@ -1,0 +1,12 @@
+.vegeai-layout { font-family: 'Plus Jakarta Sans', 'Segoe UI', sans-serif; letter-spacing: 0; }
+.site-navigation { display: flex; align-items: stretch; gap: 26px; max-width: 1280px; margin: auto; padding: 0 32px; border-top: 1px solid #edf0ef; overflow-x: auto; scrollbar-width: thin; color: #52616a; font-size: 16px; font-weight: 600; line-height: 1.5; }
+.site-navigation > a { display: flex; align-items: center; min-height: 56px; padding: 13px 0 11px; border-bottom: 3px solid transparent; white-space: nowrap; transition: color .15s, border-color .15s; }
+.site-navigation > a:hover, .site-navigation > a[aria-current="page"] { color: #007c57; border-bottom-color: #00865f; }
+.site-mobile-navigation { font-size: 15px; line-height: 1.6; }
+.site-mobile-navigation > a { overflow-wrap: anywhere; }
+.vegeai-layout a:focus-visible, .vegeai-layout button:focus-visible, .vegeai-layout summary:focus-visible { outline: 2px solid #00865f; outline-offset: 4px; }
+@media (max-width: 639px) {
+  .site-navigation { gap: 23px; padding: 0 20px; font-size: 15px; }
+  .site-navigation > a { min-height: 50px; }
+  .site-navigation.is-collapsed { display: none; }
+}

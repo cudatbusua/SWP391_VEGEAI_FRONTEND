@@ -22,22 +22,12 @@ export const RegisterForm: React.FC = () => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [generalError, setGeneralError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [step, setStep] = useState<'register' | 'verify' | 'verified'>('register');
-  const [otp, setOtp] = useState('');
 
   // Dynamic password strength bar
   const strength = calculatePasswordStrength(formData.password);
 
   const validate = (): boolean => {
     const errs: { [key: string]: string } = {};
-
-    if (!/^[a-zA-Z0-9_]{4,50}$/.test(formData.username.trim())) {
-      errs.username = 'Username phải có 4-50 ký tự, chỉ gồm chữ cái, số và dấu gạch dưới.';
-    }
-
-    if (!formData.fullName.trim() || formData.fullName.trim().length > 100 || /\d/.test(formData.fullName)) {
-      errs.fullName = 'Vui lòng nhập họ tên không chứa số (tối đa 100 ký tự).';
-    }
 
     if (!formData.emailOrPhone.trim()) {
       errs.emailOrPhone = 'Email không đúng định dạng';
@@ -88,56 +78,10 @@ export const RegisterForm: React.FC = () => {
         const email = formData.emailOrPhone.trim();
         navigate(`/verify-email?email=${encodeURIComponent(email)}`, { state: { email } });
       } else {
-        // A 409 means this registration did not create another account. If it is
-        // already pending verification, use the resend-OTP flow instead.
         setGeneralError(res.error || 'Đăng ký không thành công.');
       }
     } catch {
       setGeneralError('Đã có lỗi xảy ra. Vui lòng thử lại sau.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleVerifySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGeneralError('');
-    if (!/^\d{6}$/.test(otp)) {
-      setGeneralError('Mã OTP phải gồm đúng 6 chữ số.');
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      const result = await authService.verifyEmail(formData.emailOrPhone, otp);
-      if (result.success) {
-        setStep('verified');
-        setSuccessMessage('Email đã được xác thực. Bạn có thể đăng nhập.');
-      } else {
-        // Show BE's validation/error message (e.g. wrong/expired OTP) as-is.
-        setGeneralError(result.error || 'Không thể xác thực email.');
-      }
-    } catch {
-      setGeneralError('Không thể xác thực email. Vui lòng thử lại.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    setGeneralError('');
-    setIsSubmitting(true);
-    try {
-      const result = await authService.resendOtp(formData.emailOrPhone);
-      if (result.success) {
-        setSuccessMessage(
-          'Backend đã tiếp nhận yêu cầu gửi OTP. Hãy kiểm tra email; nếu SMTP chưa cấu hình, ' +
-          'xem console backend tìm dòng [DEV/FALLBACK] Registration OTP.'
-        );
-      } else {
-        setGeneralError(result.error || 'Không thể gửi lại OTP.');
-      }
-    } catch {
-      setGeneralError('Không thể gửi lại OTP. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
@@ -180,7 +124,7 @@ export const RegisterForm: React.FC = () => {
           onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
         />
 
-        {/* BE requires an email address for account creation and OTP delivery. */}
+        {/* Email hoặc Số điện thoại (Image 1 & 2) */}
         <div>
           <Input
             label="Email"
@@ -291,30 +235,7 @@ export const RegisterForm: React.FC = () => {
           </Button>
         </div>
 
-      </form>}
-
-      {step === 'verify' && (
-        <form onSubmit={handleVerifySubmit} className="space-y-3.5">
-          <Input
-            label="Mã OTP xác thực email (6 chữ số)"
-            placeholder="123456"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          />
-          <Button type="submit" fullWidth isLoading={isSubmitting}>
-            Xác thực email
-          </Button>
-          <Button type="button" variant="outline" fullWidth disabled={isSubmitting} onClick={handleResendOtp}>
-            Gửi lại mã OTP
-          </Button>
-        </form>
-      )}
-
-      {step === 'verified' && (
-        <Button type="button" fullWidth onClick={() => navigate('/login')}>
-          Đến trang đăng nhập
-        </Button>
-      )}
+      </form>
 
       {/* Footer link: Đã có tài khoản? Đăng nhập (Image 1 & 2) */}
       <div className="text-center text-xs text-gray-500 mt-6">

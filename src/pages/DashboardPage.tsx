@@ -6,19 +6,21 @@ import { MainLayout } from '../layouts/MainLayout';
 import { OverviewTab } from '../features/dashboard/components/OverviewTab';
 import { NutritionProfileTab } from '../features/dashboard/components/NutritionProfileTab';
 
+type DashboardTab = 'overview' | 'profile';
+const tabs: DashboardTab[] = ['overview', 'profile'];
+const asTab = (value: string | null): DashboardTab | null => tabs.includes(value as DashboardTab) ? value as DashboardTab : null;
+
 export const DashboardPage: React.FC = () => {
   const { isLoading, isAuthenticated, sessionError, retrySession } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'profile' ? 'profile' : 'overview';
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile'>(initialTab);
+  const [activeTab, setActiveTab] = useState<DashboardTab>(asTab(searchParams.get('tab')) ?? 'overview');
 
   useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'profile') setActiveTab('profile');
-    else if (tabParam === 'overview') setActiveTab('overview');
+    const tabParam = asTab(searchParams.get('tab'));
+    if (tabParam) setActiveTab(tabParam);
   }, [searchParams]);
 
-  const handleTabChange = (tab: 'overview' | 'profile') => {
+  const handleTabChange = (tab: DashboardTab) => {
     setActiveTab(tab);
     setSearchParams({ tab });
   };
@@ -69,7 +71,8 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'overview' ? <OverviewTab /> : <NutritionProfileTab />}
+        {activeTab === 'overview' && <OverviewTab />}
+        {activeTab === 'profile' && <NutritionProfileTab />}
 
       </div>
     </MainLayout>

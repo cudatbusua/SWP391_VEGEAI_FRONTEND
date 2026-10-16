@@ -142,6 +142,9 @@ export interface NutritionTargets {
 }
 
 export interface NutritionProfile {
+  phoneNumber?: string;
+  dietaryPreferences?: string;
+  allergies?: string;
   nutritionProfileId: string;
   userId: string;
   gender: NutritionGender;
@@ -158,6 +161,9 @@ export interface NutritionProfile {
 }
 
 export interface NutritionProfileInput {
+  phoneNumber?: string;
+  dietaryPreferences?: string;
+  allergies?: string;
   gender: NutritionGender;
   dateOfBirth: string;
   heightCm: number;
@@ -235,5 +241,5 @@ export interface AiAuditLogEntry {
   latencyMs: number;
   userType: string;
   status: string;
-  promptSummary: string;
+  promptSummary?: string;
 }

@@ -3,6 +3,11 @@ import type { PageResponse } from '../types/api';
 import type { FridgeRecipeMatches, RecipeDetail, RecipeFilter, RecipeInput, RecipeSummary, RecipeTag } from '../types/recipe';
 
 export const recipeService = {
+  async adminDetail(id: string): Promise<RecipeDetail> {
+    const response = await apiRequest<RecipeDetail>(`/admin/recipes/${encodeURIComponent(id)}`);
+    if (!response.data) throw new Error('Không tìm thấy công thức.');
+    return response.data;
+  },
   async adminTags(): Promise<RecipeTag[]> {
     const response = await apiRequest<RecipeTag[]>('/admin/tags');
     if (!response.data) throw new Error('Không thể tải thẻ phân loại.');

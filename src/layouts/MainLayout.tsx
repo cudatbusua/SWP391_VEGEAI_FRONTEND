@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Leaf, Bell, Menu, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/navigation.css';
+import { AdminLayout } from './AdminLayout';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated, logout, sessionError, retrySession } = useAuth();
@@ -18,14 +19,21 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     setLoggingOut(false);
   };
 
-  const isCurrent = (path: string) => location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'));
-  const navItems = [
+  const isAdmin = user?.role === 'admin';
+  const home = isAdmin ? '/admin' : isAuthenticated ? '/dashboard' : '/';
+  const isCurrent = (path: string) => location.pathname === path || (path !== '/' && path !== '/admin' && location.pathname.startsWith(path + '/')) || (isAdmin && path === '/admin/blog' && location.pathname.startsWith('/blog/'));
+  const navItems = isAdmin ? [
+    ['/admin', 'Tổng quan & tài khoản'], ['/admin/recipes', 'Công thức & dinh dưỡng'],
+    ['/admin/blog', 'Blog'], ['/admin/videos', 'Video'], ['/admin/questions', 'Hỏi đáp'],
+  ] : [
     ...(isAuthenticated ? [['/dashboard', 'Trang chủ']] : []),
     ['/', 'Khám phá'], ['/ai-chef', 'AI Bếp Trưởng'], ['/fridge-scan', 'Quét Tủ Lạnh'],
     ...(isAuthenticated ? [['/fridge', 'Kho Tủ']] : []),
     ['/nutrition', 'Dinh dưỡng'], ['/blog', 'Blog'], ['/videos', 'Video'], ['/questions', 'Hỏi đáp'], ['/restaurants', 'Quán chay gần đây'],
-    ...(user?.role === 'admin' ? [['/admin', 'Admin']] : []),
+    ...(isAuthenticated ? [['/meal-plans', 'Thực đơn']] : []),
   ];
+
+  if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
 
   return (
     <div className="vegeai-layout min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
@@ -42,65 +50,13 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           {/* Logo */}
           <div className="flex items-center gap-1.5 lg:gap-8">
             <button type="button" className="sm:hidden p-1 text-gray-600" title={mobileMenu ? 'Đóng menu' : 'Mở menu'} aria-label={mobileMenu ? 'Đóng menu' : 'Mở menu'} aria-expanded={mobileMenu} aria-controls="main-mobile-navigation" onClick={() => setMobileMenu(value => !value)}>{mobileMenu ? <X size={21} /> : <Menu size={21} />}</button>
-            <Link to={isAuthenticated ? "/dashboard" : "/"} className="flex items-center gap-2 text-slate-800 font-bold text-lg sm:text-xl tracking-tight">
+            <Link to={home} className="flex items-center gap-2 text-slate-800 font-bold text-lg sm:text-xl tracking-normal">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
                 <Leaf className="w-5 h-5 text-emerald-600" />
               </div>
               <span>VEGEAI</span>
             </Link>
 
-            {/* Nav Menu */}
-            <nav className="hidden">
-              {isAuthenticated && (
-                <Link
-                  to="/dashboard"
-                  className={`hover:text-emerald-600 transition ${
-                    isCurrent('/dashboard') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''
-                  }`}
-                >
-                  Trang Chủ
-                </Link>
-              )}
-              <Link
-                to="/"
-                className={`hover:text-emerald-600 transition ${
-                  isCurrent('/') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''
-                }`}
-              >
-                Khám Phá Công Thức
-              </Link>
-              {isAuthenticated && (
-                <>
-                  <button
-                    onClick={() => alert('Mở Kế Hoạch Tuần: Thực đơn 7 ngày cá nhân hóa')}
-                    className="hover:text-emerald-600 transition cursor-pointer"
-                  >
-                    Kế Hoạch Tuần
-                  </button>
-                </>
-              )}
-              <Link to="/fridge-scan" className={`hover:text-emerald-600 transition ${isCurrent('/fridge-scan') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''}`}>Quét Tủ Lạnh</Link>
-              {isAuthenticated && <Link to="/fridge" className={`hover:text-emerald-600 transition ${isCurrent('/fridge') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''}`}>Kho Tủ Lạnh</Link>}
-              <Link to="/ai-chef" className={`hover:text-emerald-600 transition ${isCurrent('/ai-chef') ? 'text-emerald-600 font-bold' : ''}`}>AI Bếp Trưởng</Link>
-              <Link to="/nutrition" className={`hover:text-emerald-600 transition ${isCurrent('/nutrition') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''}`}>Dinh Dưỡng</Link>
-              {user?.role === 'admin' && <Link to="/admin" className={`hover:text-emerald-600 transition ${isCurrent('/admin') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''}`}>Admin</Link>}
-              <Link
-                to="/blog"
-                className={`hover:text-emerald-600 transition ${
-                  isCurrent('/blog') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''
-                }`}
-              >
-                Blog
-              </Link>
-              <Link
-                to="/restaurants"
-                className={`hover:text-emerald-600 transition ${
-                  isCurrent('/restaurants') ? 'text-emerald-600 font-bold border-b-2 border-emerald-600 pb-1' : ''
-                }`}
-              >
-                Quán Chay Gần Đây
-              </Link>
-            </nav>
           </div>
 
           {/* Auth Actions */}
@@ -123,19 +79,19 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             ) : (
               <div className="flex items-center gap-2 sm:gap-3">
                 {/* Notification Bell */}
-                <button
+                {!isAdmin && <button
                   onClick={() => alert('Thông báo: AI đã gợi ý thực đơn bữa tối cho bạn!')}
                   className="relative p-2 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition cursor-pointer"
                 >
                   <Bell className="w-5 h-5" />
                   <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
-                </button>
+                </button>}
 
                 {/* Avatar with direct link to Dashboard */}
                 <Link
-                  to="/dashboard"
+                  to={isAdmin ? home : '/dashboard?tab=profile'}
                   className="flex items-center gap-2.5 p-1 rounded-full hover:bg-gray-50 transition cursor-pointer"
-                  title="Xem Dashboard & Hồ sơ dinh dưỡng"
+                  title={isAdmin ? 'Quản trị hệ thống' : 'Xem Dashboard & Hồ sơ dinh dưỡng'}
                 >
                   <div className="w-9 h-9 rounded-full bg-[#005f3e] text-white flex items-center justify-center font-bold text-sm shadow-2xs">
                     {user?.name?.charAt(0) || 'M'}

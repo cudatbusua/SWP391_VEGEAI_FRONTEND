@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Bookmark, BookmarkCheck, Clock3, Loader2, MessageCircle, Pencil, Send, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, Bookmark, BookmarkCheck, Clock3, ExternalLink, Loader2, MessageCircle, Pencil, Send, Trash2, UserRound } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
 import { useCommunityQuery } from '../hooks/useCommunityQuery';
 import { communityService } from '../services/communityService';
 import { errorMessage } from '../services/apiClient';
+import { safeMediaUrl } from '../utils/communityVideo';
 import type { VideoComment } from '../types/community';
 import { videoCategories } from '../types/community';
 import { communityDate, CommunityConfirm, CommunityError, CommunityLoading, CommunityPagination, VideoCard, VideoPlayer } from '../components/CommunityUi';
@@ -74,7 +75,10 @@ function VideoDetail({ videoId }: { videoId: string }) {
     {query.data && <div className={'cm-video-detail ' + (!recommendations.length ? 'single' : '')}><div><VideoPlayer video={query.data} /><div className="cm-video-card-meta"><span>{videoCategories[query.data.category || ''] || query.data.category || 'Bếp chay'}</span></div><h1 className="cm-video-title">{query.data.title}</h1><div className="cm-video-byline"><span><UserRound size={13} style={{ display: 'inline', marginRight: 5 }} />{query.data.createdBy}</span><span><Clock3 size={13} style={{ display: 'inline', marginRight: 5 }} />{communityDate(query.data.createdAt)}</span></div>
       <div className="cm-actions" style={{ marginBottom: 18 }}>{isAuthenticated ? <button className={'cm-button ' + (isSaved ? '' : 'secondary')} onClick={toggle} disabled={busy || favoriteQuery.busy || !!favoriteQuery.error} aria-pressed={isSaved}>{busy ? <Loader2 size={16} className="cm-spin" /> : isSaved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}{isSaved ? 'Đã lưu video' : 'Lưu video'}</button> : <Link to="/login" state={{ from: '/videos/' + videoId }} className="cm-button secondary"><Bookmark size={16} /> Đăng nhập để lưu</Link>}{user?.role === 'admin' && <Link className="cm-button secondary" to={'/admin/videos/' + videoId + '/edit'}><Pencil size={15} /> Sửa video</Link>}</div>
       {error && <CommunityError message={error} />}{favoriteQuery.error && <CommunityError message={favoriteQuery.error} retry={favoriteQuery.refresh} />}
-      {query.data.description && <p className="cm-video-description">{query.data.description}</p>}<VideoComments videoId={videoId} />
+      {query.data.description && <p className="cm-video-description">{query.data.description.split('\n').map((line, index) => {
+        const sourceUrl = safeMediaUrl(line.trim());
+        return <Fragment key={index}>{index > 0 && '\n'}{sourceUrl ? <a className="cm-source-link" href={sourceUrl} target="_blank" rel="noopener noreferrer">{new URL(sourceUrl).hostname} <ExternalLink size={14} /></a> : line}</Fragment>;
+      })}</p>}<VideoComments videoId={videoId} />
     </div>{!!recommendations.length && <aside className="cm-video-sidebar"><h2>Cùng vào bếp</h2>{recommendations.map(video => <VideoCard key={video.id} video={video} />)}</aside>}</div>}
   </div>;
 }

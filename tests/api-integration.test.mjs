@@ -37,6 +37,8 @@ function setup(handler) {
     restaurants: load('src/services/restaurantService.ts').restaurantService,
     recipes: load('src/services/recipeService.ts').recipeService,
     blogs: load('src/services/blogService.ts').blogService,
+    nutrition: load('src/services/nutritionService.ts').nutritionService,
+    mealPlans: load('src/services/mealPlanService.ts').mealPlanService,
     community: load('src/services/communityService.ts').communityService,
     videoMedia: load('src/utils/communityVideo.ts') };
 }
@@ -45,6 +47,41 @@ const auth = (token = 'token-1', expiresInSeconds = 900) => ({ ...profile, acces
 const reply = (data, status = 200, message = 'OK', code = status) => ({ ok: status < 400, status,
   json: async () => ({ success: status < 400, code, message, data }) });
 const hash = value => createHash('sha256').update(value).digest('hex');
+
+test('nutrition saves contact, diet and exclusions together without modifying public calculation', async () => {
+  const fixture = setup(() => reply({ targets: { dailyCaloriesTarget: 1800 } }));
+  fixture.api.setSession(auth(), true);
+  const input = { gender: 'FEMALE', dateOfBirth: '2000-01-01', heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN', phoneNumber: '0912345678', dietaryPreferences: 'VEGAN', allergies: 'Đậu phộng', customDailyCalories: null };
+  await fixture.nutrition.saveProfile(input);
+  assert.equal(fixture.calls[0].url, '/api/nutrition/profile');
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), input);
+  assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
+  await fixture.nutrition.calculate({ gender: 'FEMALE', age: 26, heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN' });
+  assert.equal(fixture.calls[1].headers.has('Authorization'), false);
+  assert.equal(JSON.parse(fixture.calls[1].body).phoneNumber, undefined);
+});
+
+test('meal plan preview, swaps, saving and pagination use authenticated server contracts', async () => {
+  const fixture = setup(() => reply({ id: 'plan-1', status: 'DRAFT' }));
+  const body = { period: 'MONTH', startDate: '2026-11-01', mealsPerDay: 3 };
+  await assert.rejects(fixture.mealPlans.generate(body), /đăng nhập/);
+  assert.equal(fixture.calls.length, 0);
+  fixture.api.setSession(auth(), true);
+  await fixture.mealPlans.generate(body); await fixture.mealPlans.get('plan-1');
+  await fixture.mealPlans.options('plan-1'); await fixture.mealPlans.swap('plan-1', 2, 1, 'recipe-2');
+  await fixture.mealPlans.save('plan-1'); await fixture.mealPlans.list(1);
+  assert.deepEqual(fixture.calls.map(call => call.url), ['/api/meal-plans/generate', '/api/meal-plans/plan-1', '/api/meal-plans/plan-1/options', '/api/meal-plans/plan-1/days/2/meals/1', '/api/meal-plans/plan-1/save', '/api/meal-plans?page=1&size=5']);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), body);
+  assert.deepEqual(JSON.parse(fixture.calls[3].body), { recipeId: 'recipe-2' });
+  assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
+});
+
+test('meal plan conflicts and provider failures remain visible without guest retries', async () => {
+  const fixture = setup(() => reply(null, 409, 'Hồ sơ đã thay đổi.'));
+  fixture.api.setSession(auth(), true);
+  await assert.rejects(fixture.mealPlans.save('old-plan'), /Hồ sơ đã thay đổi/);
+  assert.equal(fixture.calls.length, 1);
+});
 
 test('nearby places map backend coordinates and send radius in metres', async () => {
   const fixture = setup(() => reply([
@@ -112,6 +149,21 @@ test('admin recipe and tag writes use the correct paths, DTOs and methods', asyn
   denied.api.setSession(auth(), true);
   await assert.rejects(denied.recipes.save(recipe), /Admin only/);
   assert.equal(denied.calls.length, 1);
+});
+
+test('admin recipe reads use private detail and video selections are preserved or cleared explicitly', async () => {
+  const fixture = setup(() => reply({ recipeId: 'recipe-1', videos: [{ id: 'video-1', status: 'DRAFT' }] }));
+  await assert.rejects(fixture.recipes.adminDetail('recipe-1'), /đăng nhập/);
+  assert.equal(fixture.calls.length, 0);
+  fixture.api.setSession(auth(), true);
+  const detail = await fixture.recipes.adminDetail('recipe-1');
+  assert.equal(detail.videos[0].status, 'DRAFT');
+  assert.equal(fixture.calls[0].url, '/api/admin/recipes/recipe-1');
+  await fixture.recipes.save({ videoIds: ['video-1'] }, 'recipe-1');
+  await fixture.recipes.save({ videoIds: [] }, 'recipe-1');
+  assert.deepEqual(JSON.parse(fixture.calls[1].body).videoIds, ['video-1']);
+  assert.deepEqual(JSON.parse(fixture.calls[2].body).videoIds, []);
+  assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
 });
 
 test('public blog browsing encodes filters and never sends an authenticated token', async () => {

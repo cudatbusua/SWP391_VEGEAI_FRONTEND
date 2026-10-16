@@ -184,6 +184,8 @@ Mặc định trình duyệt gọi `/api`, Vite proxy tới `http://localhost:80
 | Công thức / lọc / chi tiết | `POST /api/recipes/filter`, `GET /api/recipes/tags`, `GET /api/recipes/{id}` |
 | Gợi ý món từ tủ lạnh | `GET /api/recipes/fridge-match` |
 | Tìm quán / siêu thị / cửa hàng | `/api/places/nearby`, `/api/places/search`, `/api/places/categories` |
+| Quán chay trên bản đồ | `/api/places/verified/nearby`, `/api/places/verified/search` |
+| Thông báo tài khoản | `/api/notifications`, `/api/notifications/unread-count`, `/api/notifications/{id}/read`, `/api/notifications/read-all` |
 | Admin quản lý công thức / thẻ | `/api/admin/recipes`, `/api/admin/recipes/{id}`, `/api/admin/tags`, `/api/admin/tags/{id}` |
 | AI Bếp Trưởng (`/ai-chef`) | `POST /api/ai/chat` |
 | Quét Tủ Lạnh (`/fridge-scan`) | `POST /api/ai/fridge-scan` (multipart field `image`) |
@@ -242,7 +244,9 @@ Backend cập nhật đã hỗ trợ công thức, lọc phân trang, thẻ phâ
 
 Trang `/fridge` có mục gợi ý món dựa trên nguyên liệu đang lưu. Trang `/admin` có biểu mẫu tạo/sửa/xóa công thức và tạo/xóa thẻ, yêu cầu quyền ADMIN. Để sửa công thức, lấy ID từ URL `/recipe/{id}` và tải vào biểu mẫu. API hiện không có danh sách riêng cho bản nháp/lưu trữ; giữ ID trả về khi lưu để tải lại các món này.
 
-Tìm quán gọi backend Google Places; bản đồ hiển thị vẫn dùng OpenStreetMap. Backend tự sinh địa điểm dự phòng khi thiếu/lỗi khóa Google Maps. Những kết quả có ID `mock_` được gắn nhãn dữ liệu mẫu, cần kiểm tra trước khi đến. Khóa dịch vụ chỉ lưu ở backend.
+Trang quán chay dùng các endpoint `/api/places/verified/*`, chỉ nhận kết quả thật có Google Places type `vegetarian_restaurant`, không sử dụng fallback/mock và ẩn các POI chung trên bản đồ Google. Cần cấu hình `VITE_GOOGLE_MAPS_API_KEY` bằng khóa Maps JavaScript API bị giới hạn theo HTTP referrer; không dùng hoặc đưa khóa backend vào frontend. Nhãn Google là tiêu chí lọc chứ không bảo đảm nhà hàng không bán món mặn; cần xác minh thủ công trước khi coi là danh sách thuần chay tuyệt đối.
+
+Chuông thông báo đọc dữ liệu tài khoản từ API có xác thực và cập nhật số chưa đọc theo chu kỳ 60 giây. API ghi nhận thay đổi hồ sơ/dinh dưỡng, thao tác kho lạnh/thực đơn, bài viết chờ duyệt, kết quả duyệt/trả lời hỏi đáp và bình luận/lưu video. Danh sách phân trang bắt đầu từ `page=0`; chủ tài khoản mới có thể đọc/sửa thông báo của họ.
 
 Dashboard hiển thị mục tiêu dinh dưỡng từ `/api/nutrition/profile`, trạng thái tủ lạnh từ `/api/fridge/summary` và công thức từ API lọc. Chưa có hồ sơ thì hiển thị trạng thái trống và liên kết thiết lập, không dùng số liệu dinh dưỡng giả. Theo dõi nước và ghi chú đi chợ lưu trong localStorage theo tài khoản; chưa đồng bộ sang thiết bị khác.
 

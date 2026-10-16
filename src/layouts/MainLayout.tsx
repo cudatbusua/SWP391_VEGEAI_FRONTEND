@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Leaf, Bell, Menu, X } from 'lucide-react';
+import { Leaf, Menu, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/navigation.css';
 import { AdminLayout } from './AdminLayout';
 import { UserMenu } from '../components/UserMenu';
+import { NotificationBell } from '../components/NotificationBell';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated, logout, sessionError, retrySession } = useAuth();
@@ -23,15 +24,17 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const isAdmin = user?.role === 'admin';
   const home = isAdmin ? '/admin' : isAuthenticated ? '/dashboard' : '/';
   const isCurrent = (path: string) => location.pathname === path || (path !== '/' && path !== '/admin' && location.pathname.startsWith(path + '/')) || (isAdmin && path === '/admin/blog' && location.pathname.startsWith('/blog/'));
-  const navItems = isAdmin ? [
+  const navItems: [string, string][] = isAdmin ? [
     ['/admin', 'Tổng quan & tài khoản'], ['/admin/recipes', 'Công thức & dinh dưỡng'],
     ['/admin/blog', 'Blog'], ['/admin/videos', 'Video'], ['/admin/questions', 'Hỏi đáp'],
+  ] : isAuthenticated ? [
+    ['/dashboard', 'Trang chủ'], ['/','Khám phá'], ['/nutrition', 'Dinh dưỡng'],
+    ['/ai-chef', 'AI bếp trưởng'], ['/meal-plans', 'Thực đơn'], ['/blog', 'Blog'],
+    ['/videos', 'Video'], ['/questions', 'Hỏi đáp'], ['/fridge-scan', 'Quét tủ lạnh'],
+    ['/fridge', 'Kho lạnh'], ['/restaurants', 'Quán chay gần đây'],
   ] : [
-    ...(isAuthenticated ? [['/dashboard', 'Trang chủ']] : []),
-    ['/', 'Khám phá'], ['/ai-chef', 'AI Bếp Trưởng'], ['/fridge-scan', 'Quét Tủ Lạnh'],
-    ...(isAuthenticated ? [['/fridge', 'Kho Tủ']] : []),
-    ['/nutrition', 'Dinh dưỡng'], ['/blog', 'Blog'], ['/videos', 'Video'], ['/questions', 'Hỏi đáp'], ['/restaurants', 'Quán chay gần đây'],
-    ...(isAuthenticated ? [['/meal-plans', 'Thực đơn']] : []),
+    ['/','Khám phá'], ['/blog', 'Blog'], ['/questions', 'Hỏi đáp'],
+    ['/restaurants', 'Quán chay gần đây'],
   ];
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
@@ -79,14 +82,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               </>
             ) : (
               <div className="flex items-center gap-2 sm:gap-3">
-                {/* Notification Bell */}
-                {!isAdmin && <button
-                  onClick={() => alert('Thông báo: AI đã gợi ý thực đơn bữa tối cho bạn!')}
-                  className="relative p-2 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-                >
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
-                </button>}
+                <NotificationBell />
 
                 {/* Avatar dropdown: personal pages, change password, logout */}
                 <UserMenu user={user} loggingOut={loggingOut} onLogout={handleLogout} />

@@ -34,6 +34,7 @@ function setup(handler) {
   }
   return { context, calls, api: load('src/services/apiClient.ts'), auth: load('src/services/authService.ts').authService,
     users: load('src/services/userService.ts').userService, ai: load('src/services/aiService.ts').aiService,
+    notifications: load('src/services/notificationService.ts').notificationService,
     restaurants: load('src/services/restaurantService.ts').restaurantService,
     recipes: load('src/services/recipeService.ts').recipeService,
     blogs: load('src/services/blogService.ts').blogService,
@@ -104,6 +105,46 @@ test('place search encodes keywords and preserves backend errors', async () => {
   assert.equal(url.searchParams.get('query'), 'Quận 1 & trung tâm'); assert.equal(url.searchParams.get('radius'), '2000');
   const failure = setup(() => reply(null, 503, 'Places unavailable'));
   await assert.rejects(failure.restaurants.nearby({ lat: 10, lon: 106 }, 2), /Places unavailable/);
+});
+
+test('verified restaurant feeds discard unverified, non-restaurant and mock records', async () => {
+  const fixture = setup(() => reply([
+    { placeId: 'verified-1', name: 'Chay xanh', latitude: 10.1, longitude: 106.1, category: 'RESTAURANT', isVerified: true },
+    { placeId: 'unverified-1', name: 'Mixed menu', latitude: 10.2, longitude: 106.2, category: 'RESTAURANT', isVerified: false },
+    { placeId: 'verified-market', name: 'Market', latitude: 10.3, longitude: 106.3, category: 'SUPERMARKET', isVerified: true },
+    { placeId: 'mock_verified', name: 'Demo', latitude: 10.4, longitude: 106.4, category: 'RESTAURANT', isVerified: true },
+  ]));
+  const places = await fixture.restaurants.verifiedRestaurantsNearby({ lat: 10, lon: 106 }, 5);
+  assert.deepEqual(places.map(place => place.id), ['verified-1']);
+  const url = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(url.pathname, '/api/places/verified/nearby');
+  assert.equal(url.searchParams.get('radius'), '5000');
+
+  const search = setup(() => reply([{ placeId: 'verified-search', name: 'Chay', latitude: 10, longitude: 106, category: 'RESTAURANT', isVerified: true }]));
+  assert.equal((await search.restaurants.searchVerifiedRestaurants('Quận 1 & gần đây', { lat: 10, lon: 106 }, 2)).length, 1);
+  const searchUrl = new URL(search.calls[0].url, 'http://localhost');
+  assert.equal(searchUrl.pathname, '/api/places/verified/search');
+  assert.equal(searchUrl.searchParams.get('query'), 'Quận 1 & gần đây');
+});
+
+test('notification APIs load, count and update only authenticated account notices', async () => {
+  const item = { id: 'notice-1', eventType: 'QUESTION_ANSWERED', title: 'Đã trả lời', content: 'Có câu trả lời mới.', createdAt: '2026-10-17T02:00:00', readAt: null, isRead: false, redirectUrl: '/questions/mine/question-1' };
+  const fixture = setup(url => {
+    if (url.endsWith('/notifications/unread-count')) return reply({ unreadCount: 1 });
+    if (url.includes('/notifications?page=')) return reply({ items: [item], page: 0, size: 20, totalElements: 1, totalPages: 1, first: true, last: true });
+    if (url.endsWith('/notifications/notice-1/read')) return reply({ ...item, isRead: true, readAt: '2026-10-17T02:01:00' });
+    if (url.endsWith('/notifications/read-all')) return reply({ updatedCount: 1 });
+    throw new Error(`Unexpected notification URL ${url}`);
+  });
+  fixture.api.setSession(auth(), true);
+  assert.equal(await fixture.notifications.unreadCount(), 1);
+  assert.deepEqual((await fixture.notifications.list()).items.map(value => value.id), ['notice-1']);
+  assert.equal((await fixture.notifications.markRead('notice-1')).isRead, true);
+  assert.equal(await fixture.notifications.markAllRead(), 1);
+  assert.ok(fixture.calls.every(call => Boolean(call.headers.get('Authorization'))));
+  assert.deepEqual(fixture.calls.map(call => new URL(call.url, 'http://localhost').pathname), [
+    '/api/notifications/unread-count', '/api/notifications', '/api/notifications/notice-1/read', '/api/notifications/read-all',
+  ]);
 });
 
 test('recipe filter sends server pagination, inclusion, exclusion and sorting', async () => {

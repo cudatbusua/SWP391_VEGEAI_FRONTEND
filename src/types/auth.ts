@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   name: string;
+  username?: string;
   emailOrPhone: string;
   role: 'guest' | 'user' | 'admin';
   avatar?: string;

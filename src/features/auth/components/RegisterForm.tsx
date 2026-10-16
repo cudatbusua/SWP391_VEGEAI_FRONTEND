@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle } from 'lucide-react';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
 import { isStrictEmail, calculatePasswordStrength } from '../../../utils/validation';
-import { authService } from '../../../services/authService';
 
 export const RegisterForm: React.FC = () => {
   const { register } = useAuth();
@@ -22,7 +21,6 @@ export const RegisterForm: React.FC = () => {
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [generalError, setGeneralError] = useState<string>('');
-  const [successMessage, setSuccessMessage] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<'register' | 'verify' | 'verified'>('register');
   const [otp, setOtp] = useState('');
@@ -42,11 +40,17 @@ export const RegisterForm: React.FC = () => {
     }
 
     if (!formData.emailOrPhone.trim()) {
-      errs.emailOrPhone = 'Vui lòng nhập email đã đăng ký.';
+      errs.emailOrPhone = 'Email không đúng định dạng';
     } else if (!isStrictEmail(formData.emailOrPhone)) {
-      errs.emailOrPhone = 'Backend yêu cầu email hợp lệ để tạo tài khoản và gửi OTP.';
+      errs.emailOrPhone = 'Email không đúng định dạng';
     }
 
+    if (!/^[a-zA-Z0-9_]{4,50}$/.test(formData.username.trim())) {
+      errs.username = 'Tên đăng nhập cần 4–50 ký tự, chỉ gồm chữ, số và dấu gạch dưới.';
+    }
+    if (!formData.fullName.trim() || formData.fullName.trim().length > 100 || /[0-9]/.test(formData.fullName)) {
+      errs.fullName = 'Vui lòng nhập họ tên (tối đa 100 ký tự, không chứa số).';
+    }
     if (!formData.password) {
       errs.password = 'Mật khẩu quá yếu, cần tối thiểu 8 ký tự gồm chữ và số';
     } else if (
@@ -74,7 +78,6 @@ export const RegisterForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setGeneralError('');
-    setSuccessMessage('');
 
     if (!validate()) return;
 
@@ -82,14 +85,8 @@ export const RegisterForm: React.FC = () => {
     try {
       const res = await register(formData);
       if (res.success) {
-        // A successful response means the account was created as pending verification.
-        // OTP delivery is asynchronous on BE, so a success response does not guarantee
-        // SMTP delivered the email; in local development, BE logs a fallback OTP.
-        setStep('verify');
-        setSuccessMessage(
-          'Tài khoản đã được tạo. Hãy kiểm tra email; nếu chưa nhận được, xem console backend ' +
-          'tìm dòng [DEV/FALLBACK] Registration OTP hoặc chờ 30 giây rồi chọn gửi lại mã.'
-        );
+        const email = formData.emailOrPhone.trim();
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`, { state: { email } });
       } else {
         // A 409 means this registration did not create another account. If it is
         // already pending verification, use the resend-OTP flow instead.
@@ -169,42 +166,25 @@ export const RegisterForm: React.FC = () => {
         </div>
       )}
 
-      {successMessage && (
-        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-          <span>{successMessage}</span>
-        </div>
-      )}
-
-      {step === 'register' && <form onSubmit={handleSubmit} className="space-y-3.5">
-        {/* Username is required by the backend registration DTO. */}
-        <Input
-          label="Tên đăng nhập"
-          placeholder="nguyen_van_a"
-          value={formData.username}
-          onChange={(e) => {
-            setFormData({ ...formData, username: e.target.value });
-            if (errors.username) setErrors({ ...errors, username: '' });
-          }}
-          error={errors.username}
-        />
+      <form onSubmit={handleSubmit} className="space-y-3.5">
+        <Input label="Tên đăng nhập" placeholder="nguyen_van_a" autoComplete="username"
+          value={formData.username} error={errors.username}
+          onChange={e => setFormData({ ...formData, username: e.target.value })} />
         
         {/* Họ tên */}
         <Input
           label="Họ tên"
           placeholder="Nguyễn Văn A"
           value={formData.fullName}
-          onChange={(e) => {
-            setFormData({ ...formData, fullName: e.target.value });
-            if (errors.fullName) setErrors({ ...errors, fullName: '' });
-          }}
           error={errors.fullName}
+          onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
         />
 
         {/* BE requires an email address for account creation and OTP delivery. */}
         <div>
           <Input
             label="Email"
+            type="email"
             placeholder="nguyen@gmail.com"
             value={formData.emailOrPhone}
             onChange={(e) => {

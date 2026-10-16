@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { User, LoginFormData, RegisterFormData, ActionResult } from '../types';
 import { authService } from '../services/authService';
+import { AUTH_EXPIRED_EVENT, errorMessage } from '../services/apiClient';
 
 interface AuthContextType {
   user: User | null;
@@ -10,8 +11,9 @@ interface AuthContextType {
   login: (data: LoginFormData) => Promise<ActionResult<User>>;
   register: (data: RegisterFormData) => Promise<ActionResult<void>>;
   logout: () => Promise<ActionResult<void>>;
-  startPreviewSession: (role?: 'user' | 'admin') => void;
-  endPreviewSession: () => void;
+  updateUser: (user: User) => void;
+  sessionError: string;
+  retrySession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,71 +38,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isPreviewSession, setIsPreviewSession] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const authOperationRef = useRef(0);
+  const [sessionError, setSessionError] = useState('');
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
 
   useEffect(() => {
-    // Rehydrate the user from BE via the HttpOnly refresh cookie on page load.
-    const operation = ++authOperationRef.current;
-    void authService.restoreSession().then((result) => {
-      if (authOperationRef.current === operation) {
-        setUser(result.success ? result.data ?? null : null);
-        setIsPreviewSession(false);
-        setIsLoading(false);
-      }
-    });
-  }, []);
+    let active = true;
+    setIsLoading(true);
+    setSessionError('');
+    const onExpired = () => { setUser(null); setSessionError(''); };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    authService.getCurrentUser()
+      .then(saved => { if (active) setUser(saved); })
+      .catch(error => { if (active) setSessionError(errorMessage(error)); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired); };
+  }, [restoreAttempt]);
 
   const login = async (data: LoginFormData): Promise<ActionResult<User>> => {
     authOperationRef.current += 1;
     setIsLoading(true);
-    try {
-      const res = await authService.login(data);
-      if (res.success && res.data) {
-        setUser(res.data);
-        setIsPreviewSession(false);
-      }
-      return res;
-    } finally {
-      setIsLoading(false);
+    const res = await authService.login(data);
+    setIsLoading(false);
+    if (res.success && res.data) {
+      setUser(res.data);
+      setSessionError('');
     }
   };
 
-  const register = async (data: RegisterFormData): Promise<ActionResult<void>> => {
-    authOperationRef.current += 1;
-    setIsLoading(true);
-    try {
-      return await authService.register(data);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const register = (data: RegisterFormData) => authService.register(data);
 
-  const logout = async (): Promise<ActionResult<void>> => {
-    authOperationRef.current += 1;
-    if (isPreviewSession) {
-      // A preview has no BE credentials, so leave the backend logout endpoint untouched.
-      setUser(null);
-      setIsPreviewSession(false);
-      return { success: true };
-    }
-
+  const logout = async () => {
     const result = await authService.logout();
-    setUser(null);
-    setIsPreviewSession(false);
+    if (result.success) { setUser(null); setSessionError(''); }
     return result;
-  };
-
-  const startPreviewSession = (role: 'user' | 'admin' = 'user') => {
-    // Compile-time guard: a preview role can never replace or impersonate a real BE login.
-    if (!import.meta.env.DEV || isLoading || (user && !isPreviewSession)) return;
-    setUser(previewUsers[role]);
-    setIsPreviewSession(true);
-  };
-
-  const endPreviewSession = () => {
-    if (!import.meta.env.DEV || !isPreviewSession) return;
-    setUser(null);
-    setIsPreviewSession(false);
   };
 
   return (
@@ -113,8 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
-        startPreviewSession,
-        endPreviewSession
+        updateUser: setUser,
+        sessionError,
+        retrySession: () => setRestoreAttempt(value => value + 1),
       }}
     >
       {children}

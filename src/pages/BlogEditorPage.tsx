@@ -14,7 +14,8 @@ const initial: BlogInput = { title: '', excerpt: '', content: '', category: 'KIT
 const covers = [{ src: '/images/vietnamese-vegan-table.png', label: 'Bữa cơm chay' }, { src: '/images/vegan-tofu-meal.png', label: 'Món đậu phụ' }, { src: '/images/fresh-vegetables.png', label: 'Rau xanh' }];
 export function BlogEditorPage() {
   const { id } = useParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const navigate = useNavigate();
   const [form, setForm] = useState<BlogInput>(initial);
   const [post, setPost] = useState<BlogPost | null>(null);
@@ -34,7 +35,7 @@ export function BlogEditorPage() {
       setPost(value); setForm({ title: value.title, excerpt: value.excerpt, content: value.content || '', category: value.category, coverImage: value.coverImage || '', version: value.version }); setDirty(false);
     }).catch(reason => { if (!controller.signal.aborted) setError(errorMessage(reason)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [id, isAuthenticated, reload]);
+  }, [id, isAuthenticated, user?.id, reload]);
   useEffect(() => {
     const preventLoss = (event: BeforeUnloadEvent) => { if (dirty && !busy) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', preventLoss); return () => window.removeEventListener('beforeunload', preventLoss);
@@ -44,17 +45,17 @@ export function BlogEditorPage() {
     event.preventDefault(); if (busy) return;
     if (!form.title.trim()) { setPreview(false); setError('Vui lòng nhập tiêu đề bài viết.'); return; }
     const submitting = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'submit';
-    if (submitting && (form.title.trim().length < 5 || form.content.trim().length < 80)) { setError('Tiêu đề cần ít nhất 5 ký tự và nội dung ít nhất 80 ký tự trước khi gửi duyệt.'); return; }
+    if ((submitting || post?.status === 'PUBLISHED') && (form.title.trim().length < 5 || form.content.trim().length < 80)) { setError('Tiêu đề cần ít nhất 5 ký tự và nội dung ít nhất 80 ký tự trước khi gửi bài.'); return; }
     setBusy(true); setError(''); setMessage('');
     try {
       const saved = await blogService.save({ ...form, version: post?.version }, post?.postId || id);
       setPost(saved); setForm(previous => ({ ...previous, version: saved.version })); setDirty(false);
       if (submitting) { await blogService.submit(saved.postId, saved.version); navigate('/blog/my-posts/' + saved.postId); }
-      else { setMessage('Đã lưu bản nháp.'); if (!id) navigate('/blog/my-posts/' + saved.postId + '/edit', { replace: true }); }
+      else { setMessage(saved.status === 'PUBLISHED' ? 'Đã cập nhật bài viết công khai.' : 'Đã lưu bản nháp.'); if (!id) navigate('/blog/my-posts/' + saved.postId + '/edit', { replace: true }); }
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
   };
-  const editable = !post || ['DRAFT', 'REJECTED'].includes(post.status);
+  const editable = !post || ['DRAFT', 'REJECTED'].includes(post.status) || (isAdmin && post.status === 'PUBLISHED');
   return <MainLayout><div className="blog-shell"><BlogAccess><Link to="/blog/my-posts" className="blog-back"><ArrowLeft size={15} /> Bài viết của tôi</Link><header className="blog-page-heading"><div><span className="blog-eyebrow">CHIA SẺ CÙNG CỘNG ĐỒNG</span><h1>{id ? 'Chỉnh sửa bài viết' : 'Viết bài mới'}</h1></div>{post && <BlogBadge status={post.status} />}</header>
     {error && <BlogError message={error} retry={id ? () => setReload(value => value + 1) : undefined} />}{message && <p role="status" className="blog-message">{message}</p>}
     {loading ? <p role="status" className="blog-empty">Đang tải bản nháp...</p> : id && error && !post ? null : !editable ? <div className="blog-empty"><p>Bài viết hiện không thể chỉnh sửa.</p><Link to={'/blog/my-posts/' + id} className="blog-button secondary">Xem trạng thái</Link></div> : <form onSubmit={save} className="blog-editor-grid">
@@ -64,8 +65,8 @@ export function BlogEditorPage() {
         {preview && <article className="blog-editor-preview"><span className="blog-eyebrow">{blogCategories[form.category]}</span><h2>{form.title || 'Tiêu đề bài viết'}</h2><p className="blog-lead">{form.excerpt}</p><BlogCover post={{ title: form.title || 'Ảnh bìa', coverImage: form.coverImage }} /><BlogBody content={form.content || 'Nội dung bài viết'} /></article>}
       </div>
       <aside className="blog-editor-side"><fieldset disabled={busy}><label>Chủ đề<select value={form.category} onChange={event => change('category', event.target.value)}>{Object.entries(blogCategories).map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label><label><span className="blog-inline-label"><Image size={16} /> Ảnh bìa</span><input value={form.coverImage} maxLength={1000} onChange={event => change('coverImage', event.target.value)} placeholder="https://..." /></label><div className="blog-cover-options">{covers.map(cover => <label key={cover.src} title={cover.label}><input type="radio" name="cover" aria-label={cover.label} checked={form.coverImage === cover.src} onChange={() => change('coverImage', cover.src)} /><img src={cover.src} alt={cover.label} /></label>)}</div><BlogCover post={{ title: form.title || 'Ảnh bìa', coverImage: form.coverImage }} /></fieldset>
-        <div className="blog-editor-submit"><button name="intent" value="draft" type="submit" className="blog-button secondary" disabled={busy}><Save size={16} />{busy ? 'Đang xử lý...' : 'Lưu bản nháp'}</button><button name="intent" value="submit" type="submit" className="blog-button" disabled={busy}><Send size={16} /> Gửi admin duyệt</button></div>
-        <p className="blog-moderation-note">Bài viết chỉ xuất hiện công khai sau khi được ban biên tập duyệt.</p>
+        <div className="blog-editor-submit"><button name="intent" value="draft" type="submit" className="blog-button secondary" disabled={busy}><Save size={16} />{busy ? 'Đang xử lý...' : post?.status === 'PUBLISHED' ? 'Lưu thay đổi' : 'Lưu bản nháp'}</button>{post?.status !== 'PUBLISHED' && <button name="intent" value="submit" type="submit" className="blog-button" disabled={busy}><Send size={16} />{isAdmin ? 'Xuất bản' : 'Gửi admin duyệt'}</button>}</div>
+        {!isAdmin && <p className="blog-moderation-note">Bài viết chỉ xuất hiện công khai sau khi được ban biên tập duyệt.</p>}
       </aside>
     </form>}
   </BlogAccess></div></MainLayout>;

@@ -7,6 +7,7 @@ import { nutritionService } from '../../../services/nutritionService';
 import { fridgeService } from '../../../services/fridgeService';
 import { ApiError, errorMessage } from '../../../services/apiClient';
 import { RecipeCard } from '../../../components/RecipeCard';
+import { SavedMealPlans } from '../../../components/SavedMealPlans';
 import type { RecipeSummary } from '../../../types/recipe';
 import type { FridgeSummary, NutritionProfile } from '../../../types/api';
 import '../../../styles/discovery.css';
@@ -73,6 +74,7 @@ export function OverviewTab() {
     </section>
     <div className="dashboard-columns">
       <div className="dashboard-main">
+        <SavedMealPlans />
         <section><div className="dashboard-section-heading"><div><span className="dashboard-eyebrow">MÓN NGON TỪ THỰC VẬT</span><h2>Cảm hứng cho bữa ăn</h2></div><Link to="/">Khám phá thêm <ArrowUpRight size={15} /></Link></div>
           <div className="dashboard-food-banner"><img src="/images/vietnamese-vegan-table.png" alt="Bữa cơm chay với gỏi cuốn, đậu phụ và rau xanh" /><div><span>BẾP XANH VIỆT NAM</span><h3>Bữa chay trọn vị.</h3><Link to="/">Chọn món cho hôm nay <ArrowUpRight size={16} /></Link></div></div>
           {loading && <p role="status" className="dashboard-muted">Đang tìm món ngon...</p>}

@@ -10,8 +10,8 @@ export const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const requestedPath: unknown = location.state?.from;
-  const destination = typeof requestedPath === 'string' && /^\/(?:blog|questions|videos|admin\/(?:blog|questions|videos))(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
-    ? requestedPath : '/dashboard';
+  const destination = typeof requestedPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition)(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
+    ? requestedPath : null;
 
   const [formData, setFormData] = useState({
     emailOrPhone: '',
@@ -54,7 +54,7 @@ export const LoginForm: React.FC = () => {
       if (res.success) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          navigate(destination, { replace: true });
+          navigate(destination || (res.data?.role === 'admin' ? '/admin' : '/dashboard'), { replace: true });
         }, 800);
       } else {
         setGeneralError(res.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');

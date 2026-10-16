@@ -10,12 +10,12 @@ import type {
 } from '../types/api';
 
 export const adminService = {
-  async stats(): Promise<AdminDashboardStats> {
-    const response = await apiRequest<AdminDashboardStats>('/admin/dashboard/stats');
+  async stats(signal?: AbortSignal): Promise<AdminDashboardStats> {
+    const response = await apiRequest<AdminDashboardStats>('/admin/dashboard/stats', { signal });
     if (!response.data) throw new Error('Không thể tải thống kê admin.');
     return response.data;
   },
-  async users(params: { page?: number; size?: number; search?: string; role?: AdminUserRole | ''; status?: AccountStatus | '' }): Promise<PageResponse<UserProfile>> {
+  async users(params: { page?: number; size?: number; search?: string; role?: AdminUserRole | ''; status?: AccountStatus | '' }, signal?: AbortSignal): Promise<PageResponse<UserProfile>> {
     const query = new URLSearchParams({
       page: String(params.page ?? 0),
       size: String(params.size ?? 10),
@@ -25,7 +25,7 @@ export const adminService = {
     if (params.search) query.set('search', params.search);
     if (params.role) query.set('role', params.role);
     if (params.status) query.set('status', params.status);
-    const response = await apiRequest<PageResponse<UserProfile>>(`/admin/users?${query.toString()}`);
+    const response = await apiRequest<PageResponse<UserProfile>>(`/admin/users?${query.toString()}`, { signal });
     if (!response.data) throw new Error('Không thể tải danh sách người dùng.');
     return response.data;
   },

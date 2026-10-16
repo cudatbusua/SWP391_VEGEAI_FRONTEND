@@ -13,6 +13,9 @@ import { FridgeScanPage } from './pages/FridgeScanPage';
 import { FridgeInventoryPage } from './pages/FridgeInventoryPage';
 import { NutritionCalculatorPage } from './pages/NutritionCalculatorPage';
 import { AdminPage } from './pages/AdminPage';
+import { MealPlansPage } from './pages/MealPlansPage';
+import { AdminRecipesPage } from './pages/AdminRecipesPage';
+import { PersonalFeatureBoundary } from './components/PersonalFeatureBoundary';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { BlogPage, BlogDetailPage } from './pages/BlogPage';
 import { BlogEditorPage } from './pages/BlogEditorPage';
@@ -34,17 +37,21 @@ export const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<RecipeDiscoveryPage />} />
           <Route path="/recipe/:id" element={<RecipeDetailPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/dashboard" element={<PersonalFeatureBoundary><DashboardPage /></PersonalFeatureBoundary>} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/ai-chef" element={<AiChatPage />} />
-          <Route path="/fridge-scan" element={<FridgeScanPage />} />
-          <Route path="/fridge" element={<FridgeInventoryPage />} />
-          <Route path="/nutrition" element={<NutritionCalculatorPage />} />
+          <Route path="/ai-chef" element={<PersonalFeatureBoundary><AiChatPage /></PersonalFeatureBoundary>} />
+          <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />
+          <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
+          <Route path="/nutrition" element={<PersonalFeatureBoundary><NutritionCalculatorPage /></PersonalFeatureBoundary>} />
+          <Route path="/meal-plans" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
+          <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/users" element={<AdminPage accountsOnly />} />
+          <Route path="/admin/recipes" element={<AdminRecipesPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/write" element={<BlogEditorPage />} />
           <Route path="/blog/my-posts" element={<MyBlogPostsPage />} />

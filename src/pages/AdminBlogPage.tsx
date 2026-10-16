@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, Search, ShieldCheck, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Search, ShieldCheck, RefreshCw, Plus, FileText } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { BlogAccess, BlogBadge, BlogCover, BlogError, BlogPagination, blogDate } from '../components/BlogUi';
 import { blogService } from '../services/blogService';
@@ -28,7 +28,7 @@ export function AdminBlogPage() {
       .finally(() => { if (!controller.signal.aborted) setBusy(false); }); }, 200);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [isAuthenticated, user?.role, status, keyword, page, reload]);
-  return <MainLayout><div className="blog-shell"><BlogAccess admin><Link to="/admin" className="blog-back"><ArrowLeft size={15} /> Quản trị hệ thống</Link><header className="blog-page-heading"><div><span className="blog-eyebrow"><ShieldCheck size={15} /> BAN BIÊN TẬP VEGEAI</span><h1>Duyệt bài Blog</h1><p>Xem xét những câu chuyện được gửi từ cộng đồng.</p></div><div className="blog-actions"><span className="blog-count">{data?.totalElements ?? 0} bài viết</span><button className="blog-icon-button" title="Tải lại danh sách" aria-label="Tải lại danh sách" disabled={busy} onClick={() => setReload(value => value + 1)}><RefreshCw size={16} /></button></div></header>
+  return <MainLayout><div className="blog-shell"><BlogAccess admin><Link to="/admin" className="blog-back"><ArrowLeft size={15} /> Quản trị hệ thống</Link><header className="blog-page-heading"><div><span className="blog-eyebrow"><ShieldCheck size={15} /> BAN BIÊN TẬP VEGEAI</span><h1>Quản lý Blog</h1><p>Xem xét những câu chuyện được gửi từ cộng đồng.</p></div><div className="blog-actions"><Link className="blog-button" to="/blog/write"><Plus size={16} /> Viết bài</Link><Link className="blog-button secondary" to="/blog/my-posts"><FileText size={16} /> Bài tôi viết</Link><Link className="blog-button secondary" to="/blog">Xem Blog <ArrowUpRight size={15} /></Link><button className="blog-icon-button" title="Tải lại danh sách" aria-label="Tải lại danh sách" disabled={busy} onClick={() => setReload(value => value + 1)}><RefreshCw size={16} /></button></div></header>
     <div className="blog-filter-bar"><div className="blog-tabs">{(['PENDING_REVIEW', 'PUBLISHED', 'REJECTED'] as BlogStatus[]).map(value => <button key={value} aria-pressed={status === value} onClick={() => { setStatus(value); setPage(0); }}>{blogStatuses[value]}</button>)}</div><label className="blog-search"><Search size={17} /><input aria-label="Tìm bài chờ duyệt" value={keyword} onChange={event => { setKeyword(event.target.value); setPage(0); }} placeholder="Tìm theo tiêu đề..." /></label></div>
     {error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}{busy && <p role="status" className="blog-empty">Đang tải hàng chờ...</p>}
     {!busy && !error && !data?.items.length && <div className="blog-empty"><ShieldCheck size={34} /><h2>Không có bài viết ở mục này</h2></div>}

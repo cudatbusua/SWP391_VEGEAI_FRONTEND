@@ -9,7 +9,7 @@ import { useCommunityQuery } from '../hooks/useCommunityQuery';
 import { useAuth } from '../hooks/useAuth';
 import { mealPlanService } from '../services/mealPlanService';
 import { nutritionService } from '../services/nutritionService';
-import { errorMessage } from '../services/apiClient';
+import { ApiError, errorMessage } from '../services/apiClient';
 import { dietLabels, displayAllergies } from '../utils/nutritionProfile';
 import type { MealPlan, PlannedMeal } from '../types/mealPlan';
 import '../styles/meal-plan.css';
@@ -29,7 +29,10 @@ function Planner() {
   const [plan, setPlan] = useState<MealPlan | null>(null); const [day, setDay] = useState(0);
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [message, setMessage] = useState('');
   const [revision, setRevision] = useState(0); const [swapping, setSwapping] = useState<number | null>(null); const [replacement, setReplacement] = useState('');
-  const profile = useCommunityQuery('planner-profile:' + user?.id, signal => nutritionService.getProfile(signal));
+  const profile = useCommunityQuery('planner-profile:' + user?.id, signal => nutritionService.getProfile(signal).catch(reason => {
+    if (reason instanceof ApiError && reason.status === 404) return null;
+    throw reason;
+  }));
   const query = useCommunityQuery('meal-plan:' + user?.id + ':' + id, signal => mealPlanService.get(id || '', signal), !!id);
   const options = useCommunityQuery('plan-options:' + user?.id + ':' + id, signal => mealPlanService.options(id || '', signal), !!id && plan?.id === id && plan.status === 'DRAFT');
   useEffect(() => { setPlan(null); setDay(0); setError(''); setMessage(''); setSwapping(null); }, [id]);
@@ -58,8 +61,8 @@ function Planner() {
   const selected = plan?.plan.days[day];
   const targets = plan?.plan.targets;
   return <div className="meal-plan-page"><header className="meal-plan-heading"><div><span><ChefHat size={17} /> AI BẾP TRƯỞNG</span><h1>Kế hoạch ăn uống</h1></div><Link to="/dashboard">Dashboard<ArrowUpRight size={16} /></Link></header>
-    <div className="meal-plan-layout"><aside className="meal-plan-sidebar"><form onSubmit={generate} className="plan-settings"><h2><CalendarDays size={18} /> Kế hoạch mới</h2><fieldset disabled={busy || profile.busy || !!profile.error}><div className="plan-period" role="group" aria-label="Thời gian kế hoạch">{(['WEEK','MONTH'] as const).map(value => <button type="button" key={value} aria-pressed={period === value} onClick={() => setPeriod(value)}>{value === 'WEEK' ? 'Tuần' : 'Tháng'}</button>)}</div><label>Ngày bắt đầu<input type="date" required min={today} value={startDate} onChange={event => setStartDate(event.target.value)} /></label><label>Số bữa mỗi ngày<select value={meals} onChange={event => setMeals(Number(event.target.value))}>{[1,2,3,4,5,6].map(value => <option key={value} value={value}>{value} bữa</option>)}</select></label><button className="plan-primary" type="submit"><Sparkles size={16} />{busy ? 'Đang xử lý...' : 'Tạo thực đơn'}</button></fieldset></form>
-      <section className="plan-profile"><h2>Hồ sơ đang áp dụng</h2>{profile.busy && <p role="status">Đang tải hồ sơ...</p>}{profile.error && <div role="alert"><p>{profile.error}</p><button onClick={profile.refresh}>Tải lại</button></div>}{profile.data && <><strong>{profile.data.targets.dailyCaloriesTarget.toLocaleString('vi-VN')} kcal/ngày</strong><p>{dietLabels[profile.data.dietaryPreferences || ''] || 'Chưa chọn chế độ ăn'}</p>{displayAllergies(profile.data.allergies) && <p className="plan-avoid">Tránh: {displayAllergies(profile.data.allergies)}</p>}</>}<Link to="/nutrition">Cập nhật hồ sơ<ArrowUpRight size={14} /></Link></section><SavedMealPlans revision={revision} />
+    <div className="meal-plan-layout"><aside className="meal-plan-sidebar"><form onSubmit={generate} className="plan-settings"><h2><CalendarDays size={18} /> Kế hoạch mới</h2><fieldset disabled={busy || profile.busy || !!profile.error || !profile.data}><div className="plan-period" role="group" aria-label="Thời gian kế hoạch">{(['WEEK','MONTH'] as const).map(value => <button type="button" key={value} aria-pressed={period === value} onClick={() => setPeriod(value)}>{value === 'WEEK' ? 'Tuần' : 'Tháng'}</button>)}</div><label>Ngày bắt đầu<input type="date" required min={today} value={startDate} onChange={event => setStartDate(event.target.value)} /></label><label>Số bữa mỗi ngày<select value={meals} onChange={event => setMeals(Number(event.target.value))}>{[1,2,3,4,5,6].map(value => <option key={value} value={value}>{value} bữa</option>)}</select></label><button className="plan-primary" type="submit"><Sparkles size={16} />{busy ? 'Đang xử lý...' : 'Tạo thực đơn'}</button></fieldset></form>
+      <section className="plan-profile"><h2>Hồ sơ đang áp dụng</h2>{profile.busy && <p role="status">Đang tải hồ sơ...</p>}{profile.error && <div role="alert"><p>{profile.error}</p><button onClick={profile.refresh}>Tải lại</button></div>}{!profile.busy && !profile.error && !profile.data && <div><p>Bạn chưa có hồ sơ dinh dưỡng. Hãy tạo hồ sơ để AI lập thực đơn phù hợp với bạn.</p><Link to="/nutrition">Tạo hồ sơ dinh dưỡng<ArrowUpRight size={14} /></Link></div>}{profile.data && <><strong>{profile.data.targets.dailyCaloriesTarget.toLocaleString('vi-VN')} kcal/ngày</strong><p>{dietLabels[profile.data.dietaryPreferences || ''] || 'Chưa chọn chế độ ăn'}</p>{displayAllergies(profile.data.allergies) && <p className="plan-avoid">Tránh: {displayAllergies(profile.data.allergies)}</p>}</>}<Link to="/nutrition">Cập nhật hồ sơ<ArrowUpRight size={14} /></Link></section><SavedMealPlans revision={revision} />
     </aside><section className="meal-plan-content">
       {error && swapping === null && <p role="alert" className="plan-error">{error}</p>}{message && <p role="status" className="plan-success">{message}<Link to="/dashboard">Xem Dashboard<ArrowUpRight size={15} /></Link></p>}
       {query.busy && <p role="status">Đang tải kế hoạch...</p>}{query.error && <div role="alert" className="plan-error">{query.error}<button onClick={query.refresh}>Tải lại</button></div>}

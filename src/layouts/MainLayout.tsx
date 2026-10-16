@@ -4,7 +4,7 @@ import { Leaf, Bell, Menu, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/navigation.css';
 import { AdminLayout } from './AdminLayout';
-import { KeyRound } from 'lucide-react';
+import { UserMenu } from '../components/UserMenu';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated, logout, sessionError, retrySession } = useAuth();
@@ -88,37 +88,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                   <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
                 </button>}
 
-                {/* Avatar with direct link to Dashboard */}
-                <Link
-                  to={isAdmin ? home : '/dashboard?tab=profile'}
-                  className="flex items-center gap-2.5 p-1 rounded-full hover:bg-gray-50 transition cursor-pointer"
-                  title={isAdmin ? 'Quản trị hệ thống' : 'Xem Dashboard & Hồ sơ dinh dưỡng'}
-                >
-                  <div className="w-9 h-9 rounded-full bg-[#005f3e] text-white flex items-center justify-center font-bold text-sm shadow-2xs">
-                    {user?.name?.charAt(0) || 'M'}
-                  </div>
-                  <span className="text-xs font-bold text-gray-800 hidden sm:block max-w-[160px] truncate" title={user?.name}>
-                    {user?.name || 'Nguyễn Hoàng Minh'}
-                  </span>
-                </Link>
-
-                {/* Change password */}
-                <Link
-                  to="/change-password"
-                  className="p-2 rounded-xl text-gray-500 hover:text-emerald-700 hover:bg-gray-50 transition cursor-pointer"
-                  title="Đổi mật khẩu"
-                  aria-label="Đổi mật khẩu"
-                >
-                  <KeyRound className="w-5 h-5" />
-                </Link>
-
-                <button
-                  onClick={handleLogout}
-                  disabled={loggingOut}
-                  className="text-xs whitespace-nowrap text-red-500 hover:underline cursor-pointer ml-1 font-medium"
-                >
-                  {loggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
-                </button>
+                {/* Avatar dropdown: dashboard, change password, logout */}
+                <UserMenu user={user} loggingOut={loggingOut} onLogout={handleLogout} />
               </div>
             )}
           </div>

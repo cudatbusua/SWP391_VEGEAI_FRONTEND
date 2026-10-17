@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowUpRight, BookOpen, ChevronRight, CircleHelp, FilePenLine, LayoutDashboard, Leaf, LogOut, Menu, PanelLeftClose, Search, ShieldCheck, Users, Video, X } from 'lucide-react';
+import { ArrowUpRight, BookOpen, ChevronRight, CircleHelp, FilePenLine, LayoutDashboard, Leaf, LogOut, MapPin, Menu, PanelLeftClose, Search, ShieldCheck, Users, Video, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/admin.css';
 
@@ -8,9 +8,10 @@ const items = [
   { path: '/admin', label: 'Tổng quan', icon: LayoutDashboard, section: 'workspace' },
   { path: '/admin/users', label: 'Tài khoản', icon: Users, section: 'workspace' },
   { path: '/admin/recipes', label: 'Công thức & dinh dưỡng', icon: BookOpen, section: 'content' },
-  { path: '/admin/blog', label: 'Blog', icon: FilePenLine, section: 'content' },
-  { path: '/admin/videos', label: 'Video', icon: Video, section: 'content' },
-  { path: '/admin/questions', label: 'Hỏi đáp', icon: CircleHelp, section: 'content' },
+  { path: '/admin/blog', label: 'Cộng đồng (AI & Admin duyệt)', icon: FilePenLine, section: 'content' },
+  { path: '/admin/videos', label: 'Kho Video Bếp Chay', icon: Video, section: 'content' },
+  { path: '/restaurants', label: 'Bản đồ Quán & Điện Máy Xanh', icon: MapPin, section: 'content' },
+  { path: '/admin/questions', label: 'Cần hỗ trợ', icon: CircleHelp, section: 'content' },
 ];
 
 export function AdminLayout({ children }: { children: ReactNode }) {

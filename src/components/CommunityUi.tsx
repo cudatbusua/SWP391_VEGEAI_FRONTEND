@@ -49,7 +49,7 @@ export function VideoCover({ video }: { video: Pick<CommunityVideo, 'videoUrl' |
 export function VideoCard({ video, extra }: { video: CommunityVideo; extra?: ReactNode }) {
   return <article className="cm-video-card"><Link to={'/videos/' + video.id}><VideoCover video={video} /></Link><div className="cm-video-card-meta"><span>{videoCategories[video.category || ''] || video.category || 'Bếp chay'}</span><time>{communityDate(video.createdAt)}</time></div><h2><Link to={'/videos/' + video.id}>{video.title}</Link></h2>{video.description && <p>{video.description}</p>}{extra}</article>;
 }
-export function VideoPlayer({ video }: { video: CommunityVideo }) {
+export function VideoPlayer({ video }: { video: Partial<CommunityVideo> & Pick<CommunityVideo, 'videoUrl' | 'title'> }) {
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
   const source = videoSource(video.videoUrl);

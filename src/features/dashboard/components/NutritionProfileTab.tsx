@@ -38,8 +38,52 @@ export function NutritionProfileTab() {
       ['Mức vận động', nutrition ? ({SEDENTARY:'Ít vận động',LIGHT:'Vận động nhẹ',MODERATE:'Vận động vừa',ACTIVE:'Vận động nhiều',VERY_ACTIVE:'Rất năng động'})[nutrition.activityLevel] : ''],
       ['Mục tiêu', nutrition ? ({LOSE_WEIGHT:'Giảm cân',MAINTAIN:'Giữ cân',GAIN_MUSCLE:'Tăng cơ'})[nutrition.goal] : ''],
     ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-gray-500 mb-2">{label}</dt><dd className="font-semibold break-words">{value || 'Chưa cập nhật'}</dd></div>)}</dl></div>
-    {nutrition ? <section><h2 className="font-semibold mb-5">Mục tiêu mỗi ngày</h2><dl className="grid grid-cols-2 sm:grid-cols-4 gap-5">{[
-      ['Năng lượng', nutrition.targets.dailyCaloriesTarget + ' kcal'], ['Đạm', nutrition.targets.proteinTargetG + ' g'], ['Carb', nutrition.targets.carbsTargetG + ' g'], ['Chất béo', nutrition.targets.fatTargetG + ' g'],
-    ].map(([label, value]) => <div key={label} className="border-l-2 border-emerald-600 pl-4"><dt className="text-xs text-gray-500 mb-2">{label}</dt><dd className="font-bold text-lg">{value}</dd></div>)}</dl><Link to="/meal-plans" className="inline-flex gap-2 items-center mt-6 text-emerald-700 text-sm font-semibold">Xem kế hoạch ăn uống<ArrowUpRight size={16} /></Link></section> : <p className="text-sm text-gray-500">Bạn chưa lưu mục tiêu dinh dưỡng.</p>}</>}
+    {nutrition ? (
+      <section>
+        <h2 className="font-semibold mb-5">Mục tiêu dinh dưỡng cá nhân mỗi ngày</h2>
+        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+          {[
+            ['Năng lượng', nutrition.targets.dailyCaloriesTarget + ' kcal'],
+            ['Đạm', nutrition.targets.proteinTargetG + ' g'],
+            ['Carb', nutrition.targets.carbsTargetG + ' g'],
+            ['Chất béo', nutrition.targets.fatTargetG + ' g'],
+          ].map(([label, value]) => (
+            <div key={label} className="border-l-2 border-emerald-600 pl-4">
+              <dt className="text-xs text-gray-500 mb-2">{label}</dt>
+              <dd className="font-bold text-lg">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <Link
+            to="/ai-chef"
+            state={{
+              nutritionTargets: nutrition.targets,
+              goal: nutrition.goal,
+              mode: 'chat',
+            }}
+            className="inline-flex gap-2 items-center rounded-xl bg-emerald-700 text-white px-4 py-2.5 text-xs font-bold hover:bg-emerald-800 transition"
+          >
+            Đưa mục tiêu cho AI Bếp Trưởng phân tích
+            <ArrowUpRight size={15} />
+          </Link>
+          <Link
+            to="/ai-chef?tab=meal-plan"
+            state={{
+              nutritionTargets: nutrition.targets,
+              goal: nutrition.goal,
+              mode: 'meal-plan',
+              period: 'WEEK',
+            }}
+            className="inline-flex gap-2 items-center rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 px-4 py-2.5 text-xs font-bold hover:bg-emerald-100 transition"
+          >
+            AI Set Thực Đơn Tuần / Tháng
+            <ArrowUpRight size={15} />
+          </Link>
+        </div>
+      </section>
+    ) : (
+      <p className="text-sm text-gray-500">Bạn chưa lưu mục tiêu dinh dưỡng.</p>
+    )}</>}
   </section>;
 }

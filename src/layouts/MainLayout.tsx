@@ -22,16 +22,41 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const isAdmin = user?.role === 'admin';
   const home = isAdmin ? '/admin' : isAuthenticated ? '/dashboard' : '/';
-  const isCurrent = (path: string) => location.pathname === path || (path !== '/' && path !== '/admin' && location.pathname.startsWith(path + '/')) || (isAdmin && path === '/admin/blog' && location.pathname.startsWith('/blog/'));
+  const isCurrent = (path: string) => {
+    if (path === '/ai-chef') {
+      return (
+        location.pathname === '/ai-chef' ||
+        location.pathname.startsWith('/fridge') ||
+        location.pathname.startsWith('/meal-plans')
+      );
+    }
+    if (path === '/blog' && !isAdmin) {
+      return (
+        location.pathname === '/blog' ||
+        location.pathname.startsWith('/blog/') ||
+        location.pathname === '/community' ||
+        location.pathname.startsWith('/videos')
+      );
+    }
+    return (
+      location.pathname === path ||
+      (path !== '/' && path !== '/admin' && location.pathname.startsWith(path + '/')) ||
+      (isAdmin && path === '/admin/blog' && location.pathname.startsWith('/blog/'))
+    );
+  };
   const navItems = isAdmin ? [
-    ['/admin', 'Tổng quan & tài khoản'], ['/admin/recipes', 'Công thức & dinh dưỡng'],
-    ['/admin/blog', 'Blog'], ['/admin/videos', 'Video'], ['/admin/questions', 'Hỏi đáp'],
+    ['/admin', 'Tổng quan & tài khoản'],
+    ['/admin/recipes', 'Công thức & dinh dưỡng'],
+    ['/admin/blog', 'Cộng đồng (Duyệt bài)'],
+    ['/admin/videos', 'Video Bếp Chay'],
+    ['/admin/questions', 'Cần hỗ trợ'],
   ] : [
     ...(isAuthenticated ? [['/dashboard', 'Trang chủ']] : []),
-    ['/', 'Khám phá'], ['/ai-chef', 'AI Bếp Trưởng'], ['/fridge-scan', 'Quét Tủ Lạnh'],
-    ...(isAuthenticated ? [['/fridge', 'Kho Tủ']] : []),
-    ['/nutrition', 'Dinh dưỡng'], ['/blog', 'Blog'], ['/videos', 'Video'], ['/questions', 'Hỏi đáp'], ['/restaurants', 'Quán chay gần đây'],
-    ...(isAuthenticated ? [['/meal-plans', 'Thực đơn']] : []),
+    ['/', 'Khám phá'],
+    ['/ai-chef', 'AI Bếp Trưởng Thông Minh'],
+    ['/nutrition', 'Dinh dưỡng'],
+    ['/blog', 'Cộng đồng'],
+    ['/restaurants', 'Quán chay gần đây'],
   ];
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
@@ -108,21 +133,37 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-100 py-8 text-xs text-gray-500 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 font-semibold text-gray-700">
-            <Leaf className="w-4 h-4 text-emerald-600" />
-            <span>VEGEAI Vietnam</span>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100">
+            <div>
+              <p className="text-sm font-bold text-emerald-950">Bạn có thắc mắc về dinh dưỡng chay hoặc cách sử dụng hệ thống?</p>
+              <p className="text-xs text-emerald-800 mt-0.5">Đội ngũ chuyên gia & Quản trị viên VEGEAI sẵn sàng hỗ trợ giải đáp cho bạn.</p>
+            </div>
+            <Link
+              to="/support"
+              className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-semibold text-xs hover:bg-emerald-800 transition shrink-0 shadow-2xs"
+            >
+              Cần hỗ trợ & Giải đáp
+            </Link>
           </div>
 
-          <div className="flex flex-wrap justify-center items-center gap-4 text-gray-500 font-medium">
-            <a href="#" className="hover:text-emerald-600 transition">Giới thiệu</a>
-            <a href="#" className="hover:text-emerald-600 transition">Điều khoản</a>
-            <a href="#" className="hover:text-emerald-600 transition">Chính sách bảo mật</a>
-            <a href="#" className="hover:text-emerald-600 transition">Liên hệ</a>
-          </div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 font-semibold text-gray-700">
+              <Leaf className="w-4 h-4 text-emerald-600" />
+              <span>VEGEAI Vietnam</span>
+            </div>
 
-          <div>
-            © 2026 VEGEAI. All rights reserved.
+            <div className="flex flex-wrap justify-center items-center gap-4 text-gray-500 font-medium">
+              <Link to="/blog" className="hover:text-emerald-600 transition">Cộng đồng</Link>
+              <Link to="/restaurants" className="hover:text-emerald-600 transition">Bản đồ Quán chay & Điện Máy Xanh</Link>
+              <Link to="/support" className="text-emerald-700 font-semibold hover:text-emerald-800 transition">Cần hỗ trợ</Link>
+              <a href="#" className="hover:text-emerald-600 transition">Điều khoản</a>
+              <a href="#" className="hover:text-emerald-600 transition">Chính sách bảo mật</a>
+            </div>
+
+            <div>
+              © 2026 VEGEAI. All rights reserved.
+            </div>
           </div>
         </div>
       </footer>

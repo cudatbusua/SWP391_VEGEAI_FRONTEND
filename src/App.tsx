@@ -55,6 +55,7 @@ export const App: React.FC = () => {
           <Route path="/admin/users" element={<AdminPage accountsOnly />} />
           <Route path="/admin/recipes" element={<AdminRecipesPage />} />
           <Route path="/blog" element={<BlogPage />} />
+          <Route path="/community" element={<BlogPage />} />
           <Route path="/blog/write" element={<BlogEditorPage />} />
           <Route path="/blog/my-posts" element={<MyBlogPostsPage />} />
           <Route path="/blog/my-posts/:id/edit" element={<BlogEditorPage />} />
@@ -63,6 +64,8 @@ export const App: React.FC = () => {
           <Route path="/admin/blog" element={<AdminBlogPage />} />
           <Route path="/admin/blog/:id" element={<BlogPostStatusPage adminMode />} />
           <Route path="/restaurants" element={<RestaurantsPage />} />
+          <Route path="/support" element={<QuestionsPage />} />
+          <Route path="/support/mine" element={<QuestionsPage mine />} />
           <Route path="/questions" element={<QuestionsPage />} />
           <Route path="/questions/mine" element={<QuestionsPage mine />} />
           <Route path="/questions/mine/:id" element={<QuestionDetailPage mine />} />

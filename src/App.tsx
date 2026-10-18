@@ -1,41 +1,47 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './store/AuthContext';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
-import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
-import { RecipeDiscoveryPage } from './pages/RecipeDiscoveryPage';
-import { RecipeDetailPage } from './pages/RecipeDetailPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { VerifyEmailPage } from './pages/VerifyEmailPage';
-import { AiChatPage } from './pages/AiChatPage';
-import { FridgeScanPage } from './pages/FridgeScanPage';
-import { FridgeInventoryPage } from './pages/FridgeInventoryPage';
-import { NutritionCalculatorPage } from './pages/NutritionCalculatorPage';
-import { AdminPage } from './pages/AdminPage';
-import { MealPlansPage } from './pages/MealPlansPage';
-import { AdminRecipesPage } from './pages/AdminRecipesPage';
 import { PersonalFeatureBoundary } from './components/PersonalFeatureBoundary';
 import { AdminFeatureBoundary } from './components/AdminFeatureBoundary';
-import { ChangePasswordPage } from './pages/ChangePasswordPage';
-import { ResetPasswordPage } from './pages/ResetPasswordPage';
-import { BlogPage, BlogDetailPage } from './pages/BlogPage';
-import { BlogEditorPage } from './pages/BlogEditorPage';
-import { MyBlogPostsPage } from './pages/MyBlogPostsPage';
-import { BlogPostStatusPage } from './pages/BlogPostStatusPage';
-import { AdminBlogPage } from './pages/AdminBlogPage';
-import { RestaurantsPage } from './pages/RestaurantsPage';
-import { QuestionsPage, QuestionDetailPage } from './pages/QuestionsPage';
-import { VideosPage } from './pages/VideosPage';
-import { VideoDetailPage } from './pages/VideoDetailPage';
-import { AdminQuestionsPage, AdminQuestionDetailPage } from './pages/AdminQuestionsPage';
-import { AdminVideosPage } from './pages/AdminVideosPage';
-import { AdminVideoEditorPage } from './pages/AdminVideoEditorPage';
+
+const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
+const RegisterPage = lazy(() => import('./pages/RegisterPage').then(module => ({ default: module.RegisterPage })));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(module => ({ default: module.ForgotPasswordPage })));
+const RecipeDiscoveryPage = lazy(() => import('./pages/RecipeDiscoveryPage').then(module => ({ default: module.RecipeDiscoveryPage })));
+const RecipeDetailPage = lazy(() => import('./pages/RecipeDetailPage').then(module => ({ default: module.RecipeDetailPage })));
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then(module => ({ default: module.DashboardPage })));
+const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage').then(module => ({ default: module.VerifyEmailPage })));
+const AiChatPage = lazy(() => import('./pages/AiChatPage').then(module => ({ default: module.AiChatPage })));
+const FridgeScanPage = lazy(() => import('./pages/FridgeScanPage').then(module => ({ default: module.FridgeScanPage })));
+const FridgeInventoryPage = lazy(() => import('./pages/FridgeInventoryPage').then(module => ({ default: module.FridgeInventoryPage })));
+const NutritionCalculatorPage = lazy(() => import('./pages/NutritionCalculatorPage').then(module => ({ default: module.NutritionCalculatorPage })));
+const AdminPage = lazy(() => import('./pages/AdminPage').then(module => ({ default: module.AdminPage })));
+const MealPlansPage = lazy(() => import('./pages/MealPlansPage').then(module => ({ default: module.MealPlansPage })));
+const AdminRecipesPage = lazy(() => import('./pages/AdminRecipesPage').then(module => ({ default: module.AdminRecipesPage })));
+const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage').then(module => ({ default: module.ChangePasswordPage })));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(module => ({ default: module.ResetPasswordPage })));
+const BlogPage = lazy(() => import('./pages/BlogPage').then(module => ({ default: module.BlogPage })));
+const BlogDetailPage = lazy(() => import('./pages/BlogPage').then(module => ({ default: module.BlogDetailPage })));
+const BlogEditorPage = lazy(() => import('./pages/BlogEditorPage').then(module => ({ default: module.BlogEditorPage })));
+const MyBlogPostsPage = lazy(() => import('./pages/MyBlogPostsPage').then(module => ({ default: module.MyBlogPostsPage })));
+const BlogPostStatusPage = lazy(() => import('./pages/BlogPostStatusPage').then(module => ({ default: module.BlogPostStatusPage })));
+const AdminBlogPage = lazy(() => import('./pages/AdminBlogPage').then(module => ({ default: module.AdminBlogPage })));
+const RestaurantsPage = lazy(() => import('./pages/RestaurantsPage').then(module => ({ default: module.RestaurantsPage })));
+const QuestionsPage = lazy(() => import('./pages/QuestionsPage').then(module => ({ default: module.QuestionsPage })));
+const QuestionDetailPage = lazy(() => import('./pages/QuestionsPage').then(module => ({ default: module.QuestionDetailPage })));
+const VideosPage = lazy(() => import('./pages/VideosPage').then(module => ({ default: module.VideosPage })));
+const VideoDetailPage = lazy(() => import('./pages/VideoDetailPage').then(module => ({ default: module.VideoDetailPage })));
+const AdminQuestionsPage = lazy(() => import('./pages/AdminQuestionsPage').then(module => ({ default: module.AdminQuestionsPage })));
+const AdminQuestionDetailPage = lazy(() => import('./pages/AdminQuestionsPage').then(module => ({ default: module.AdminQuestionDetailPage })));
+const AdminVideosPage = lazy(() => import('./pages/AdminVideosPage').then(module => ({ default: module.AdminVideosPage })));
+const AdminVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.AdminVideoEditorPage })));
 
 export const App: React.FC = () => {
   return (
     <AuthProvider>
       <BrowserRouter>
+        {/* Defer each route bundle until navigation so maps, admin tools and editors stay off the initial download. */}
+        <Suspense fallback={<main className="min-h-[60vh] p-10 text-center text-sm font-medium text-slate-600" role="status">Đang tải trang...</main>}>
         <Routes>
           <Route path="/" element={<RecipeDiscoveryPage />} />
           <Route path="/recipe/:id" element={<RecipeDetailPage />} />
@@ -78,6 +84,7 @@ export const App: React.FC = () => {
           <Route path="/admin/videos/:id/edit" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );

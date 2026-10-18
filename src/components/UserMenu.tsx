@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, KeyRound, LogOut } from 'lucide-react';
+import { ChevronDown, KeyRound, LayoutDashboard, LogOut } from 'lucide-react';
 import type { User } from '../types/auth';
 
 interface UserMenuProps {
@@ -10,6 +10,7 @@ interface UserMenuProps {
 }
 
 const menuItems = [
+  { to: '/dashboard?tab=profile', label: 'Dashboard & Hồ sơ dinh dưỡng', icon: LayoutDashboard },
   { to: '/change-password', label: 'Đổi mật khẩu', icon: KeyRound },
 ];
 

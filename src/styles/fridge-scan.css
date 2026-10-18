@@ -53,6 +53,14 @@
   transform: translateY(-50%);
 }
 
+/* Keep the connector behind the step label so it never runs through the text. */
+.fridge-scan-step > span:last-child {
+  position: relative;
+  z-index: 1;
+  padding-inline: 0.25rem;
+  background: #fff;
+}
+
 .fridge-scan-step-number {
   z-index: 1;
   display: inline-flex;

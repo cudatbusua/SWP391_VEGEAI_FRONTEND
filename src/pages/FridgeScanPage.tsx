@@ -16,6 +16,7 @@ const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 type SelectedImage = { id: string; file: File; preview: string };
 
 function ingredientIllustration(name: string) {
+  // Normalize Vietnamese accents before matching API ingredient names to small, consistent food icons.
   const normalized = name.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const illustrations: [string[], string][] = [
     [['ca chua', 'tomato'], '🍅'], [['dua leo', 'cucumber'], '🥒'], [['ca rot', 'carrot'], '🥕'],
@@ -28,6 +29,7 @@ function ingredientIllustration(name: string) {
 }
 
 function mergeScanResults(results: FridgeScanResponse[]): FridgeScanResponse {
+  // Several photos may identify the same ingredient; keep its first AI result and merge the unique suggestions/warnings.
   const ingredients = new Map<string, FridgeScanResponse['ingredients'][number]>();
   results.forEach(result => result.ingredients.forEach(item => {
     const key = item.name.trim().toLocaleLowerCase('vi');

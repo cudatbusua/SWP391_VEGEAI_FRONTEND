@@ -82,6 +82,13 @@
 .blog-lead { font-size: 14px; line-height: 1.9; color: #819589; margin: 18px 0 24px; overflow-wrap: anywhere; }
 .blog-body { color: #53685a; font-size: 14px; line-height: 2; overflow-wrap: anywhere; }
 .blog-body p { white-space: pre-wrap; margin-bottom: 22px; }
+.blog-body h2 { color: #213f30; font-size: 21px; font-weight: 750; line-height: 1.5; margin: 34px 0 12px; }
+.blog-body h3, .blog-body h4 { color: #294b39; font-size: 17px; font-weight: 700; line-height: 1.55; margin: 26px 0 10px; }
+.blog-body ul, .blog-body ol { margin: 0 0 24px; padding-left: 25px; }
+.blog-body li { padding-left: 4px; margin: 7px 0; }
+.blog-body blockquote { margin: 26px 0; padding: 15px 20px; border-left: 3px solid #68a584; border-radius: 0 8px 8px 0; background: #eff7f1; color: #315c42; }
+.blog-body a { color: #16734d; text-decoration: underline; text-underline-offset: 3px; }
+.blog-body hr { border: 0; border-top: 1px solid #dfe9e1; margin: 28px 0; }
 .blog-editor-preview .blog-cover { margin: 22px 0; }
 .blog-status-banner { display: flex; gap: 23px; align-items: center; padding: 27px 28px; margin-bottom: 29px; background: #edf2f0; }
 .blog-status-banner > svg { flex-shrink: 0; color: #6b9a7f; }

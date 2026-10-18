@@ -107,24 +107,29 @@ test('place search encodes keywords and preserves backend errors', async () => {
   await assert.rejects(failure.restaurants.nearby({ lat: 10, lon: 106 }, 2), /Places unavailable/);
 });
 
-test('verified restaurant feeds discard unverified, non-restaurant and mock records', async () => {
+test('verified restaurant feeds only include explicitly vegetarian-only or vegan-only OSM tags', async () => {
   const fixture = setup(() => reply([
-    { placeId: 'verified-1', name: 'Chay xanh', latitude: 10.1, longitude: 106.1, category: 'RESTAURANT', isVerified: true },
+    { placeId: 'verified-1', name: 'Chay xanh', latitude: 10.1, longitude: 106.1, category: 'RESTAURANT', isVerified: true, types: ['cuisine=vegetarian'] },
+    { placeId: 'verified-vegan', name: 'Thuần chay', latitude: 10.15, longitude: 106.15, category: 'RESTAURANT', isVerified: true, types: ['cuisine=vegan'] },
+    { placeId: 'mixed-yes', name: 'Có món chay và món mặn', latitude: 10.18, longitude: 106.18, category: 'RESTAURANT', isVerified: true, types: ['diet:vegetarian=yes'] },
+    { placeId: 'mixed-cuisine', name: 'Cuisine pha trộn', latitude: 10.19, longitude: 106.19, category: 'RESTAURANT', isVerified: true, types: ['cuisine=vietnamese;vegetarian'] },
     { placeId: 'unverified-1', name: 'Mixed menu', latitude: 10.2, longitude: 106.2, category: 'RESTAURANT', isVerified: false },
     { placeId: 'verified-market', name: 'Market', latitude: 10.3, longitude: 106.3, category: 'SUPERMARKET', isVerified: true },
-    { placeId: 'mock_verified', name: 'Demo', latitude: 10.4, longitude: 106.4, category: 'RESTAURANT', isVerified: true },
+    { placeId: 'mock_verified', name: 'Demo', latitude: 10.4, longitude: 106.4, category: 'RESTAURANT', isVerified: true, types: ['cuisine=vegetarian'] },
   ]));
   const places = await fixture.restaurants.verifiedRestaurantsNearby({ lat: 10, lon: 106 }, 5);
-  assert.deepEqual(places.map(place => place.id), ['verified-1']);
+  assert.deepEqual(places.map(place => place.id), ['verified-1', 'verified-vegan']);
   const url = new URL(fixture.calls[0].url, 'http://localhost');
   assert.equal(url.pathname, '/api/places/verified/nearby');
   assert.equal(url.searchParams.get('radius'), '5000');
 
-  const search = setup(() => reply([{ placeId: 'verified-search', name: 'Chay', latitude: 10, longitude: 106, category: 'RESTAURANT', isVerified: true }]));
-  assert.equal((await search.restaurants.searchVerifiedRestaurants('Quận 1 & gần đây', { lat: 10, lon: 106 }, 2)).length, 1);
+  const search = setup(() => reply([{ placeId: 'verified-search', name: 'Chay', latitude: 10, longitude: 106, category: 'RESTAURANT', isVerified: true, types: ['diet:vegan=only'] }]));
+  assert.equal((await search.restaurants.searchVerifiedRestaurants('Quận 1 & gần đây', undefined, 2)).length, 1);
   const searchUrl = new URL(search.calls[0].url, 'http://localhost');
   assert.equal(searchUrl.pathname, '/api/places/verified/search');
   assert.equal(searchUrl.searchParams.get('query'), 'Quận 1 & gần đây');
+  assert.equal(searchUrl.searchParams.has('lat'), false);
+  assert.equal(searchUrl.searchParams.has('lng'), false);
 });
 
 test('notification APIs load, count and update only authenticated account notices', async () => {

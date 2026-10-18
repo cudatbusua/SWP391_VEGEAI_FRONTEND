@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+.vegeai-map-marker {
+  display: grid;
+  place-items: center;
+  border: 3px solid white;
+  border-radius: 9999px;
+  background: #059669;
+  box-shadow: 0 2px 8px rgb(15 23 42 / 30%);
+}
+
+.vegeai-map-marker span {
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 @layer base {
   body {
     @apply bg-[#f8fafc] text-slate-800 antialiased font-sans;

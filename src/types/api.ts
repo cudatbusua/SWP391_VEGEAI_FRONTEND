@@ -56,6 +56,8 @@ export interface FridgeScanResponse {
   hasNonVegetarianItem: boolean;
   ingredients: {
     name: string;
+    quantity?: number;
+    unit?: string;
     category: string;
     isVegetarian: boolean;
     freshness: string;

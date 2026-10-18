@@ -5,18 +5,20 @@ import { Calendar } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { OverviewTab } from '../features/dashboard/components/OverviewTab';
 import { NutritionProfileTab } from '../features/dashboard/components/NutritionProfileTab';
+import { PersonalProfileTab } from '../features/dashboard/components/PersonalProfileTab';
 
-type DashboardTab = 'overview' | 'profile';
-const tabs: DashboardTab[] = ['overview', 'profile'];
+type DashboardTab = 'overview' | 'personal' | 'nutrition';
+const tabs: DashboardTab[] = ['overview', 'personal', 'nutrition'];
 const asTab = (value: string | null): DashboardTab | null => tabs.includes(value as DashboardTab) ? value as DashboardTab : null;
 
 export const DashboardPage: React.FC = () => {
   const { isLoading, isAuthenticated, sessionError, retrySession } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<DashboardTab>(asTab(searchParams.get('tab')) ?? 'overview');
+  const [activeTab, setActiveTab] = useState<DashboardTab>(asTab(searchParams.get('tab')) ?? (searchParams.get('tab') === 'profile' ? 'nutrition' : 'overview'));
 
   useEffect(() => {
-    const tabParam = asTab(searchParams.get('tab'));
+    const tabValue = searchParams.get('tab');
+    const tabParam = asTab(tabValue) ?? (tabValue === 'profile' ? 'nutrition' : null);
     if (tabParam) setActiveTab(tabParam);
   }, [searchParams]);
 
@@ -46,14 +48,26 @@ export const DashboardPage: React.FC = () => {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Tổng quan cá nhân
+              Tổng quan
             </button>
 
             <button
-              onClick={() => handleTabChange('profile')}
-              aria-pressed={activeTab === 'profile'}
+              onClick={() => handleTabChange('personal')}
+              aria-pressed={activeTab === 'personal'}
               className={`px-4 py-2.5 rounded-md text-xs font-semibold transition cursor-pointer ${
-                activeTab === 'profile'
+                activeTab === 'personal'
+                  ? 'bg-emerald-50 text-emerald-800 shadow-2xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Hồ sơ cá nhân
+            </button>
+
+            <button
+              onClick={() => handleTabChange('nutrition')}
+              aria-pressed={activeTab === 'nutrition'}
+              className={`px-4 py-2.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                activeTab === 'nutrition'
                   ? 'bg-emerald-50 text-emerald-800 shadow-2xs'
                   : 'text-gray-600 hover:text-gray-900'
               }`}
@@ -72,7 +86,8 @@ export const DashboardPage: React.FC = () => {
 
         {/* Tab Content */}
         {activeTab === 'overview' && <OverviewTab />}
-        {activeTab === 'profile' && <NutritionProfileTab />}
+        {activeTab === 'personal' && <PersonalProfileTab />}
+        {activeTab === 'nutrition' && <NutritionProfileTab />}
 
       </div>
     </MainLayout>

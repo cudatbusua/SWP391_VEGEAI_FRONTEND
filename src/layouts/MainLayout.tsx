@@ -84,7 +84,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               <div className="flex items-center gap-2 sm:gap-3">
                 <NotificationBell />
 
-                {/* Avatar dropdown: personal pages, change password, logout */}
+                {/* Avatar dropdown includes dashboard, profile, password, and logout actions. */}
                 <UserMenu user={user} loggingOut={loggingOut} onLogout={handleLogout} />
               </div>
             )}

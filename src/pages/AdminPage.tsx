@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, CircleHelp, FilePenLine, LockKeyhole, Plus, RefreshCw, Search, ShieldCheck, ShieldMinus, ShieldPlus, UnlockKeyhole, Users, Video } from 'lucide-react';
+import { ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, CircleHelp, FilePenLine, LockKeyhole, Plus, RefreshCw, Search, ShieldCheck, ShieldMinus, ShieldPlus, Trash2, UnlockKeyhole, Users, Video } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { CommunityConfirm } from '../components/CommunityUi';
 import { useAuth } from '../hooks/useAuth';
@@ -17,7 +17,7 @@ const statusLabels: Record<AccountStatus, string> = {
   ACTIVE: 'Hoạt động', PENDING_VERIFICATION: 'Chờ xác minh', LOCKED: 'Bị khóa', DISABLED: 'Vô hiệu hóa',
 };
 const number = (value: number | undefined) => value === undefined ? '--' : value.toLocaleString('vi-VN');
-type Change = { user: UserProfile; kind: 'status' | 'role'; nextStatus?: AccountStatus; nextRole?: AdminUserRole };
+type Change = { user: UserProfile; kind: 'status' | 'role' | 'delete'; nextStatus?: AccountStatus; nextRole?: AdminUserRole };
 
 export function AdminPage({ accountsOnly = false }: { accountsOnly?: boolean }) {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -50,10 +50,12 @@ export function AdminPage({ accountsOnly = false }: { accountsOnly?: boolean }) 
     try {
       if (pending.kind === 'status' && pending.nextStatus) {
         await adminService.updateStatus(pending.user.userId, pending.nextStatus, 'Updated from admin workspace');
+      } else if (pending.kind === 'delete') {
+        await adminService.updateStatus(pending.user.userId, 'DISABLED', 'Deactivated by admin from account management');
       } else if (pending.nextRole) {
         await adminService.updateRole(pending.user.userId, pending.nextRole);
       }
-      setPending(null); setMessage('Đã cập nhật tài khoản.'); stats.refresh(); accounts.refresh();
+      setPending(null); setMessage(pending.kind === 'delete' ? 'Đã vô hiệu hóa tài khoản người dùng.' : 'Đã cập nhật tài khoản.'); stats.refresh(); accounts.refresh();
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setMutating(false); }
   };
@@ -99,12 +101,14 @@ export function AdminPage({ accountsOnly = false }: { accountsOnly?: boolean }) 
         {accounts.data.items.map(item => {
           const isSelf = item.userId === user.id;
           const canStatus = !isSelf && item.role !== 'ADMIN';
+          const canDelete = !isSelf && item.role === 'MEMBER' && item.status !== 'DISABLED';
           return <tr key={item.userId}><td><div className="admin-table-person"><span className="admin-table-avatar">{(item.fullName || item.username).charAt(0).toUpperCase()}</span><span className="admin-table-name">{item.fullName || item.username}<small>{isSelf ? 'Tài khoản của bạn' : '@' + item.username}</small></span></div></td>
             {accountsOnly && <td>{item.email}</td>}<td><span className={'admin-role' + (item.role === 'ADMIN' ? ' is-admin' : '')}>{item.role === 'ADMIN' ? 'Quản trị viên' : 'Thành viên'}</span></td>
             <td><span className={'admin-status ' + item.status.toLowerCase()}>{statusLabels[item.status as AccountStatus] || item.status}</span></td>
             <td><div className="admin-table-actions">
               <button type="button" title={!canStatus ? 'Không thể khóa tài khoản quản trị viên' : item.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'} aria-label={(item.status === 'ACTIVE' ? 'Khóa ' : 'Mở khóa ') + item.username} disabled={!canStatus || mutating} className={item.status === 'ACTIVE' ? 'is-lock' : ''} onClick={() => { setError(''); setPending({ user: item, kind: 'status', nextStatus: item.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE' }); }}>{item.status === 'ACTIVE' ? <LockKeyhole size={13} /> : <UnlockKeyhole size={13} />}</button>
               <button type="button" title={isSelf ? 'Không thể tự đổi vai trò' : item.role === 'ADMIN' ? 'Chuyển thành thành viên' : 'Cấp quyền quản trị viên'} aria-label={'Đổi vai trò ' + item.username} disabled={isSelf || mutating} onClick={() => { setError(''); setPending({ user: item, kind: 'role', nextRole: item.role === 'ADMIN' ? 'MEMBER' : 'ADMIN' }); }}>{item.role === 'ADMIN' ? <ShieldMinus size={14} /> : <ShieldPlus size={14} />}</button>
+              <button type="button" title={canDelete ? 'Xóa user (vô hiệu hóa tài khoản)' : 'Không thể xóa tài khoản này'} aria-label={'Xóa user ' + item.username} disabled={!canDelete || mutating} className="is-lock" onClick={() => { setError(''); setPending({ user: item, kind: 'delete', nextStatus: 'DISABLED' }); }}><Trash2 size={14} /></button>
             </div></td></tr>;
         })}
       </tbody></table></div>}
@@ -134,8 +138,8 @@ export function AdminPage({ accountsOnly = false }: { accountsOnly?: boolean }) 
         <div className="admin-videos-list">{overview.videos.items.slice(0, 3).map(video => <Link className="admin-video-item" key={video.id} to={'/admin/videos/' + video.id + '/edit'}><img className="admin-video-image" src={videoThumbnail(video.videoUrl, video.thumbnailUrl)} alt={video.title} loading="lazy" onError={event => { if (!event.currentTarget.src.endsWith('/images/vietnamese-vegan-table.png')) event.currentTarget.src = '/images/vietnamese-vegan-table.png'; }} /><div><h3>{video.title}</h3><p>{video.createdBy} · Công khai</p></div></Link>)}</div>}
     </section></div>}
     {!accountsOnly && <nav aria-label="Tạo nội dung" className="admin-quick-actions"><Link to="/admin/recipes"><Plus size={14} />Công thức mới</Link><Link to="/blog/write"><FilePenLine size={14} />Viết bài Blog</Link><Link to="/admin/videos/new"><Video size={14} />Thêm video</Link></nav>}
-    <CommunityConfirm open={!!pending} title={pending?.kind === 'role' ? 'Thay đổi vai trò tài khoản?' : pending?.nextStatus === 'LOCKED' ? 'Khóa tài khoản này?' : 'Mở lại tài khoản?'} busy={mutating} destructive={pending?.nextStatus === 'LOCKED'} onCancel={() => { setPending(null); setError(''); }} onConfirm={confirm}>
-      <p>{pending?.kind === 'role' ? pending.nextRole === 'ADMIN' ? 'Tài khoản sẽ được cấp quyền quản lý nội dung và tài khoản trên hệ thống.' : 'Tài khoản sẽ trở về quyền thành viên và không còn truy cập khu quản trị.' : pending?.nextStatus === 'LOCKED' ? 'Người dùng sẽ không thể sử dụng các chức năng cần đăng nhập cho đến khi được mở khóa.' : 'Tài khoản sẽ được chuyển sang trạng thái hoạt động.'}</p>
+    <CommunityConfirm open={!!pending} title={pending?.kind === 'delete' ? 'Xóa user này?' : pending?.kind === 'role' ? 'Thay đổi vai trò tài khoản?' : pending?.nextStatus === 'LOCKED' ? 'Khóa tài khoản này?' : 'Mở lại tài khoản?'} busy={mutating} destructive={pending?.kind === 'delete' || pending?.nextStatus === 'LOCKED'} onCancel={() => { setPending(null); setError(''); }} onConfirm={confirm}>
+      <p>{pending?.kind === 'delete' ? 'Tài khoản sẽ bị vô hiệu hóa và người dùng không thể đăng nhập. Dữ liệu liên quan vẫn được giữ lại.' : pending?.kind === 'role' ? pending.nextRole === 'ADMIN' ? 'Tài khoản sẽ được cấp quyền quản lý nội dung và tài khoản trên hệ thống.' : 'Tài khoản sẽ trở về quyền thành viên và không còn truy cập khu quản trị.' : pending?.nextStatus === 'LOCKED' ? 'Người dùng sẽ không thể sử dụng các chức năng cần đăng nhập cho đến khi được mở khóa.' : 'Tài khoản sẽ được chuyển sang trạng thái hoạt động.'}</p>
       {pending && <div className="admin-modal-summary"><strong>{pending.user.fullName || pending.user.username}</strong><div>{pending.user.email}</div></div>}
       {error && <p role="alert" className="admin-feedback error">{error}</p>}
     </CommunityConfirm>

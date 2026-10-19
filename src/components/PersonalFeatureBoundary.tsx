@@ -4,11 +4,11 @@ import { useAuth } from '../hooks/useAuth';
 import { MainLayout } from '../layouts/MainLayout';
 
 export function PersonalFeatureBoundary({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isLoading, isAuthenticated, sessionError, retrySession } = useAuth();
   const location = useLocation();
   if (isLoading) return <MainLayout><p role="status" className="p-8 text-center">Đang tải phiên đăng nhập...</p></MainLayout>;
   if (user?.role === 'admin') return <Navigate to="/admin" replace />;
-  // Guests may browse only exploration, published blogs, public Q&A, and verified restaurants.
-  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
+  if (sessionError && !isAuthenticated) return <MainLayout><div role="alert" className="p-8 text-center">{sessionError}<button onClick={retrySession} className="ml-2 underline">Thử lại</button></div></MainLayout>;
+  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return children;
 }

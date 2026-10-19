@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock, Flame, Users, RefreshCw } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
+import { useAuth } from '../hooks/useAuth';
 import { RecipeImage } from '../components/RecipeImage';
 import { VideoPlayer } from '../components/CommunityUi';
 import { recipeService } from '../services/recipeService';
@@ -9,6 +10,7 @@ import { errorMessage } from '../services/apiClient';
 import type { RecipeDetail } from '../types/recipe';
 
 export function RecipeDetailPage() {
+  const { isAuthenticated } = useAuth();
   const { id } = useParams();
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export function RecipeDetailPage() {
           {recipe.instructions?.map((step, index) => <li key={index}><h3 className="text-sm font-bold text-emerald-700 mb-2">Bước {index + 1}</h3><p className="text-gray-700 whitespace-pre-line">{step}</p></li>)}
         </ol></section>
       </div>
-      {!!recipe.videos?.length && <section className="mt-10 border-t pt-8"><h2 className="text-xl font-bold mb-5">Video cách nấu</h2><div className="grid md:grid-cols-2 gap-6">{recipe.videos.map(video => <article key={video.id} className="min-w-0"><h3 className="font-semibold mb-3"><Link to={'/videos/' + video.id}>{video.title}</Link></h3><VideoPlayer video={video} /></article>)}</div></section>}
+      {isAuthenticated && !!recipe.videos?.length && <section className="mt-10 border-t pt-8"><h2 className="text-xl font-bold mb-5">Video cách nấu</h2><div className="grid md:grid-cols-2 gap-6">{recipe.videos.map(video => <article key={video.id} className="min-w-0"><h3 className="font-semibold mb-3"><Link to={'/videos/' + video.id}>{video.title}</Link></h3><VideoPlayer video={video} /></article>)}</div></section>}
     </>}
   </div></MainLayout>;
 }

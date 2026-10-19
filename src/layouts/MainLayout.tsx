@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Leaf, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/navigation.css';
 import { AdminLayout } from './AdminLayout';
@@ -54,11 +54,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           {/* Logo */}
           <div className="flex items-center gap-1.5 lg:gap-8">
             <button type="button" className="sm:hidden p-1 text-gray-600" title={mobileMenu ? 'Đóng menu' : 'Mở menu'} aria-label={mobileMenu ? 'Đóng menu' : 'Mở menu'} aria-expanded={mobileMenu} aria-controls="main-mobile-navigation" onClick={() => setMobileMenu(value => !value)}>{mobileMenu ? <X size={21} /> : <Menu size={21} />}</button>
-            <Link to={home} className="flex items-center gap-2 text-slate-800 font-bold text-lg sm:text-xl tracking-normal">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
-                <Leaf className="w-5 h-5 text-emerald-600" />
-              </div>
-              <span>VEGEAI</span>
+            <Link to={home} className="flex items-center" aria-label="VEGEAI - Trang chủ">
+              <img src="/vegeai-logo.png" alt="VEGEAI" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
             </Link>
 
           </div>
@@ -106,8 +103,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       <footer className="bg-white border-t border-gray-100 py-8 text-xs text-gray-500 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 font-semibold text-gray-700">
-            <Leaf className="w-4 h-4 text-emerald-600" />
-            <span>VEGEAI Vietnam</span>
+            <img src="/vegeai-logo.png" alt="" className="h-8 w-8 object-contain" />
+            <span>Ẩm thực chay &amp; dinh dưỡng thông minh</span>
           </div>
 
           <div className="flex flex-wrap justify-center items-center gap-4 text-gray-500 font-medium">

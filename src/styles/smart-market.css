@@ -1,0 +1,133 @@
+/* Smart Market & Shopping Map - VEGEAI */
+.smart-market-page {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color: #1e293b;
+  padding-bottom: 4rem;
+}
+
+.smart-market-hero {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f8fafc 100%);
+  border-bottom: 1px solid #dcfce7;
+  padding: 2.5rem 1rem 2rem;
+  margin-bottom: 2rem;
+}
+
+.smart-market-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.smart-market-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.smart-market-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+.aisle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+}
+
+.market-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+.market-item-row:last-child {
+  border-bottom: none;
+}
+
+.market-item-row:hover {
+  background-color: #f8fafc;
+}
+
+.market-item-row.is-bought {
+  background-color: #fafafa;
+}
+
+.market-item-row.is-bought .item-name {
+  text-decoration: line-through;
+  color: #94a3b8;
+}
+
+.market-store-card {
+  padding: 1.25rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 0.875rem;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.market-store-card:hover {
+  border-color: #10b981;
+  background-color: #f0fdf4;
+}
+
+.market-store-card.is-active {
+  border-color: #059669;
+  background-color: #f0fdf4;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+}
+
+.match-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.match-pill.high {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.match-pill.partial {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.store-map-container {
+  height: 540px;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  position: relative;
+}
+
+@media (max-width: 1024px) {
+  .store-map-container {
+    height: 420px;
+  }
+}

@@ -90,6 +90,16 @@
 .blog-body blockquote { margin: 26px 0; padding: 15px 20px; border-left: 3px solid #68a584; border-radius: 0 8px 8px 0; background: #eff7f1; color: #315c42; }
 .blog-body a { color: #16734d; text-decoration: underline; text-underline-offset: 3px; }
 .blog-body hr { border: 0; border-top: 1px solid #dfe9e1; margin: 28px 0; }
+.blog-body img { display: block; max-width: 100%; height: auto; max-height: 680px; margin: 20px auto; object-fit: contain; }
+.blog-body figure { margin: 22px 0; }
+.blog-body figcaption { margin-top: 8px; color: #819589; font-size: 12px; text-align: center; }
+.blog-body pre { overflow-x: auto; padding: 14px; border-radius: 7px; background: #f1f5f2; white-space: pre-wrap; }
+.blog-body code { overflow-wrap: anywhere; }
+.blog-table-scroll { max-width: 100%; overflow-x: auto; margin: 20px 0; }
+.blog-body table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.blog-body th, .blog-body td { border: 1px solid #dfe8df; padding: 9px 11px; text-align: left; vertical-align: top; }
+.blog-body th { background: #f1f6f2; color: #294b39; font-weight: 700; }
+.blog-body-image-error { display: block; width: fit-content; max-width: 100%; margin: 18px auto; padding: 12px 16px; border-radius: 6px; color: #8b4e43; background: #fbefec; font-size: 12px; }
 .blog-editor-preview .blog-cover { margin: 22px 0; }
 .blog-status-banner { display: flex; gap: 23px; align-items: center; padding: 27px 28px; margin-bottom: 29px; background: #edf2f0; }
 .blog-status-banner > svg { flex-shrink: 0; color: #6b9a7f; }
@@ -102,6 +112,20 @@
 .blog-review-main { min-width: 0; }
 .blog-review-title h2 { font-size: 23px; line-height: 1.55; font-weight: 700; overflow-wrap: anywhere; }
 .blog-review-main > .blog-cover { margin-top: 24px; }
+.blog-submission-details { margin-top: 20px; padding: 18px; border: 1px solid #dfe8df; border-radius: 8px; background: #f8fbf8; }
+.blog-submission-details h3, .blog-submission-heading, .blog-submission-content h3 { color: #294b39; font-size: 15px; font-weight: 700; }
+.blog-submission-details dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; margin-top: 14px; }
+.blog-submission-details dl > div { min-width: 0; }
+.blog-submission-details dt, .blog-review-excerpt > span { color: #839487; font-size: 11px; }
+.blog-submission-details dd { margin-top: 3px; color: #294b39; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.blog-submission-heading { margin-top: 27px; }
+.blog-review-excerpt { margin-top: 21px; padding: 16px 18px; border-left: 3px solid #68a584; background: #f2f7f3; }
+.blog-review-excerpt .blog-lead { margin: 5px 0 0; white-space: pre-wrap; }
+.blog-submission-content { margin-top: 25px; }
+.blog-submission-content .blog-body { margin-top: 13px; }
+.blog-submission-content > .blog-empty { padding: 24px 12px; text-align: left; }
+.blog-cover-unavailable { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 18px; color: #8b4e43; background: #fbefec; font-size: 13px; text-align: center; }
+.blog-cover-unavailable span { font-size: 12px; }
 .blog-rejection-note { padding: 20px; border-left: 3px solid #c8786e; background: #fdf1ee; margin: 20px 0; color: #a36052; }
 .blog-rejection-note h3 { display: flex; gap: 7px; align-items: center; font-size: 13px; font-weight: 700; }
 .blog-rejection-note p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.9; margin-top: 11px; }
@@ -116,10 +140,21 @@
 .blog-review-side .blog-back { justify-content: center; margin: 10px 0 0; }
 .blog-link-field { font-size: 11px; color: #6d8778; margin-top: 8px; }
 .blog-link-field input { width: 100%; min-width: 0; background: #edf3ee; border: 1px solid #dfe8df; padding: 9px; border-radius: 4px; font-size: 11px; margin-top: 9px; }
-.blog-confirm { padding: 15px; border: 1px solid #dce6dd; background: #fff; border-radius: 6px; }
-.blog-confirm h4 { font-size: 13px; font-weight: 650; line-height: 1.7; margin-bottom: 13px; }
-.blog-confirm textarea { font-size: 12px; width: 100%; border: 1px solid #dce6dd; border-radius: 4px; padding: 9px; line-height: 1.9; margin-bottom: 13px; }
-.blog-confirm > div { display: flex; gap: 8px; }
+.blog-confirm-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; overflow-y: auto; padding: 20px; background: rgb(18 35 27 / 48%); }
+.blog-confirm { width: min(100%, 560px); max-height: min(90vh, 820px); overflow-y: auto; padding: 24px; border: 1px solid #dce6dd; border-radius: 12px; background: #fff; box-shadow: 0 24px 70px rgb(17 39 27 / 25%); }
+.blog-confirm h4 { color: #263f31; font-size: 18px; font-weight: 700; line-height: 1.5; margin-bottom: 12px; }
+.blog-confirm textarea { font-size: 13px; width: 100%; border: 1px solid #dce6dd; border-radius: 7px; padding: 11px; line-height: 1.8; }
+.blog-rejection-instructions { color: #718276; font-size: 12px; line-height: 1.7; }
+.blog-rejection-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin: 17px 0; border: 0; padding: 0; }
+.blog-rejection-suggestions legend { width: 100%; margin-bottom: 9px; color: #324b3a; font-size: 13px; font-weight: 700; }
+.blog-rejection-suggestions button { max-width: 100%; padding: 8px 11px; border: 1px solid #dce6dd; border-radius: 18px; color: #53685a; background: #fff; font-size: 12px; text-align: left; line-height: 1.45; cursor: pointer; }
+.blog-rejection-suggestions button:hover { border-color: #8eb99e; background: #f3f8f4; }
+.blog-rejection-suggestions button.selected { border-color: #28835d; color: #176b49; background: #e8f5ec; box-shadow: inset 0 0 0 1px #28835d; }
+.blog-rejection-detail { display: block; color: #324b3a; font-size: 13px; font-weight: 700; }
+.blog-rejection-detail textarea { display: block; margin-top: 8px; min-height: 112px; resize: vertical; font-weight: 400; }
+.blog-rejection-counter { margin-top: 6px; color: #87968b; font-size: 11px; text-align: right; }
+.blog-confirm-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.blog-confirm-actions .blog-button { width: auto; min-width: 110px; }
 .blog-article-shell { max-width: 820px; padding: 32px 28px 48px; margin: auto; color: #2e4738; }
 .blog-article-shell h1 { font-size: 30px; font-weight: 750; line-height: 1.5; overflow-wrap: anywhere; letter-spacing: 0; }
 .blog-article-shell > .blog-cover { margin: 26px 0; }
@@ -137,6 +172,10 @@
   .blog-status-banner { align-items: start; padding: 22px 18px; gap: 13px; }
   .blog-status-banner > svg { width: 27px; height: 27px; margin-top: 3px; }
   .blog-status-banner h1 { font-size: 21px; }
+  .blog-submission-details { padding: 15px; }
+  .blog-submission-details dl { gap: 12px; }
+  .blog-confirm-backdrop { padding: 12px; }
+  .blog-confirm { padding: 19px; max-height: 94vh; }
   .blog-own-row { flex-wrap: wrap; padding: 15px; gap: 15px; }
   .blog-own-image { flex-basis: 95px; }
   .blog-row-actions { margin-left: auto; }

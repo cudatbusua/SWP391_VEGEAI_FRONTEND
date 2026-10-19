@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Archive, BadgeCheck, Clock, FileText, XCircle, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -43,11 +43,24 @@ const editorialCovers: Record<string, string> = {
   'a89f19fe-3ad6-4937-bdd3-8f802c13ccdc': 'https://cdn2.tuoitre.vn/thumb_w/480/471584752817336320/2023/5/30/mon-chay-bong-mai1-2-16854085581801516334013.jpg',
 };
 
-export function BlogCover({ post }: { post: Pick<BlogPost, 'coverImage' | 'title'> & { postId?: string } }) {
-  const imageUrl = (post.postId && editorialCovers[post.postId]) || post.coverImage || '/images/vietnamese-vegan-table.png';
-  return <div className="blog-cover"><img src={imageUrl} alt={post.title} loading="lazy" onError={event => {
-    if (!event.currentTarget.src.endsWith('/images/vietnamese-vegan-table.png')) event.currentTarget.src = '/images/vietnamese-vegan-table.png';
-  }} /></div>;
+export function BlogCover({ post, useSubmittedImage = false }: {
+  post: Pick<BlogPost, 'coverImage' | 'title'> & { postId?: string };
+  useSubmittedImage?: boolean;
+}) {
+  const [submittedImageFailed, setSubmittedImageFailed] = useState(false);
+  // Reviewers must see the author's submitted image, not editorial overrides used by public cards.
+  const imageUrl = (useSubmittedImage ? post.coverImage : post.postId && editorialCovers[post.postId])
+    || post.coverImage || '/images/vietnamese-vegan-table.png';
+  const submittedImageUnavailable = useSubmittedImage && (!post.coverImage || submittedImageFailed);
+  return <div className="blog-cover">{submittedImageUnavailable
+    ? <div className="blog-cover-unavailable" role="img" aria-label={post.coverImage ? 'Ảnh bìa đã gửi không tải được' : 'Tác giả chưa gửi ảnh bìa'}>
+      <strong>{post.coverImage ? 'Không tải được ảnh bìa đã gửi.' : 'Tác giả chưa gửi ảnh bìa.'}</strong>
+      <span>{post.coverImage ? 'Kiểm tra đường dẫn ảnh trước khi duyệt.' : 'Chỉ ảnh bìa bài gửi mới được hiển thị tại đây.'}</span>
+    </div>
+    : <img src={imageUrl} alt={post.title} loading="lazy" onError={event => {
+      if (useSubmittedImage && post.coverImage) { setSubmittedImageFailed(true); return; }
+      if (!event.currentTarget.src.endsWith('/images/vietnamese-vegan-table.png')) event.currentTarget.src = '/images/vietnamese-vegan-table.png';
+    }} />}</div>;
 }
 export function BlogBody({ content }: { content: string }) {
   if (!/<\/?[a-z][\s\S]*>/i.test(content) || typeof DOMParser === 'undefined') {
@@ -57,7 +70,11 @@ export function BlogBody({ content }: { content: string }) {
   // Legacy blog bodies may contain HTML, so render only a small safe formatting allowlist.
   const document = new DOMParser().parseFromString(content, 'text/html');
   const blockedTags = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'FORM', 'SVG', 'MATH']);
-  const allowedTags = new Set(['P', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'STRONG', 'B', 'EM', 'I', 'BLOCKQUOTE', 'BR', 'A', 'HR']);
+  const allowedTags = new Set([
+    'P', 'H1', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'STRONG', 'B', 'EM', 'I', 'BLOCKQUOTE',
+    'BR', 'A', 'HR', 'IMG', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TH', 'TD',
+    'DIV', 'SPAN', 'PRE', 'CODE', 'S', 'DEL', 'INS', 'SUB', 'SUP', 'FIGURE', 'FIGCAPTION',
+  ]);
   const renderNode = (node: Node, key: string): ReactNode => {
     if (node.nodeType === Node.TEXT_NODE) return node.textContent;
     if (!(node instanceof Element) || blockedTags.has(node.tagName)) return null;
@@ -66,6 +83,7 @@ export function BlogBody({ content }: { content: string }) {
     if (!allowedTags.has(node.tagName)) return <>{children}</>;
     switch (node.tagName) {
       case 'P': return <p key={key}>{children}</p>;
+      case 'H1': return <h2 key={key}>{children}</h2>;
       case 'H2': return <h2 key={key}>{children}</h2>;
       case 'H3': return <h3 key={key}>{children}</h3>;
       case 'H4': return <h4 key={key}>{children}</h4>;
@@ -77,6 +95,35 @@ export function BlogBody({ content }: { content: string }) {
       case 'BLOCKQUOTE': return <blockquote key={key}>{children}</blockquote>;
       case 'BR': return <br key={key} />;
       case 'HR': return <hr key={key} />;
+      case 'IMG': {
+        const src = node.getAttribute('src') || '';
+        let safeSrc = '';
+        if (/^\/images\/[A-Za-z0-9._/-]+(?:[?#].*)?$/.test(src)) safeSrc = src;
+        else {
+          try {
+            const url = new URL(src);
+            if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password) safeSrc = url.href;
+          } catch { /* Invalid image URLs are omitted from the rendered post. */ }
+        }
+        return safeSrc ? <BlogBodyImage key={key} src={safeSrc} alt={node.getAttribute('alt') || ''} /> : null;
+      }
+      case 'TABLE': return <div key={key} className="blog-table-scroll"><table>{children}</table></div>;
+      case 'THEAD': return <thead key={key}>{children}</thead>;
+      case 'TBODY': return <tbody key={key}>{children}</tbody>;
+      case 'TFOOT': return <tfoot key={key}>{children}</tfoot>;
+      case 'TR': return <tr key={key}>{children}</tr>;
+      case 'TH': return <th key={key}>{children}</th>;
+      case 'TD': return <td key={key}>{children}</td>;
+      case 'DIV': return <div key={key}>{children}</div>;
+      case 'SPAN': return <span key={key}>{children}</span>;
+      case 'PRE': return <pre key={key}>{children}</pre>;
+      case 'CODE': return <code key={key}>{children}</code>;
+      case 'S': case 'DEL': return <del key={key}>{children}</del>;
+      case 'INS': return <ins key={key}>{children}</ins>;
+      case 'SUB': return <sub key={key}>{children}</sub>;
+      case 'SUP': return <sup key={key}>{children}</sup>;
+      case 'FIGURE': return <figure key={key}>{children}</figure>;
+      case 'FIGCAPTION': return <figcaption key={key}>{children}</figcaption>;
       case 'A': {
         const href = node.getAttribute('href') || '';
         const safeHref = /^(https?:|\/|#)/i.test(href) ? href : undefined;
@@ -87,6 +134,12 @@ export function BlogBody({ content }: { content: string }) {
   };
 
   return <div className="blog-body">{Array.from(document.body.childNodes).map((node, index) => renderNode(node, `blog-${index}`))}</div>;
+}
+function BlogBodyImage({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  return failed
+    ? <span className="blog-body-image-error" role="img" aria-label={alt || 'Ảnh bài viết không tải được'}>{alt || 'Ảnh bài viết không tải được'}</span>
+    : <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} />;
 }
 export function BlogError({ message, retry }: { message: string; retry?: () => void }) {
   return <div role="alert" className="blog-error"><p>{message}</p>{retry && <button onClick={retry}><RefreshCw size={15} /> Tải lại</button>}</div>;

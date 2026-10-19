@@ -59,4 +59,13 @@ export const blogService = {
   async review(id: string, version: number, decision: 'APPROVE' | 'REJECT', reason: string) {
     return data(await apiRequest<BlogPost>('/admin/blog/posts/' + encodeURIComponent(id) + '/review', { method: 'POST', body: { version, decision, reason } }));
   },
+  async adminArchive(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/admin/blog/posts/' + encodeURIComponent(id) + '/archive', { method: 'POST', body: { version } }));
+  },
+  async adminRestore(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/admin/blog/posts/' + encodeURIComponent(id) + '/restore', { method: 'POST', body: { version } }));
+  },
+  async adminDelete(id: string, version: number) {
+    await apiRequest('/admin/blog/posts/' + encodeURIComponent(id) + '?version=' + version, { method: 'DELETE' });
+  },
 };

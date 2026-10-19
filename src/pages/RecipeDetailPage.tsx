@@ -5,7 +5,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
 import { RecipeImage } from '../components/RecipeImage';
 import { VideoPlayer } from '../components/CommunityUi';
-import { ContentInteractions } from '../components/ContentInteractions';
+import { ContentInteractionsDialog } from '../components/ContentInteractionsDialog';
 import { recipeService } from '../services/recipeService';
 import { errorMessage } from '../services/apiClient';
 import type { RecipeDetail } from '../types/recipe';
@@ -40,6 +40,7 @@ export function RecipeDetailPage() {
           <span className="flex gap-2 items-center"><Users size={18} />{recipe.servings ?? '--'} khẩu phần</span>
         </div>
         <p className="text-sm text-emerald-700">{recipe.tags?.map(tag => tag.name).join(' · ')}</p>
+        <ContentInteractionsDialog type="RECIPE" id={recipe.recipeId} />
         <section className="border-t mt-6 pt-5" aria-label="Dinh dưỡng mỗi khẩu phần">
           <h2 className="text-base font-bold mb-4">Dinh dưỡng mỗi khẩu phần</h2>
           <p className="flex gap-2 items-center text-emerald-700 font-semibold mb-4"><Flame size={18} />{recipe.calories ?? '--'} kcal</p>
@@ -64,7 +65,6 @@ export function RecipeDetailPage() {
         </ol></section>
       </div>
       {isAuthenticated && !!recipe.videos?.length && <section className="mt-10 border-t pt-8"><h2 className="text-xl font-bold mb-5">Video cách nấu</h2><div className="grid md:grid-cols-2 gap-6">{recipe.videos.map(video => <article key={video.id} className="min-w-0"><h3 className="font-semibold mb-3"><Link to={'/videos/' + video.id}>{video.title}</Link></h3><VideoPlayer video={video} /></article>)}</div></section>}
-      <ContentInteractions type="RECIPE" id={recipe.recipeId} />
     </>}
   </div></MainLayout>;
 }

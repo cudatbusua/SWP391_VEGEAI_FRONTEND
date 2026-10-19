@@ -28,12 +28,18 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     ['/admin', 'Tổng quan & tài khoản'], ['/admin/recipes', 'Công thức & dinh dưỡng'],
     ['/admin/blog', 'Blog'], ['/admin/videos', 'Video'], ['/admin/questions', 'Hỏi đáp'],
   ] : isAuthenticated ? [
-    ['/dashboard', 'Trang chủ'], ['/','Khám phá'], ['/nutrition', 'Dinh dưỡng'],
-    ['/ai-chef', 'AI bếp trưởng'], ['/meal-plans', 'Thực đơn'], ['/blog', 'Blog'],
-    ['/videos', 'Video'], ['/questions', 'Hỏi đáp'], ['/fridge-scan', 'Quét tủ lạnh'],
-    ['/fridge', 'Kho lạnh'], ['/restaurants', 'Quán chay gần đây'],
+    ['/dashboard', 'Trang chủ'],
+    ['/', 'Khám phá công thức'],
+    ['/fridge-scan', 'Quét tủ lạnh'],
+    ['/ai-chef', 'AI bếp trưởng'],
+    ['/meal-plans', 'Kế hoạch tuần'],
+    ['/smart-market', 'Đi chợ thông minh'],
+    ['/blog', 'Blog'],
+    ['/restaurants', 'Quán chay gần đây'],
   ] : [
-    ['/','Khám phá'], ['/blog', 'Blog'], ['/questions', 'Hỏi đáp'],
+    ['/', 'Khám phá công thức'],
+    ['/smart-market', 'Đi chợ thông minh'],
+    ['/blog', 'Blog'],
     ['/restaurants', 'Quán chay gần đây'],
   ];
 

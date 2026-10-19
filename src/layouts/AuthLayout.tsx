@@ -1,6 +1,5 @@
 import React from 'react';
 import { Leaf } from 'lucide-react';
-import vegeaiLogo from '../assets/vegeai-logo.jpg';
 
 export interface AuthLayoutProps {
   children: React.ReactNode;
@@ -125,12 +124,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
           <div className="relative z-10 flex items-center">
             <div className="flex items-center gap-2 group">
               {/* Use the user-provided VEGEAI mascot instead of the temporary leaf mark. */}
-              <div className="w-11 h-11 rounded-full bg-white p-0.5 overflow-hidden shadow-md transition group-hover:scale-105">
-                <img src={vegeaiLogo} alt="VEGEAI" className="w-full h-full object-cover rounded-full" />
-              </div>
-              <span className="font-extrabold tracking-wider text-xl text-white drop-shadow-sm">
-                VEGEAI
-              </span>
+              <img src="/vegeai-logo.png" alt="VEGEAI" className="h-14 w-14 object-contain transition group-hover:scale-105" />
             </div>
           </div>
 

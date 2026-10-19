@@ -44,10 +44,10 @@ export const communityService = {
     await apiRequest('/admin/questions/' + id(questionId) + query({ version }), { method: 'DELETE' });
   },
   async videos(params: { keyword?: string; category?: string; page: number }, signal?: AbortSignal) {
-    return data(await apiRequest<PageResponse<CommunityVideo>>('/videos' + query({ ...params, size: 9 }), { auth: 'none', signal }));
+    return data(await apiRequest<PageResponse<CommunityVideo>>('/videos' + query({ ...params, size: 9 }), { signal }));
   },
   async video(videoId: string, signal?: AbortSignal) {
-    return data(await apiRequest<CommunityVideo>('/videos/' + id(videoId), { auth: 'none', signal }));
+    return data(await apiRequest<CommunityVideo>('/videos/' + id(videoId), { signal }));
   },
   async savedVideos(page: number, signal?: AbortSignal) {
     return data(await apiRequest<PageResponse<CommunityVideo>>('/videos/favorites' + query({ page, size: 9 }), { signal }));
@@ -59,7 +59,7 @@ export const communityService = {
     return data(await apiRequest<{ videoId: string; favorite: boolean }>('/videos/' + id(videoId) + '/favorite', { method: saved ? 'PUT' : 'DELETE' }));
   },
   async comments(videoId: string, page: number, signal?: AbortSignal) {
-    return data(await apiRequest<PageResponse<VideoComment>>('/videos/' + id(videoId) + '/comments' + query({ page, size: 10 }), { auth: 'none', signal }));
+    return data(await apiRequest<PageResponse<VideoComment>>('/videos/' + id(videoId) + '/comments' + query({ page, size: 10 }), { signal }));
   },
   async comment(videoId: string, content: string, existing?: { id: string; version: number }) {
     return data(await apiRequest<VideoComment>('/videos/' + id(videoId) + '/comments' + (existing ? '/' + id(existing.id) : ''), {

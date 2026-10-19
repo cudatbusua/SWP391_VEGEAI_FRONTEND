@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Camera, Clock, ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal, X, Leaf, ArrowUpRight, CheckCheck, Soup, Zap, Play, MessageCircle, BookOpen } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
+import { useAuth } from '../hooks/useAuth';
 import { RecipeCard } from '../components/RecipeCard';
 import '../styles/discovery.css';
 import { recipeService } from '../services/recipeService';
@@ -12,6 +13,8 @@ import type { RecipeSummary, RecipeTag } from '../types/recipe';
 const groups: Record<string, string> = { dietaryType: 'Trường phái', cookingMethod: 'Cách chế biến', dishCategory: 'Loại món', nutritionGoal: 'Dinh dưỡng', occasion: 'Hoàn cảnh', dietaryRestriction: 'Kiêng / dị ứng' };
 
 export function RecipeDiscoveryPage() {
+  const { isAuthenticated, user } = useAuth();
+  const canUsePersonal = isAuthenticated && user?.role !== 'admin';
   const [keyword, setKeyword] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [tags, setTags] = useState<Record<string, RecipeTag[]>>({});
@@ -66,12 +69,12 @@ export function RecipeDiscoveryPage() {
     <section className="discovery-cover">
       <img src="/images/vietnamese-vegan-table.png" alt="Mâm cơm chay Việt Nam với đậu phụ, nấm, gỏi cuốn và rau xanh" fetchPriority="high" />
       <div className="discovery-cover-shade" />
-      <div className="discovery-cover-content"><span className="discovery-eyebrow"><Leaf size={17} /> BẾP XANH MỖI NGÀY</span><h1>VEGEAI</h1><p>Món chay ngon, bữa ăn lành.<br />Cảm hứng từ căn bếp Việt của bạn.</p><div className="discovery-hero-actions"><a href="#cong-thuc" className="discovery-scan">Khám phá công thức <ArrowUpRight size={18} /></a><Link to="/fridge-scan" className="discovery-hero-secondary"><Camera size={18} /> Quét nguyên liệu</Link></div></div>
+      <div className="discovery-cover-content"><span className="discovery-eyebrow"><Leaf size={17} /> BẾP XANH MỖI NGÀY</span><h1>VEGEAI</h1><p>Món chay ngon, bữa ăn lành.<br />Cảm hứng từ căn bếp Việt của bạn.</p><div className="discovery-hero-actions"><a href="#cong-thuc" className="discovery-scan">Khám phá công thức <ArrowUpRight size={18} /></a>{canUsePersonal && <Link to="/fridge-scan" className="discovery-hero-secondary"><Camera size={18} /> Quét nguyên liệu</Link>}</div></div>
     </section>
     <div className="discovery-shell">
       <div className="discovery-toolbar" id="cong-thuc">
         <label className="discovery-search"><Search size={20} /><input aria-label="Tìm công thức" value={keyword} onChange={event => { setKeyword(event.target.value); setPage(0); }} placeholder="Hôm nay bạn muốn nấu món gì?" />{keyword && <button title="Xóa tìm kiếm" aria-label="Xóa tìm kiếm" onClick={() => { setKeyword(''); setPage(0); }}><X size={16} /></button>}</label>
-        <Link to="/ai-chef" className="discovery-chef"><Zap size={17} /> Hỏi AI Bếp Trưởng <ArrowUpRight size={16} /></Link>
+        {canUsePersonal && <Link to="/ai-chef" className="discovery-chef"><Zap size={17} /> Hỏi AI Bếp Trưởng <ArrowUpRight size={16} /></Link>}
       </div>
       <div className="discovery-quick-filters">{quickFilters.map(item => <button key={item.name} className={(!item.code ? !included.length : included.includes(item.code)) ? 'is-active' : ''} onClick={() => { if (!item.code) setIncluded([]); else setIncluded(previous => previous.includes(item.code) ? previous.filter(value => value !== item.code) : [...previous, item.code]); setPage(0); }}>{item.icon}{item.name}</button>)}</div>
       <div className="discovery-grid">
@@ -94,7 +97,7 @@ export function RecipeDiscoveryPage() {
           {!error && <div className={'recipe-grid ' + (loading && data ? 'is-loading' : '')}>{data?.items.map(recipe => <RecipeCard key={recipe.recipeId} recipe={recipe} />)}</div>}
           {data && data.totalPages > 1 && <nav aria-label="Phân trang công thức" className="discovery-pagination"><button title="Trang trước" aria-label="Trang trước" disabled={loading || data.first} onClick={() => setPage(value => value - 1)}><ChevronLeft size={20} /></button><span>Trang {data.page + 1} / {data.totalPages}</span><button title="Trang sau" aria-label="Trang sau" disabled={loading || data.last} onClick={() => setPage(value => value + 1)}><ChevronRight size={20} /></button></nav>}
       <section className="discovery-journal" aria-labelledby="discovery-journal-title"><div className="discovery-journal-heading"><span className="discovery-section-label">CHUYỆN TỪ CĂN BẾP</span><h2 id="discovery-journal-title">Thêm cảm hứng, thêm vị ngon</h2><p>Cùng nấu, cùng chia sẻ một lối sống xanh.</p></div><div className="discovery-journal-grid">
-        <Link to="/videos"><div className="discovery-journal-photo"><img src="/images/tofu-tomato.png" alt="Đậu phụ sốt cà chua với rau thơm" loading="lazy" /><span><Play size={19} /></span></div><div><small>VIDEO BẾP CHAY</small><h3>Vào bếp cùng nhau <ArrowUpRight size={19} /></h3><p>Xem video, tìm cảm hứng cho bữa ăn tiếp theo.</p></div></Link>
+        {isAuthenticated ? <Link to="/videos"><div className="discovery-journal-photo"><img src="/images/tofu-tomato.png" alt="Đậu phụ sốt cà chua với rau thơm" loading="lazy" /><span><Play size={19} /></span></div><div><small>VIDEO BẾP CHAY</small><h3>Vào bếp cùng nhau <ArrowUpRight size={19} /></h3><p>Xem video, tìm cảm hứng cho bữa ăn tiếp theo.</p></div></Link> : <Link to="/restaurants"><div className="discovery-journal-photo"><img src="/images/tofu-tomato.png" alt="Món chay với đậu phụ và rau thơm" loading="lazy" /><span><Leaf size={19} /></span></div><div><small>QUÁN CHAY GẦN ĐÂY</small><h3>Tìm một bữa chay ngon <ArrowUpRight size={19} /></h3><p>Khám phá địa điểm ăn chay quanh bạn.</p></div></Link>}
         <Link to="/blog"><div className="discovery-journal-photo"><img src="/images/vegan-tofu-meal.png" alt="Bữa ăn thực vật với đậu phụ và rau củ" loading="lazy" /><span><BookOpen size={19} /></span></div><div><small>BLOG CỘNG ĐỒNG</small><h3>Chuyện bếp, chuyện xanh <ArrowUpRight size={19} /></h3><p>Đọc những chia sẻ và kể câu chuyện của bạn.</p></div></Link>
         <Link to="/questions"><div className="discovery-journal-photo"><img src="/images/fresh-vegetables.png" alt="Rau củ tươi nhiều màu sắc" loading="lazy" /><span><MessageCircle size={19} /></span></div><div><small>HỎI & ĐÁP</small><h3>Bạn hỏi, bếp trả lời <ArrowUpRight size={19} /></h3><p>Gửi thắc mắc về nấu ăn và dinh dưỡng thực vật.</p></div></Link>
       </div></section>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, ChevronRight, CircleHelp, FilePenLine, LayoutDashboard, Leaf, LogOut, Menu, PanelLeftClose, Search, ShieldCheck, Users, Video, X } from 'lucide-react';
+import { BookOpen, ChevronRight, CircleHelp, FilePenLine, LayoutDashboard, LogOut, Menu, PanelLeftClose, Search, ShieldCheck, Users, Video, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/admin.css';
 
@@ -66,7 +66,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     <a className="admin-skip" href="#admin-main">Đến nội dung chính</a>
     {open && <button type="button" className="admin-overlay" aria-label="Đóng menu quản trị" onClick={() => { setOpen(false); menu.current?.focus(); }} />}
     <aside ref={sidebar} className={'admin-sidebar' + (open ? ' is-open' : '')} role={open ? 'dialog' : undefined} aria-modal={open ? true : undefined} aria-label="Menu quản trị" id="admin-sidebar" inert={mobile && !open}>
-      <div className="admin-brand-row"><Link to="/admin" className="admin-brand" title="VEGEAI Admin"><span className="admin-brand-mark"><Leaf size={23} /></span><span className="admin-brand-text">VEGEAI<small>ADMIN WORKSPACE</small></span></Link><button type="button" className="admin-sidebar-close" title="Đóng menu" aria-label="Đóng menu" onClick={() => { setOpen(false); menu.current?.focus(); }}><X size={20} /></button></div>
+      <div className="admin-brand-row"><Link to="/admin" className="admin-brand" title="VEGEAI Admin"><img src="/vegeai-logo.png" alt="VEGEAI" className="admin-brand-logo" /><span className="admin-brand-text"><small>ADMIN WORKSPACE</small></span></Link><button type="button" className="admin-sidebar-close" title="Đóng menu" aria-label="Đóng menu" onClick={() => { setOpen(false); menu.current?.focus(); }}><X size={20} /></button></div>
       <label className="admin-menu-search"><Search size={16} /><input aria-label="Tìm mục quản lý" placeholder="Tìm mục quản lý..." value={search} onChange={event => setSearch(event.target.value)} /></label>
       <nav aria-label="Điều hướng quản trị" className="admin-navigation">
         {(['workspace', 'content'] as const).map(section => <div key={section} className="admin-nav-group"><p>{section === 'workspace' ? 'KHÔNG GIAN LÀM VIỆC' : 'QUẢN LÝ NỘI DUNG'}</p>{visible.filter(item => item.section === section).map(({ path, label, icon: Icon }) => <Link key={path} to={path} title={label} aria-label={label} aria-current={active(path) ? 'page' : undefined}><Icon size={19} /><span>{label}</span>{active(path) && <ChevronRight size={14} className="admin-nav-chevron" />}</Link>)}</div>)}

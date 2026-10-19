@@ -16,6 +16,12 @@ import type { AccountStatus, AdminUserRole, UserProfile } from '../types/api';
 const statusLabels: Record<AccountStatus, string> = {
   ACTIVE: 'Hoạt động', PENDING_VERIFICATION: 'Chờ xác minh', LOCKED: 'Bị khóa', DISABLED: 'Vô hiệu hóa',
 };
+const statusActionLabels: Record<AccountStatus, string> = {
+  ACTIVE: 'Khóa tài khoản',
+  PENDING_VERIFICATION: 'Kích hoạt tài khoản',
+  LOCKED: 'Mở khóa tài khoản',
+  DISABLED: 'Khôi phục tài khoản',
+};
 const number = (value: number | undefined) => value === undefined ? '--' : value.toLocaleString('vi-VN');
 type Change = { user: UserProfile; kind: 'status' | 'role' | 'delete'; nextStatus?: AccountStatus; nextRole?: AdminUserRole };
 
@@ -55,7 +61,9 @@ export function AdminPage({ accountsOnly = false }: { accountsOnly?: boolean }) 
       } else if (pending.nextRole) {
         await adminService.updateRole(pending.user.userId, pending.nextRole);
       }
-      setPending(null); setMessage(pending.kind === 'delete' ? 'Đã vô hiệu hóa tài khoản người dùng.' : 'Đã cập nhật tài khoản.'); stats.refresh(); accounts.refresh();
+      setPending(null); setMessage(pending.kind === 'delete' ? 'Đã vô hiệu hóa tài khoản người dùng.'
+        : pending.kind === 'status' && pending.nextStatus === 'ACTIVE' && pending.user.status === 'DISABLED' ? 'Đã kích hoạt lại tài khoản người dùng.'
+          : 'Đã cập nhật tài khoản.'); stats.refresh(); accounts.refresh();
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setMutating(false); }
   };
@@ -106,7 +114,13 @@ export function AdminPage({ accountsOnly = false }: { accountsOnly?: boolean }) 
             {accountsOnly && <td>{item.email}</td>}<td><span className={'admin-role' + (item.role === 'ADMIN' ? ' is-admin' : '')}>{item.role === 'ADMIN' ? 'Quản trị viên' : 'Thành viên'}</span></td>
             <td><span className={'admin-status ' + item.status.toLowerCase()}>{statusLabels[item.status as AccountStatus] || item.status}</span></td>
             <td><div className="admin-table-actions">
-              <button type="button" title={!canStatus ? 'Không thể khóa tài khoản quản trị viên' : item.status === 'ACTIVE' ? 'Khóa tài khoản' : 'Mở khóa tài khoản'} aria-label={(item.status === 'ACTIVE' ? 'Khóa ' : 'Mở khóa ') + item.username} disabled={!canStatus || mutating} className={item.status === 'ACTIVE' ? 'is-lock' : ''} onClick={() => { setError(''); setPending({ user: item, kind: 'status', nextStatus: item.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE' }); }}>{item.status === 'ACTIVE' ? <LockKeyhole size={13} /> : <UnlockKeyhole size={13} />}</button>
+              <button type="button" title={!canStatus ? 'Không thể đổi trạng thái tài khoản quản trị viên' : statusActionLabels[item.status as AccountStatus]}
+                aria-label={`${statusActionLabels[item.status as AccountStatus]} ${item.username}`} disabled={!canStatus || mutating}
+                className={item.status === 'ACTIVE' ? 'is-lock' : item.status === 'DISABLED' ? 'is-restore' : ''}
+                onClick={() => { setError(''); setPending({ user: item, kind: 'status', nextStatus: item.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE' }); }}>
+                {item.status === 'ACTIVE' ? <LockKeyhole size={13} /> : <UnlockKeyhole size={13} />}
+                {item.status === 'DISABLED' && <span>Khôi phục</span>}
+              </button>
               <button type="button" title={isSelf ? 'Không thể tự đổi vai trò' : item.role === 'ADMIN' ? 'Chuyển thành thành viên' : 'Cấp quyền quản trị viên'} aria-label={'Đổi vai trò ' + item.username} disabled={isSelf || mutating} onClick={() => { setError(''); setPending({ user: item, kind: 'role', nextRole: item.role === 'ADMIN' ? 'MEMBER' : 'ADMIN' }); }}>{item.role === 'ADMIN' ? <ShieldMinus size={14} /> : <ShieldPlus size={14} />}</button>
               <button type="button" title={canDelete ? 'Xóa user (vô hiệu hóa tài khoản)' : 'Không thể xóa tài khoản này'} aria-label={'Xóa user ' + item.username} disabled={!canDelete || mutating} className="is-lock" onClick={() => { setError(''); setPending({ user: item, kind: 'delete', nextStatus: 'DISABLED' }); }}><Trash2 size={14} /></button>
             </div></td></tr>;
@@ -138,8 +152,14 @@ export function AdminPage({ accountsOnly = false }: { accountsOnly?: boolean }) 
         <div className="admin-videos-list">{overview.videos.items.slice(0, 3).map(video => <Link className="admin-video-item" key={video.id} to={'/admin/videos/' + video.id + '/edit'}><img className="admin-video-image" src={videoThumbnail(video.videoUrl, video.thumbnailUrl)} alt={video.title} loading="lazy" onError={event => { if (!event.currentTarget.src.endsWith('/images/vietnamese-vegan-table.png')) event.currentTarget.src = '/images/vietnamese-vegan-table.png'; }} /><div><h3>{video.title}</h3><p>{video.createdBy} · Công khai</p></div></Link>)}</div>}
     </section></div>}
     {!accountsOnly && <nav aria-label="Tạo nội dung" className="admin-quick-actions"><Link to="/admin/recipes"><Plus size={14} />Công thức mới</Link><Link to="/blog/write"><FilePenLine size={14} />Viết bài Blog</Link><Link to="/admin/videos/new"><Video size={14} />Thêm video</Link></nav>}
-    <CommunityConfirm open={!!pending} title={pending?.kind === 'delete' ? 'Xóa user này?' : pending?.kind === 'role' ? 'Thay đổi vai trò tài khoản?' : pending?.nextStatus === 'LOCKED' ? 'Khóa tài khoản này?' : 'Mở lại tài khoản?'} busy={mutating} destructive={pending?.kind === 'delete' || pending?.nextStatus === 'LOCKED'} onCancel={() => { setPending(null); setError(''); }} onConfirm={confirm}>
-      <p>{pending?.kind === 'delete' ? 'Tài khoản sẽ bị vô hiệu hóa và người dùng không thể đăng nhập. Dữ liệu liên quan vẫn được giữ lại.' : pending?.kind === 'role' ? pending.nextRole === 'ADMIN' ? 'Tài khoản sẽ được cấp quyền quản lý nội dung và tài khoản trên hệ thống.' : 'Tài khoản sẽ trở về quyền thành viên và không còn truy cập khu quản trị.' : pending?.nextStatus === 'LOCKED' ? 'Người dùng sẽ không thể sử dụng các chức năng cần đăng nhập cho đến khi được mở khóa.' : 'Tài khoản sẽ được chuyển sang trạng thái hoạt động.'}</p>
+    <CommunityConfirm open={!!pending}
+      title={pending?.kind === 'delete' ? 'Xóa user này?' : pending?.kind === 'role' ? 'Thay đổi vai trò tài khoản?' : pending?.nextStatus === 'LOCKED' ? 'Khóa tài khoản này?' : pending?.user.status === 'DISABLED' ? 'Kích hoạt lại tài khoản?' : 'Mở lại tài khoản?'}
+      busy={mutating} destructive={pending?.kind === 'delete' || pending?.nextStatus === 'LOCKED'} onCancel={() => { setPending(null); setError(''); }} onConfirm={confirm}>
+      <p>{pending?.kind === 'delete' ? 'Tài khoản sẽ bị vô hiệu hóa và người dùng không thể đăng nhập. Dữ liệu liên quan vẫn được giữ lại.'
+        : pending?.kind === 'role' ? pending.nextRole === 'ADMIN' ? 'Tài khoản sẽ được cấp quyền quản lý nội dung và tài khoản trên hệ thống.' : 'Tài khoản sẽ trở về quyền thành viên và không còn truy cập khu quản trị.'
+          : pending?.nextStatus === 'LOCKED' ? 'Người dùng sẽ không thể sử dụng các chức năng cần đăng nhập cho đến khi được mở khóa.'
+            : pending?.user.status === 'DISABLED' ? 'Tài khoản sẽ được kích hoạt lại và người dùng có thể đăng nhập trở lại.'
+              : 'Tài khoản sẽ được chuyển sang trạng thái hoạt động.'}</p>
       {pending && <div className="admin-modal-summary"><strong>{pending.user.fullName || pending.user.username}</strong><div>{pending.user.email}</div></div>}
       {error && <p role="alert" className="admin-feedback error">{error}</p>}
     </CommunityConfirm>

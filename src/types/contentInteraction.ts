@@ -1,4 +1,4 @@
-export type InteractionTarget = 'BLOG' | 'RECIPE';
+export type InteractionTarget = 'BLOG' | 'RECIPE' | 'VIDEO';
 
 export interface InteractionRating {
   targetType: InteractionTarget;
@@ -15,6 +15,10 @@ export interface InteractionComment {
   authorId: string;
   authorName: string;
   content: string;
+  reviewStars: number | null;
+  tags: string[];
+  photoUrls: string[];
+  publicDisplayName: boolean;
   createdAt: string;
   updatedAt: string;
   version: number;

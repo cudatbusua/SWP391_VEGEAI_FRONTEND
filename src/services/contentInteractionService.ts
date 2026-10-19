@@ -4,6 +4,21 @@ import type { PageResponse } from '../types/api';
 import type { AdminInteractionRating } from '../types/contentInteraction';
 
 const base = (type: InteractionTarget, id: string) => `/content-interactions/${type}/${encodeURIComponent(id)}`;
+type ReviewInput = {
+  content: string;
+  stars: number;
+  tags: string[];
+  publicDisplayName: boolean;
+  photoUrls?: string[];
+  version?: number;
+};
+
+function reviewForm(input: ReviewInput, photos: File[]) {
+  const form = new FormData();
+  form.append('review', new Blob([JSON.stringify(input)], { type: 'application/json' }));
+  photos.forEach(photo => form.append('photos', photo));
+  return form;
+}
 
 type RatingRequest = { type: InteractionTarget; id: string; resolve: (rating: InteractionRating | null) => void; reject: (reason: unknown) => void };
 const pendingRatings = new Map<string, RatingRequest[]>();
@@ -66,6 +81,18 @@ export const contentInteractionService = {
     const response = await apiRequest<InteractionComment>(`${base(type, id)}/comments${existing ? `/${encodeURIComponent(existing.id)}` : ''}`, {
       method: existing ? 'PUT' : 'POST', body: existing ? { content, version: existing.version } : { content },
     });
+    return response.data;
+  },
+  async submitReview(type: InteractionTarget, id: string, input: ReviewInput, photos: File[], existing?: Pick<InteractionComment, 'id' | 'version'>) {
+    const response = await apiRequest<InteractionComment>(
+      existing
+        ? `${base(type, id)}/comments/${encodeURIComponent(existing.id)}/review`
+        : `${base(type, id)}/reviews`,
+      {
+        method: existing ? 'PUT' : 'POST',
+        body: reviewForm({ ...input, version: existing?.version, photoUrls: existing ? input.photoUrls : [] }, photos),
+      },
+    );
     return response.data;
   },
   async deleteComment(type: InteractionTarget, id: string, commentId: string, version: number) {

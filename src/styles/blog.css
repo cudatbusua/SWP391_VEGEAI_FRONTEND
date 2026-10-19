@@ -57,6 +57,7 @@
 .blog-badge.pending_review { background: #faf1dc; color: #b48a3a; }
 .blog-badge.published { background: #e3f6ed; color: #1a8b65; }
 .blog-badge.rejected { background: #fdece9; color: #ba5b52; }
+.blog-badge.archived { background: #edf0f0; color: #67756e; }
 .blog-editor-grid { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 32px; align-items: start; }
 .blog-editor-main { min-width: 0; }
 .blog-editor-tabs { display: flex; gap: 8px; border-bottom: 1px solid #dfe8df; margin-bottom: 23px; padding-bottom: 12px; }

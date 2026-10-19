@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, ChevronRight, CircleHelp, FilePenLine, LayoutDashboard, LogOut, Menu, PanelLeftClose, Search, ShieldCheck, Users, Video, X } from 'lucide-react';
+import { BookOpen, ChevronRight, CircleHelp, FilePenLine, LayoutDashboard, LogOut, Menu, MessageCircle, PanelLeftClose, Search, ShieldCheck, Users, Video, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/admin.css';
 
@@ -10,6 +10,7 @@ const items = [
   { path: '/admin/recipes', label: 'Công thức & dinh dưỡng', icon: BookOpen, section: 'content' },
   { path: '/admin/blog', label: 'Blog', icon: FilePenLine, section: 'content' },
   { path: '/admin/videos', label: 'Video', icon: Video, section: 'content' },
+  { path: '/admin/content-interactions', label: 'Bình luận & đánh giá', icon: MessageCircle, section: 'content' },
   { path: '/admin/questions', label: 'Hỏi đáp', icon: CircleHelp, section: 'content' },
 ];
 

@@ -38,6 +38,8 @@ function setup(handler) {
     restaurants: load('src/services/restaurantService.ts').restaurantService,
     recipes: load('src/services/recipeService.ts').recipeService,
     blogs: load('src/services/blogService.ts').blogService,
+    interactions: load('src/services/contentInteractionService.ts').contentInteractionService,
+    blogContent: load('src/utils/blogContent.ts'),
     nutrition: load('src/services/nutritionService.ts').nutritionService,
     mealPlans: load('src/services/mealPlanService.ts').mealPlanService,
     community: load('src/services/communityService.ts').communityService,
@@ -230,12 +232,43 @@ test('blog drafts, edits, submission and withdrawal preserve the server revision
   const input = { title: 'Bữa chay', category: 'KITCHEN', content: 'Nội dung', coverImage: '/images/vegan-tofu-meal.png', excerpt: '', version: 3 };
   await fixture.blogs.save(input); await fixture.blogs.save(input, 'post-1');
   await fixture.blogs.submit('post-1', 4); await fixture.blogs.withdraw('post-1', 5); await fixture.blogs.remove('post-1', 6);
-  assert.deepEqual(fixture.calls.map(call => call.method), ['POST', 'PUT', 'POST', 'POST', 'DELETE']);
-  assert.deepEqual(fixture.calls.map(call => call.url), ['/api/blog/my-posts', '/api/blog/my-posts/post-1', '/api/blog/my-posts/post-1/submit', '/api/blog/my-posts/post-1/withdraw', '/api/blog/my-posts/post-1?version=6']);
+  await fixture.blogs.archive('post-1', 7); await fixture.blogs.restore('post-1', 8);
+  await fixture.blogs.requestPublishedEdit('post-1', { ...input, version: 7 });
+  await fixture.blogs.deleteAny('post-1', 8);
+  assert.deepEqual(fixture.calls.map(call => call.method), ['POST', 'PUT', 'POST', 'POST', 'DELETE', 'POST', 'POST', 'PUT', 'DELETE']);
+  assert.deepEqual(fixture.calls.map(call => call.url), ['/api/blog/my-posts', '/api/blog/my-posts/post-1', '/api/blog/my-posts/post-1/submit', '/api/blog/my-posts/post-1/withdraw', '/api/blog/my-posts/post-1?version=6', '/api/blog/my-posts/post-1/archive', '/api/blog/my-posts/post-1/restore', '/api/blog/my-posts/post-1/request-review', '/api/blog/my-posts/post-1/permanent?version=8']);
   assert.deepEqual(JSON.parse(fixture.calls[2].body), { version: 4 });
+  assert.deepEqual(JSON.parse(fixture.calls[5].body), { version: 7 });
+  assert.deepEqual(JSON.parse(fixture.calls[6].body), { version: 8 });
+  assert.deepEqual(JSON.parse(fixture.calls[7].body), { ...input, version: 7 });
   assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
   const guest = setup(() => reply({}));
   await assert.rejects(guest.blogs.save(input), /đăng nhập/); assert.equal(guest.calls.length, 0);
+});
+
+test('legacy blog HTML is converted to readable paragraphs in the editor', () => {
+  const { blogContent } = setup(() => reply({}));
+  assert.equal(blogContent.blogContentForEditor('<p>Món <strong>chay</strong> &amp; ngon.</p><p>Bữa thứ hai.<br>Rất vui!</p>'),
+    'Món chay & ngon.\n\nBữa thứ hai.\nRất vui!');
+  assert.equal(blogContent.blogContentForEditor('Nội dung văn bản thuần'), 'Nội dung văn bản thuần');
+  assert.equal(blogContent.blogContentForEditor('<p>An toàn</p><script>alert(1)</script>'), 'An toàn');
+});
+
+test('rating badges batch summaries and do not fetch comment pages', async () => {
+  const fixture = setup(() => reply([
+    { targetId: 'blog-1', averageStars: 4.5, ratingCount: 2 },
+    { targetId: 'blog-2', averageStars: null, ratingCount: 0 },
+  ]));
+  const [first, second] = await Promise.all([
+    fixture.interactions.loadRating('BLOG', 'blog-1'),
+    fixture.interactions.loadRating('BLOG', 'blog-2'),
+  ]);
+  assert.equal(fixture.calls.length, 1);
+  const url = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(url.pathname, '/api/public/content-interactions/BLOG/ratings');
+  assert.deepEqual(url.searchParams.getAll('ids'), ['blog-1', 'blog-2']);
+  assert.equal(first.averageStars, 4.5);
+  assert.equal(second.ratingCount, 0);
 });
 
 test('admin blog decisions include reason and exact revision; 403 is not retried', async () => {

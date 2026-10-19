@@ -27,6 +27,18 @@ export const blogService = {
   async save(input: BlogInput, id?: string) {
     return data(await apiRequest<BlogPost>(id ? '/blog/my-posts/' + encodeURIComponent(id) : '/blog/my-posts', { method: id ? 'PUT' : 'POST', body: input }));
   },
+  async requestPublishedEdit(id: string, input: BlogInput) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/request-review', { method: 'PUT', body: input }));
+  },
+  async archive(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/archive', { method: 'POST', body: { version } }));
+  },
+  async restore(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/restore', { method: 'POST', body: { version } }));
+  },
+  async deleteAny(id: string, version: number) {
+    await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '/permanent?version=' + version, { method: 'DELETE' });
+  },
   async submit(id: string, version: number) {
     return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/submit', { method: 'POST', body: { version } }));
   },

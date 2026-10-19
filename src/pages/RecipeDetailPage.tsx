@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, Flame, Users, RefreshCw } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { RecipeImage } from '../components/RecipeImage';
 import { VideoPlayer } from '../components/CommunityUi';
+import { ContentInteractions } from '../components/ContentInteractions';
 import { recipeService } from '../services/recipeService';
 import { errorMessage } from '../services/apiClient';
 import type { RecipeDetail } from '../types/recipe';
@@ -61,6 +62,6 @@ export function RecipeDetailPage() {
         </ol></section>
       </div>
       {!!recipe.videos?.length && <section className="mt-10 border-t pt-8"><h2 className="text-xl font-bold mb-5">Video cách nấu</h2><div className="grid md:grid-cols-2 gap-6">{recipe.videos.map(video => <article key={video.id} className="min-w-0"><h3 className="font-semibold mb-3"><Link to={'/videos/' + video.id}>{video.title}</Link></h3><VideoPlayer video={video} /></article>)}</div></section>}
-    </>}
+    <ContentInteractions type="RECIPE" id={recipe.recipeId} /></>}
   </div></MainLayout>;
 }

@@ -35,6 +35,7 @@ const AdminQuestionsPage = lazy(() => import('./pages/AdminQuestionsPage').then(
 const AdminQuestionDetailPage = lazy(() => import('./pages/AdminQuestionsPage').then(module => ({ default: module.AdminQuestionDetailPage })));
 const AdminVideosPage = lazy(() => import('./pages/AdminVideosPage').then(module => ({ default: module.AdminVideosPage })));
 const AdminVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.AdminVideoEditorPage })));
+const AdminContentInteractionsPage = lazy(() => import('./pages/AdminContentInteractionsPage').then(module => ({ default: module.AdminContentInteractionsPage })));
 
 export const App: React.FC = () => {
   return (
@@ -80,6 +81,7 @@ export const App: React.FC = () => {
           <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos" element={<AdminFeatureBoundary><AdminVideosPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/content-interactions" element={<AdminFeatureBoundary><AdminContentInteractionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos/new" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos/:id/edit" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />

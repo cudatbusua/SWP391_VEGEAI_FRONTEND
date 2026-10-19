@@ -5,6 +5,8 @@ import { MainLayout } from '../layouts/MainLayout';
 import { blogService } from '../services/blogService';
 import { errorMessage } from '../services/apiClient';
 import { BlogBody, BlogCover, BlogError, BlogPagination, blogDate } from '../components/BlogUi';
+import { ContentInteractions } from '../components/ContentInteractions';
+import { ContentRatingBadge } from '../components/ContentRatingBadge';
 import { useAuth } from '../hooks/useAuth';
 import { blogCategories } from '../types/blog';
 import type { BlogCategory, BlogPost } from '../types/blog';
@@ -35,7 +37,7 @@ export function BlogPage() {
     {error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}
     {busy && !data && <p role="status" className="blog-empty">Đang tải bài viết...</p>}
     {!busy && !error && !data?.items.length && <div className="blog-empty"><BookOpen size={36} /><h2>Chưa có bài viết được xuất bản</h2><p>Chia sẻ câu chuyện sống chay của bạn cùng cộng đồng.</p><Link to="/blog/write" className="blog-button"><Plus size={16} /> Viết bài đầu tiên</Link></div>}
-    {!error && <div className={'blog-public-grid ' + (busy ? 'is-loading' : '')}>{data?.items.map(post => <Link to={'/blog/' + post.postId} key={post.postId} className="blog-public-card"><BlogCover post={{ ...post, postId: post.postId }} /><div className="blog-public-card-body"><span className="blog-eyebrow">{blogCategories[post.category]}</span><h2>{post.title}</h2><p>{post.excerpt}</p><div className="blog-public-meta"><span><UserRound size={13} />{post.authorName}</span><span><Clock size={13} />{post.readingMinutes} phút đọc</span></div><span className="blog-read-link">Đọc bài viết <ArrowUpRight size={16} /></span></div></Link>)}</div>}
+    {!error && <div className={'blog-public-grid ' + (busy ? 'is-loading' : '')}>{data?.items.map(post => <Link to={'/blog/' + post.postId} key={post.postId} className="blog-public-card"><BlogCover post={{ ...post, postId: post.postId }} /><div className="blog-public-card-body"><span className="blog-eyebrow">{blogCategories[post.category]}</span><h2>{post.title}</h2><p>{post.excerpt}</p><div className="blog-public-meta"><span><UserRound size={13} />{post.authorName}</span><span><Clock size={13} />{post.readingMinutes} phút đọc</span></div><ContentRatingBadge type="BLOG" id={post.postId} /><span className="blog-read-link">Đọc bài viết <ArrowUpRight size={16} /></span></div></Link>)}</div>}
     <BlogPagination data={data} busy={busy} change={setPage} />
   </div></MainLayout>;
 }
@@ -52,5 +54,5 @@ export function BlogDetailPage() {
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [id, reload]);
-  return <MainLayout><article className="blog-article-shell"><Link to="/blog" className="blog-back"><ArrowLeft size={15} /> Blog cộng đồng</Link>{busy && <p role="status" className="blog-empty">Đang tải bài viết...</p>}{error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}{post && <><span className="blog-eyebrow">{blogCategories[post.category]}</span><h1>{post.title}</h1><p className="blog-lead">{post.excerpt}</p><div className="blog-public-meta"><span><UserRound size={14} />{post.authorName}</span><span>{blogDate(post.publishedAt)}</span><span><Clock size={14} />{post.readingMinutes} phút đọc</span></div><BlogCover post={{ ...post, postId: post.postId }} /><BlogBody content={post.content || ''} /><Link to="/blog" className="blog-read-link"><ArrowLeft size={15} /> Khám phá bài viết khác</Link></>}</article></MainLayout>;
+  return <MainLayout><article className="blog-article-shell"><Link to="/blog" className="blog-back"><ArrowLeft size={15} /> Blog cộng đồng</Link>{busy && <p role="status" className="blog-empty">Đang tải bài viết...</p>}{error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}{post && <><span className="blog-eyebrow">{blogCategories[post.category]}</span><h1>{post.title}</h1><p className="blog-lead">{post.excerpt}</p><div className="blog-public-meta"><span><UserRound size={14} />{post.authorName}</span><span>{blogDate(post.publishedAt)}</span><span><Clock size={14} />{post.readingMinutes} phút đọc</span></div><BlogCover post={{ ...post, postId: post.postId }} /><BlogBody content={post.content || ''} /><Link to="/blog" className="blog-read-link"><ArrowLeft size={15} /> Khám phá bài viết khác</Link></>}</article>{post && <ContentInteractions type="BLOG" id={post.postId} />}</MainLayout>;
 }

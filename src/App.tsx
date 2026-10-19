@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './store/AuthContext';
 import { PersonalFeatureBoundary } from './components/PersonalFeatureBoundary';
 import { AdminFeatureBoundary } from './components/AdminFeatureBoundary';
+import { CommunityGuard } from './components/CommunityUi';
 
 const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
 const RegisterPage = lazy(() => import('./pages/RegisterPage').then(module => ({ default: module.RegisterPage })));
@@ -74,9 +75,9 @@ export const App: React.FC = () => {
           <Route path="/questions/mine" element={<PersonalFeatureBoundary><QuestionsPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine/:id" element={<PersonalFeatureBoundary><QuestionDetailPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/:id" element={<QuestionDetailPage />} />
-          <Route path="/videos" element={<PersonalFeatureBoundary><VideosPage /></PersonalFeatureBoundary>} />
-          <Route path="/videos/saved" element={<PersonalFeatureBoundary><VideosPage saved /></PersonalFeatureBoundary>} />
-          <Route path="/videos/:id" element={<PersonalFeatureBoundary><VideoDetailPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos" element={<CommunityGuard><VideosPage /></CommunityGuard>} />
+          <Route path="/videos/saved" element={<CommunityGuard><VideosPage saved /></CommunityGuard>} />
+          <Route path="/videos/:id" element={<CommunityGuard><VideoDetailPage /></CommunityGuard>} />
           <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos" element={<AdminFeatureBoundary><AdminVideosPage /></AdminFeatureBoundary>} />

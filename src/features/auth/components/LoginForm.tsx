@@ -9,8 +9,10 @@ export const LoginForm: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const requestedPath: unknown = location.state?.from;
-  const destination = typeof requestedPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition)(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
+  const from: unknown = location.state?.from;
+  const requestedPath = typeof from === 'string' ? from
+    : from && typeof from === 'object' && 'pathname' in from ? from.pathname : null;
+  const destination = typeof requestedPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition|ai-chef|fridge-scan|fridge|dashboard|change-password)(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
     ? requestedPath : null;
 
   const [formData, setFormData] = useState({

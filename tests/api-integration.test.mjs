@@ -49,7 +49,7 @@ const reply = (data, status = 200, message = 'OK', code = status) => ({ ok: stat
   json: async () => ({ success: status < 400, code, message, data }) });
 const hash = value => createHash('sha256').update(value).digest('hex');
 
-test('nutrition saves contact, diet and exclusions together without modifying public calculation', async () => {
+test('nutrition saves contact, diet and exclusions and authenticates calculation', async () => {
   const fixture = setup(() => reply({ targets: { dailyCaloriesTarget: 1800 } }));
   fixture.api.setSession(auth(), true);
   const input = { gender: 'FEMALE', dateOfBirth: '2000-01-01', heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN', phoneNumber: '0912345678', dietaryPreferences: 'VEGAN', allergies: 'Đậu phộng', customDailyCalories: null };
@@ -58,7 +58,7 @@ test('nutrition saves contact, diet and exclusions together without modifying pu
   assert.deepEqual(JSON.parse(fixture.calls[0].body), input);
   assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
   await fixture.nutrition.calculate({ gender: 'FEMALE', age: 26, heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN' });
-  assert.equal(fixture.calls[1].headers.has('Authorization'), false);
+  assert.equal(fixture.calls[1].headers.get('Authorization'), 'Bearer token-1');
   assert.equal(JSON.parse(fixture.calls[1].body).phoneNumber, undefined);
 });
 
@@ -434,15 +434,17 @@ test('video embeds use exact provider allowlists and reject unsafe or credential
   assert.equal(videoMedia.videoDuration(3661), '1:01:01');
 });
 
-test('guest AI chat preserves server session ID and sends no bearer token', async () => {
-  const fixture = setup(() => reply({ reply: 'Món chay', sessionId: 'chat-1', isGuestTrial: true, remainingGuestQuota: 2 }));
+test('customer AI chat preserves server session ID and sends bearer token', async () => {
+  const fixture = setup(() => reply({ reply: 'Món chay', sessionId: 'chat-1', isGuestTrial: false }));
+  fixture.api.setSession(auth(), true);
   const result = await fixture.ai.chat(' Gợi ý món chay ', 'chat-1');
-  assert.equal(result.remainingGuestQuota, 2); assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+  assert.equal(result.sessionId, 'chat-1'); assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
   assert.deepEqual(JSON.parse(fixture.calls[0].body), { message: 'Gợi ý món chay', sessionId: 'chat-1' });
 });
 
 test('AI chef sends bounded conversation history and rejects invalid roles before fetch', async () => {
   const fixture = setup(() => reply({ reply: 'Cách nấu', sessionId: 'chef-1' }));
+  fixture.api.setSession(auth(), true);
   const history = [{ role: 'user', text: 'Tôi có đậu phụ' }, { role: 'model', text: 'Nấu sốt nấm' }];
   await fixture.ai.chat('Nấu thế nào?', 'chef-1', history);
   assert.deepEqual(JSON.parse(fixture.calls[0].body).history, history);
@@ -465,12 +467,14 @@ test('Gemini provider failures preserve member login and never retry as guest', 
 
 test('AI rejects empty replies and missing scan arrays instead of rendering fake success', async () => {
   const fixture = setup(() => reply({ reply: '', summary: 'Invalid result' }));
+  fixture.api.setSession(auth(), true);
   await assert.rejects(fixture.ai.chat('Nấu chay'), /chưa trả về/);
   await assert.rejects(fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })), /chưa trả về/);
 });
 
 test('fridge scan uses multipart image and validates type/size before any request', async () => {
   const fixture = setup(() => reply({ summary: 'Đậu phụ', ingredients: [] }));
+  fixture.api.setSession(auth(), true);
   const image = new File(['image'], 'fridge.png', { type: 'image/png' });
   await fixture.ai.scanFridge(image);
   assert.equal(fixture.calls[0].url, '/api/ai/fridge-scan');
@@ -479,6 +483,20 @@ test('fridge scan uses multipart image and validates type/size before any reques
   await assert.rejects(fixture.ai.scanFridge(new File(['x'], 'x.txt', { type: 'text/plain' })), /JPG/);
   await assert.rejects(fixture.ai.scanFridge(new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.png', { type: 'image/png' })), /5 MB/);
   assert.equal(fixture.calls.length, 1);
+});
+
+test('guest cannot call AI, nutrition or video services before logging in', async () => {
+  const fixture = setup(() => { throw new Error('Guest must not send protected requests'); });
+  for (const action of [
+    () => fixture.ai.chat('Gợi ý món chay'),
+    () => fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })),
+    () => fixture.nutrition.options(),
+    () => fixture.nutrition.calculate({ gender: 'FEMALE', age: 25, heightCm: 160, weightKg: 50, activityLevel: 'SEDENTARY', goal: 'MAINTAIN' }),
+    () => fixture.community.videos({ page: 0 }),
+    () => fixture.community.video('video-id'),
+    () => fixture.community.comments('video-id', 0),
+  ]) await assert.rejects(action(), /đăng nhập/);
+  assert.equal(fixture.calls.length, 0);
 });
 
 test('a late refresh cannot restore a session that has already been cleared', async () => {

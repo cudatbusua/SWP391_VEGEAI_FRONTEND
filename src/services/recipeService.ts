@@ -47,7 +47,7 @@ export const recipeService = {
     return response.data;
   },
   async detail(id: string, signal?: AbortSignal): Promise<RecipeDetail> {
-    const response = await apiRequest<RecipeDetail>(`/recipes/${encodeURIComponent(id)}`, { auth: 'none', signal });
+    const response = await apiRequest<RecipeDetail>(`/recipes/${encodeURIComponent(id)}`, { auth: 'optional', signal });
     if (!response.data) throw new Error('Không tìm thấy công thức.');
     return response.data;
   },

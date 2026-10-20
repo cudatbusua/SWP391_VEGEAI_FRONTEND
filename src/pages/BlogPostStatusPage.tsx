@@ -42,23 +42,26 @@ export function BlogPostStatusPage({ adminMode = false }: { adminMode?: boolean 
     return () => controller.abort();
   }, [id, isAuthenticated, user?.role, adminMode, reload]);
   useEffect(() => {
-    if (adminMode || !isAuthenticated || !id || post?.status !== 'PENDING_REVIEW' || busy || confirm) return;
+    if (!isAuthenticated || (adminMode && user?.role !== 'admin') || !id
+      || post?.status !== 'PENDING_REVIEW' || busy || confirm) return;
     const controller = new AbortController();
     let inFlight = false;
     const timer = window.setInterval(async () => {
       if (inFlight || document.visibilityState !== 'visible') return;
       inFlight = true;
       try {
-        const latest = await blogService.ownPost(id, controller.signal);
+        const latest = adminMode
+          ? await blogService.reviewPost(id, controller.signal)
+          : await blogService.ownPost(id, controller.signal);
         if (!controller.signal.aborted) {
           setPost(latest);
           if (latest.status !== 'PENDING_REVIEW') setMessage('Trạng thái bài viết vừa được cập nhật.');
         }
       } catch { /* Keep the current view during transient polling failures. */ }
       finally { inFlight = false; }
-    }, 15000);
+    }, post.aiModerationStatus === 'CHECKING' ? 5000 : 15000);
     return () => { clearInterval(timer); controller.abort(); };
-  }, [adminMode, isAuthenticated, id, post?.status, busy, confirm]);
+  }, [adminMode, isAuthenticated, user?.role, id, post?.status, post?.aiModerationStatus, busy, confirm]);
   useEffect(() => {
     if (!confirm) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -119,13 +122,19 @@ export function BlogPostStatusPage({ adminMode = false }: { adminMode?: boolean 
   return <MainLayout><div className="blog-shell"><BlogAccess admin={adminMode}><Link to={adminMode ? '/admin/blog' : '/blog/my-posts'} className="blog-back"><ArrowLeft size={15} />{adminMode ? 'Hàng chờ duyệt Blog' : 'Bài viết của tôi'}</Link>
     {error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}{message && <p role="status" className="blog-message">{message}</p>}
     {loading && <p role="status" className="blog-empty">Đang tải bài viết...</p>}
-    {post && <><header className={'blog-status-banner ' + post.status.toLowerCase()}><StatusIcon size={42} /><div><BlogBadge status={post.status} /><h1>{adminMode && post.status === 'PENDING_REVIEW' ? 'Xem xét bài viết cộng đồng' : headline}</h1><p>{post.status === 'PUBLISHED' ? 'Câu chuyện của bạn đã xuất hiện trên Blog cộng đồng VEGEAI.' : post.status === 'PENDING_REVIEW' ? 'Ban biên tập sẽ xem xét nội dung trước khi xuất bản.' : post.status === 'REJECTED' ? 'Xem góp ý từ ban biên tập, chỉnh sửa và gửi duyệt lại.' : post.status === 'ARCHIVED' ? 'Bài viết đã được ẩn khỏi Blog và có thể khôi phục từ kho lưu trữ.' : 'Lưu những ý tưởng của bạn và gửi bài khi đã sẵn sàng.'}</p></div></header>
+    {post && <><header className={'blog-status-banner ' + post.status.toLowerCase()}><StatusIcon size={42} /><div><BlogBadge status={post.status} /><h1>{adminMode && post.status === 'PENDING_REVIEW' ? 'Xem xét bài viết cộng đồng' : headline}</h1><p>{post.status === 'PUBLISHED' ? 'Câu chuyện của bạn đã xuất hiện trên Blog cộng đồng VEGEAI.' : post.status === 'PENDING_REVIEW' ? post.aiModerationStatus === 'CHECKING' ? 'AI đang kiểm tra trong nền; bài viết vẫn chờ Admin duyệt và AI không tự quyết định xuất bản.' : 'Ban biên tập sẽ xem xét nội dung trước khi xuất bản.' : post.status === 'REJECTED' ? 'Xem góp ý từ ban biên tập, chỉnh sửa và gửi duyệt lại.' : post.status === 'ARCHIVED' ? 'Bài viết đã được ẩn khỏi Blog và có thể khôi phục từ kho lưu trữ.' : 'Lưu những ý tưởng của bạn và gửi bài khi đã sẵn sàng.'}</p></div></header>
       <div className="blog-review-grid"><div className="blog-review-main"><div className="blog-review-title"><span className="blog-eyebrow">{blogCategories[post.category]}</span><h2>{post.title}</h2><div className="blog-public-meta"><span>{post.authorName}</span><span>{post.readingMinutes} phút đọc</span><span>Cập nhật {blogDate(post.updatedAt)}</span></div></div>
         {post.status === 'REJECTED' && <section className="blog-rejection-note"><h3><ShieldCheck size={17} /> Lý do từ chối từ ban biên tập</h3><p>{post.moderationReason}</p><span>{post.reviewerName} · {blogDate(post.reviewedAt)}</span></section>}
         {adminMode && <section className="blog-submission-details" aria-label="Thông tin bài gửi duyệt">
           <h3>Thông tin bài gửi duyệt</h3>
           <dl><div><dt>Tác giả</dt><dd>{post.authorName}</dd></div><div><dt>Chuyên mục</dt><dd>{blogCategories[post.category]}</dd></div>
             <div><dt>Thời gian gửi</dt><dd>{blogDate(post.submittedAt || post.updatedAt)}</dd></div><div><dt>Độ dài</dt><dd>{post.readingMinutes} phút đọc</dd></div></dl>
+        </section>}
+        {adminMode && <section className="blog-ai-review" aria-label="Kết quả kiểm tra tự động">
+          <h3>Kết quả AI hỗ trợ kiểm duyệt</h3>
+          <p>{post.aiModerationStatus === 'CHECKING' ? 'AI đang kiểm tra trong nền. Bài viết vẫn ở hàng chờ duyệt.' : post.aiModerationStatus === 'FLAGGED' ? 'Đề nghị Admin xem xét kỹ hơn.' : post.aiModerationStatus === 'SAFE' ? 'Không phát hiện dấu hiệu cần gắn cờ.' : post.aiModerationStatus === 'UNAVAILABLE' ? 'AI chưa kiểm tra được; cần đánh giá thủ công.' : 'Bài chưa được kiểm tra tự động.'}</p>
+          {post.aiModerationReason && <p>{post.aiModerationReason}</p>}
+          <small>AI chỉ hỗ trợ sàng lọc. Quyết định duyệt hoặc từ chối vẫn thuộc về Admin.</small>
         </section>}
         {adminMode && <h3 className="blog-submission-heading">Nội dung bài viết gửi duyệt</h3>}
         <BlogCover key={post.postId} post={{ ...post, postId: post.postId }} useSubmittedImage={adminMode} />

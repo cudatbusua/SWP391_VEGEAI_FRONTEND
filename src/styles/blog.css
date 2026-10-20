@@ -118,6 +118,16 @@
 .blog-submission-details dl > div { min-width: 0; }
 .blog-submission-details dt, .blog-review-excerpt > span { color: #839487; font-size: 11px; }
 .blog-submission-details dd { margin-top: 3px; color: #294b39; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.blog-ai-review { margin-top: 16px; padding: 17px; border: 1px solid #f2d6a0; border-radius: 8px; background: #fffaf0; }
+.blog-ai-review h3 { color: #75531a; font-size: 14px; font-weight: 700; }
+.blog-ai-review p { margin-top: 8px; color: #624f30; font-size: 12px; line-height: 1.7; }
+.blog-ai-review small { display: block; margin-top: 10px; color: #8a7a5d; font-size: 11px; line-height: 1.6; }
+.blog-ai-flag { display: inline-block; margin: 5px 0; color: #a34835; font-size: 11px; }
+.blog-ai-reason { color: #a34835 !important; font-size: 11px; }
+.blog-ai-checking { display: inline-block; margin: 5px 0; padding: 3px 8px; border-radius: 999px; background: #e7f1eb; color: #315e48; font-size: 11px; }
+.blog-ai-unavailable { display: inline-block; margin: 5px 0; padding: 3px 8px; border-radius: 999px; background: #fff4d6; color: #79540e; font-size: 11px; }
+.blog-ai-unavailable-reason { color: #79540e !important; font-size: 11px; }
+.blog-ai-safe { display: inline-block; margin: 5px 0; color: #3e7557; font-size: 11px; }
 .blog-submission-heading { margin-top: 27px; }
 .blog-review-excerpt { margin-top: 21px; padding: 16px 18px; border-left: 3px solid #68a584; background: #f2f7f3; }
 .blog-review-excerpt .blog-lead { margin: 5px 0 0; white-space: pre-wrap; }

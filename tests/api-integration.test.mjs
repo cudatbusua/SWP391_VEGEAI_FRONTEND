@@ -349,6 +349,20 @@ test('admin blog decisions include reason and exact revision; 403 is not retried
   await assert.rejects(denied.blogs.review('post-1', 7, 'APPROVE', ''), /Admin only/); assert.equal(denied.calls.length, 1);
 });
 
+test('admin blog queue can filter posts whose AI moderation was unavailable', async () => {
+  const fixture = setup(() => reply({ items: [] }));
+  fixture.api.setSession(auth(), true);
+  await fixture.blogs.queue('PENDING_REVIEW', '', 0, undefined, 'UNAVAILABLE');
+  assert.equal(fixture.calls[0].url, '/api/admin/blog/posts?status=PENDING_REVIEW&page=0&size=10&aiStatus=UNAVAILABLE');
+});
+
+test('admin blog queue can filter posts whose AI moderation is in progress', async () => {
+  const fixture = setup(() => reply({ items: [] }));
+  fixture.api.setSession(auth(), true);
+  await fixture.blogs.queue('PENDING_REVIEW', '', 0, undefined, 'CHECKING');
+  assert.equal(fixture.calls[0].url, '/api/admin/blog/posts?status=PENDING_REVIEW&page=0&size=10&aiStatus=CHECKING');
+});
+
 test('admin blog archive, restore and permanent delete use revision-checked endpoints', async () => {
   const fixture = setup(() => reply({ postId: 'post-1', version: 9, status: 'ARCHIVED' }));
   fixture.api.setSession(auth(), true);

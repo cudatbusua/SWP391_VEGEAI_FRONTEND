@@ -39,13 +39,14 @@ export const adminService = {
     if (!response.data) throw new Error('Không thể cập nhật vai trò.');
     return response.data;
   },
-  async aiStatus(): Promise<AiOpsStatus> {
-    const response = await apiRequest<AiOpsStatus>('/admin/ai/status');
+  async aiStatus(signal?: AbortSignal): Promise<AiOpsStatus> {
+    const response = await apiRequest<AiOpsStatus>('/admin/ai/status', { signal });
     if (!response.data) throw new Error('Không thể tải trạng thái AI.');
     return response.data;
   },
-  async aiAuditLogs(): Promise<AiAuditLogEntry[]> {
-    const response = await apiRequest<AiAuditLogEntry[]>('/admin/ai/audit-logs');
-    return response.data ?? [];
+  async aiAuditLogs(signal?: AbortSignal): Promise<AiAuditLogEntry[]> {
+    const response = await apiRequest<AiAuditLogEntry[]>('/admin/ai/audit-logs', { signal });
+    if (!response.data) throw new Error('Không thể tải nhật ký hoạt động AI.');
+    return response.data;
   },
 };

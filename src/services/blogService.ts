@@ -1,6 +1,6 @@
 import { apiRequest } from './apiClient';
 import type { ApiResponse, PageResponse } from '../types/api';
-import type { BlogCategory, BlogInput, BlogPost, BlogStatus } from '../types/blog';
+import type { AiModerationStatus, BlogCategory, BlogInput, BlogPost, BlogStatus } from '../types/blog';
 
 function data<T>(response: ApiResponse<T>): T {
   if (!response.data) throw new Error('Máy chủ không trả về dữ liệu bài viết.');
@@ -48,9 +48,10 @@ export const blogService = {
   async remove(id: string, version: number) {
     await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '?version=' + version, { method: 'DELETE' });
   },
-  async queue(status: BlogStatus, keyword: string, page: number, signal?: AbortSignal) {
+  async queue(status: BlogStatus, keyword: string, page: number, signal?: AbortSignal, aiStatus?: AiModerationStatus) {
     const query = new URLSearchParams({ status, page: String(page), size: '10' });
     if (keyword.trim()) query.set('keyword', keyword.trim());
+    if (aiStatus) query.set('aiStatus', aiStatus);
     return data(await apiRequest<PageResponse<BlogPost>>('/admin/blog/posts?' + query, { signal }));
   },
   async reviewPost(id: string, signal?: AbortSignal) {

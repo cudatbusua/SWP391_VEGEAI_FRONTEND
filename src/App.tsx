@@ -17,6 +17,7 @@ const FridgeScanPage = lazy(() => import('./pages/FridgeScanPage').then(module =
 const FridgeInventoryPage = lazy(() => import('./pages/FridgeInventoryPage').then(module => ({ default: module.FridgeInventoryPage })));
 const NutritionCalculatorPage = lazy(() => import('./pages/NutritionCalculatorPage').then(module => ({ default: module.NutritionCalculatorPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then(module => ({ default: module.AdminPage })));
+const AdminAiPage = lazy(() => import('./pages/AdminAiPage').then(module => ({ default: module.AdminAiPage })));
 const MealPlansPage = lazy(() => import('./pages/MealPlansPage').then(module => ({ default: module.MealPlansPage })));
 const AdminRecipesPage = lazy(() => import('./pages/AdminRecipesPage').then(module => ({ default: module.AdminRecipesPage })));
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage').then(module => ({ default: module.ChangePasswordPage })));
@@ -62,6 +63,7 @@ export const App: React.FC = () => {
           <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
           <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
           <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
+          <Route path="/admin/ai" element={<AdminFeatureBoundary><AdminAiPage /></AdminFeatureBoundary>} />
           <Route path="/admin/recipes" element={<AdminFeatureBoundary><AdminRecipesPage /></AdminFeatureBoundary>} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/write" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />

@@ -227,11 +227,13 @@ export interface AiModelStatus {
 
 export interface AiOpsStatus {
   systemHealth: string;
-  uptimePercentage: number;
-  averageLatencyMs: number;
+  successRatePercentage?: number | null;
+  averageLatencyMs?: number | null;
   totalAiRequests: number;
   guestAiRequestsToday: number;
-  lastHealthCheckAt: string;
+  moderationReviewedCount: number;
+  moderationAgreementRate?: number | null;
+  generatedAt: string;
   models: AiModelStatus[];
 }
 
@@ -243,5 +245,7 @@ export interface AiAuditLogEntry {
   latencyMs: number;
   userType: string;
   status: string;
+  outcome?: string;
+  errorType?: string;
   promptSummary?: string;
 }

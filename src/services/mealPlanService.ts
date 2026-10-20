@@ -8,7 +8,7 @@ function data<T>(response: ApiResponse<T>): T {
 }
 const id = encodeURIComponent;
 export const mealPlanService = {
-  async generate(input: GenerateMealPlan) { return data(await apiRequest<MealPlan>('/meal-plans/generate', { method: 'POST', body: input, timeoutMs: 90000 })); },
+  async generate(input: GenerateMealPlan) { return data(await apiRequest<MealPlan>('/meal-plans/generate', { method: 'POST', body: input, timeoutMs: 60000 })); },
   async get(planId: string, signal?: AbortSignal) { return data(await apiRequest<MealPlan>('/meal-plans/' + id(planId), { signal })); },
   async list(page = 0, signal?: AbortSignal) { return data(await apiRequest<PageResponse<MealPlanSummary>>('/meal-plans?page=' + page + '&size=5', { signal })); },
   async options(planId: string, signal?: AbortSignal) { return data(await apiRequest<RecipeSummary[]>('/meal-plans/' + id(planId) + '/options', { signal })); },

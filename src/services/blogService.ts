@@ -1,6 +1,6 @@
 import { apiRequest } from './apiClient';
 import type { ApiResponse, PageResponse } from '../types/api';
-import type { BlogCategory, BlogInput, BlogPost, BlogStatus } from '../types/blog';
+import type { AiModerationStatus, BlogCategory, BlogInput, BlogPost, BlogStatus } from '../types/blog';
 
 function data<T>(response: ApiResponse<T>): T {
   if (!response.data) throw new Error('Máy chủ không trả về dữ liệu bài viết.');
@@ -27,6 +27,18 @@ export const blogService = {
   async save(input: BlogInput, id?: string) {
     return data(await apiRequest<BlogPost>(id ? '/blog/my-posts/' + encodeURIComponent(id) : '/blog/my-posts', { method: id ? 'PUT' : 'POST', body: input }));
   },
+  async requestPublishedEdit(id: string, input: BlogInput) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/request-review', { method: 'PUT', body: input }));
+  },
+  async archive(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/archive', { method: 'POST', body: { version } }));
+  },
+  async restore(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/restore', { method: 'POST', body: { version } }));
+  },
+  async deleteAny(id: string, version: number) {
+    await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '/permanent?version=' + version, { method: 'DELETE' });
+  },
   async submit(id: string, version: number) {
     return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/submit', { method: 'POST', body: { version } }));
   },
@@ -36,9 +48,10 @@ export const blogService = {
   async remove(id: string, version: number) {
     await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '?version=' + version, { method: 'DELETE' });
   },
-  async queue(status: BlogStatus, keyword: string, page: number, signal?: AbortSignal) {
+  async queue(status: BlogStatus, keyword: string, page: number, signal?: AbortSignal, aiStatus?: AiModerationStatus) {
     const query = new URLSearchParams({ status, page: String(page), size: '10' });
     if (keyword.trim()) query.set('keyword', keyword.trim());
+    if (aiStatus) query.set('aiStatus', aiStatus);
     return data(await apiRequest<PageResponse<BlogPost>>('/admin/blog/posts?' + query, { signal }));
   },
   async reviewPost(id: string, signal?: AbortSignal) {
@@ -46,5 +59,14 @@ export const blogService = {
   },
   async review(id: string, version: number, decision: 'APPROVE' | 'REJECT', reason: string) {
     return data(await apiRequest<BlogPost>('/admin/blog/posts/' + encodeURIComponent(id) + '/review', { method: 'POST', body: { version, decision, reason } }));
+  },
+  async adminArchive(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/admin/blog/posts/' + encodeURIComponent(id) + '/archive', { method: 'POST', body: { version } }));
+  },
+  async adminRestore(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/admin/blog/posts/' + encodeURIComponent(id) + '/restore', { method: 'POST', body: { version } }));
+  },
+  async adminDelete(id: string, version: number) {
+    await apiRequest('/admin/blog/posts/' + encodeURIComponent(id) + '?version=' + version, { method: 'DELETE' });
   },
 };

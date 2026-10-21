@@ -2,14 +2,13 @@ import type { ReactNode } from 'react';
 import type { AiEvent, AiEventLevel, AiServiceHealth } from '../../types/aiMonitoring';
 
 export const OPERATIONS: Record<string, { label: string; matrix: string; tone: string; success: string }> = {
-  CONTENT_MODERATION: { label: 'VegeCheck NLP', matrix: 'VegeCheck NLP Worker', tone: 'green', success: 'Quét bài viết cộng đồng, không phát hiện vi phạm' },
+  CONTENT_MODERATION: { label: 'AI Kiểm Duyệt Blog', matrix: 'AI Kiểm Duyệt Bài Blog', tone: 'green', success: 'Quét bài viết cộng đồng, không phát hiện vi phạm' },
   FRIDGE_SCAN: { label: 'AI Tủ Lạnh', matrix: 'Vision OCR & Tủ Lạnh', tone: 'amber', success: 'Nhận diện nguyên liệu từ ảnh tủ lạnh' },
-  RECIPE_GENERATION: { label: 'AI Bếp Trưởng', matrix: 'AI Bếp Trưởng', tone: 'rose', success: 'Khởi tạo công thức chay theo yêu cầu' },
   MEAL_PLAN_RANKING: { label: 'AI Thực Đơn', matrix: 'AI Lập Thực Đơn', tone: 'violet', success: 'Xếp hạng món cho kế hoạch thực đơn tuần' },
-  NUTRITION_CHAT: { label: 'CrocVeggie Chat', matrix: 'CrocVeggie Chat', tone: 'cyan', success: 'Tư vấn dinh dưỡng chay cho người dùng' },
+  NUTRITION_CHAT: { label: 'AI Bếp Trưởng', matrix: 'AI Bếp Trưởng (Chat)', tone: 'rose', success: 'Tư vấn món chay và dinh dưỡng cho người dùng' },
   REPLAY_TEST: { label: 'Replay Test', matrix: 'Kiểm thử Replay', tone: 'slate', success: 'Kiểm thử kết nối model (Replay)' },
 };
-export const MATRIX_OPERATIONS = ['CONTENT_MODERATION', 'FRIDGE_SCAN', 'RECIPE_GENERATION', 'MEAL_PLAN_RANKING', 'NUTRITION_CHAT'];
+export const MATRIX_OPERATIONS = ['CONTENT_MODERATION', 'FRIDGE_SCAN', 'NUTRITION_CHAT', 'MEAL_PLAN_RANKING'];
 export const USER_TYPES: Record<string, string> = { GUEST: 'Khách vãng lai', MEMBER: 'Thành viên', SYSTEM: 'Hệ thống' };
 export const LEVEL_LABEL: Record<AiEventLevel, string> = { SUCCESS: 'Thành công', FLAGGED: 'Gắn cờ', FAILED: 'Lỗi' };
 export const HEALTH_LABEL: Record<AiServiceHealth, string> = { HEALTHY: 'Hoạt động tốt', WARNING: 'Tải cao', DOWN: 'Sự cố', NO_DATA: 'Chưa có dữ liệu' };

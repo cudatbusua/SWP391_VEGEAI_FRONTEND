@@ -11,6 +11,19 @@ interface OpenStreetMapVegetarianMapProps {
   onSelect(place: Place): void;
 }
 
+// Vite exposes VITE_* values in the browser bundle, so restrict this public key to the frontend origin in MapTiler Cloud.
+const mapTilerApiKey = import.meta.env.VITE_MAPTILER_API_KEY?.trim();
+const mapTileProvider = mapTilerApiKey ? 'MapTiler' : 'OpenStreetMap';
+const mapTileUrl = mapTilerApiKey
+  ? `https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${encodeURIComponent(mapTilerApiKey)}`
+  : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const mapTileAttribution = mapTilerApiKey
+  ? '<a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">&copy; OpenStreetMap contributors</a>'
+  : '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">&copy; OpenStreetMap contributors</a>';
+const mapTileSize = mapTilerApiKey ? 512 : 256;
+// MapTiler's 512px raster tiles need a -1 offset to match Leaflet's standard zoom scale.
+const mapTileZoomOffset = mapTilerApiKey ? -1 : 0;
+
 function MapViewport({ center, selectedPlace }: Pick<OpenStreetMapVegetarianMapProps, 'center' | 'selectedPlace'>) {
   const map = useMap();
   useEffect(() => {
@@ -40,11 +53,15 @@ export function OpenStreetMapVegetarianMap({ center, places, selectedPlace, onSe
         zoom={14}
         scrollWheelZoom
         className="z-0 h-full min-h-[420px] w-full"
-        aria-label="Bản đồ OpenStreetMap chỉ hiển thị quán chay đã lọc"
+        aria-label="Bản đồ các quán chay đã lọc"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={mapTileAttribution}
+          url={mapTileUrl}
+          tileSize={mapTileSize}
+          zoomOffset={mapTileZoomOffset}
+          minZoom={mapTilerApiKey ? 1 : 0}
+          crossOrigin={mapTilerApiKey ? true : undefined}
           eventHandlers={{
             tileerror: () => setTileError(true),
             tileload: () => setTileError(false),
@@ -70,7 +87,7 @@ export function OpenStreetMapVegetarianMap({ center, places, selectedPlace, onSe
       </MapContainer>
       {tileError && (
         <p role="alert" className="absolute bottom-10 left-3 z-[1000] max-w-xs rounded-lg bg-white/95 px-3 py-2 text-xs text-slate-700 shadow">
-          Không tải được ảnh nền OpenStreetMap. Hãy kiểm tra kết nối mạng; các ghim địa điểm vẫn có thể hoạt động.
+          Không tải được ảnh nền {mapTileProvider}. Hãy kiểm tra kết nối mạng hoặc cấu hình khóa bản đồ; các ghim địa điểm vẫn có thể hoạt động.
         </p>
       )}
     </div>

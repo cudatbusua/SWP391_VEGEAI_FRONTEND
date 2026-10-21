@@ -16,7 +16,7 @@ function setup(handler) {
     removeItem: key => values.delete(key),
   }; };
   const context = vm.createContext({
-    console, setTimeout, clearTimeout, Headers, FormData, File, AbortController, AbortSignal, URL, URLSearchParams, Event,
+    console, setTimeout, clearTimeout, Headers, FormData, File, Blob, AbortController, AbortSignal, URL, URLSearchParams, Event,
     Error, Date, TextEncoder, Uint8Array, crypto: webcrypto,
     localStorage: storage(), sessionStorage: storage(), window: new EventTarget(),
     fetch: async (url, options) => { calls.push({ url, ...options }); return handler(url, options, calls); },
@@ -35,9 +35,12 @@ function setup(handler) {
   return { context, calls, api: load('src/services/apiClient.ts'), auth: load('src/services/authService.ts').authService,
     users: load('src/services/userService.ts').userService, ai: load('src/services/aiService.ts').aiService,
     notifications: load('src/services/notificationService.ts').notificationService,
+    admin: load('src/services/adminService.ts').adminService,
     restaurants: load('src/services/restaurantService.ts').restaurantService,
     recipes: load('src/services/recipeService.ts').recipeService,
     blogs: load('src/services/blogService.ts').blogService,
+    interactions: load('src/services/contentInteractionService.ts').contentInteractionService,
+    blogContent: load('src/utils/blogContent.ts'),
     nutrition: load('src/services/nutritionService.ts').nutritionService,
     mealPlans: load('src/services/mealPlanService.ts').mealPlanService,
     community: load('src/services/communityService.ts').communityService,
@@ -152,6 +155,39 @@ test('notification APIs load, count and update only authenticated account notice
   ]);
 });
 
+test('admin can reactivate a disabled account through the existing status API', async () => {
+  const fixture = setup((url, options) => reply({
+    userId: 'member-1',
+    status: JSON.parse(options.body).status,
+  }));
+  fixture.api.setSession(auth(), true);
+  const updated = await fixture.admin.updateStatus('member-1', 'ACTIVE', 'Reactivated from admin account management');
+  assert.equal(updated.status, 'ACTIVE');
+  assert.equal(fixture.calls[0].url, '/api/admin/users/member-1/status');
+  assert.equal(fixture.calls[0].method, 'PATCH');
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), {
+    status: 'ACTIVE',
+    reason: 'Reactivated from admin account management',
+  });
+  assert.ok(fixture.calls[0].headers.has('Authorization'));
+});
+
+test('admin AI monitoring reads real telemetry endpoints and surfaces access errors', async () => {
+  const status = { systemHealth: 'NO_DATA', totalAiRequests: 0, failedAiRequests: 0,
+    successRatePercentage: null, averageLatencyMs: null, generatedAt: '2026-10-21T00:00:00Z',
+    models: [{ modelName: 'gemini-test', provider: 'Google Gemini', version: 'gemini-test', status: 'NO_DATA' }] };
+  const fixture = setup(url => reply(url.endsWith('/status') ? status : []));
+  fixture.api.setSession(auth(), true);
+  assert.deepEqual(await fixture.admin.aiStatus(), status);
+  assert.deepEqual(await fixture.admin.aiAuditLogs(), []);
+  assert.deepEqual(fixture.calls.map(call => call.url), ['/api/admin/ai/status', '/api/admin/ai/audit-logs']);
+  assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
+  const denied = setup(() => reply(null, 403, 'Admin only'));
+  denied.api.setSession(auth(), true);
+  await assert.rejects(denied.admin.aiStatus(), /Admin only/);
+  assert.equal(denied.calls.length, 1);
+});
+
 test('recipe filter sends server pagination, inclusion, exclusion and sorting', async () => {
   const page = { items: [{ recipeId: 'recipe-1', title: 'Tofu' }], page: 1, size: 12, totalElements: 14, totalPages: 2, first: false, last: true };
   const fixture = setup(() => reply(page));
@@ -212,6 +248,23 @@ test('admin recipe reads use private detail and video selections are preserved o
   assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
 });
 
+test('admin recipe list filters by keyword and status using the authenticated admin endpoint', async () => {
+  const fixture = setup(() => reply({ items: [{ recipeId: 'recipe-1', status: 'DRAFT' }], page: 0, size: 10, totalElements: 1, totalPages: 1, first: true, last: true }));
+  fixture.api.setSession(auth(), true);
+  const result = await fixture.recipes.adminList({ keyword: 'đậu phụ', status: 'DRAFT', page: 0 });
+  const url = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(url.pathname, '/api/admin/recipes');
+  assert.equal(url.searchParams.get('keyword'), 'đậu phụ');
+  assert.equal(url.searchParams.get('status'), 'DRAFT');
+  assert.equal(url.searchParams.get('page'), '0');
+  assert.equal(url.searchParams.get('size'), '10');
+  assert.equal(result.items[0].status, 'DRAFT');
+  assert.ok(fixture.calls[0].headers.has('Authorization'));
+  const denied = setup(() => reply(null, 403, 'Admin only'));
+  denied.api.setSession(auth(), true);
+  await assert.rejects(denied.recipes.adminList({ page: 0 }), /Admin only/);
+});
+
 test('public blog browsing encodes filters and never sends an authenticated token', async () => {
   const fixture = setup(() => reply({ items: [], totalElements: 0 }));
   fixture.api.setSession(auth(), true);
@@ -230,12 +283,75 @@ test('blog drafts, edits, submission and withdrawal preserve the server revision
   const input = { title: 'Bữa chay', category: 'KITCHEN', content: 'Nội dung', coverImage: '/images/vegan-tofu-meal.png', excerpt: '', version: 3 };
   await fixture.blogs.save(input); await fixture.blogs.save(input, 'post-1');
   await fixture.blogs.submit('post-1', 4); await fixture.blogs.withdraw('post-1', 5); await fixture.blogs.remove('post-1', 6);
-  assert.deepEqual(fixture.calls.map(call => call.method), ['POST', 'PUT', 'POST', 'POST', 'DELETE']);
-  assert.deepEqual(fixture.calls.map(call => call.url), ['/api/blog/my-posts', '/api/blog/my-posts/post-1', '/api/blog/my-posts/post-1/submit', '/api/blog/my-posts/post-1/withdraw', '/api/blog/my-posts/post-1?version=6']);
+  await fixture.blogs.archive('post-1', 7); await fixture.blogs.restore('post-1', 8);
+  await fixture.blogs.requestPublishedEdit('post-1', { ...input, version: 7 });
+  await fixture.blogs.deleteAny('post-1', 8);
+  assert.deepEqual(fixture.calls.map(call => call.method), ['POST', 'PUT', 'POST', 'POST', 'DELETE', 'POST', 'POST', 'PUT', 'DELETE']);
+  assert.deepEqual(fixture.calls.map(call => call.url), ['/api/blog/my-posts', '/api/blog/my-posts/post-1', '/api/blog/my-posts/post-1/submit', '/api/blog/my-posts/post-1/withdraw', '/api/blog/my-posts/post-1?version=6', '/api/blog/my-posts/post-1/archive', '/api/blog/my-posts/post-1/restore', '/api/blog/my-posts/post-1/request-review', '/api/blog/my-posts/post-1/permanent?version=8']);
   assert.deepEqual(JSON.parse(fixture.calls[2].body), { version: 4 });
+  assert.deepEqual(JSON.parse(fixture.calls[5].body), { version: 7 });
+  assert.deepEqual(JSON.parse(fixture.calls[6].body), { version: 8 });
+  assert.deepEqual(JSON.parse(fixture.calls[7].body), { ...input, version: 7 });
   assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
   const guest = setup(() => reply({}));
   await assert.rejects(guest.blogs.save(input), /đăng nhập/); assert.equal(guest.calls.length, 0);
+});
+
+test('legacy blog HTML is converted to readable paragraphs in the editor', () => {
+  const { blogContent } = setup(() => reply({}));
+  assert.equal(blogContent.blogContentForEditor('<p>Món <strong>chay</strong> &amp; ngon.</p><p>Bữa thứ hai.<br>Rất vui!</p>'),
+    'Món chay & ngon.\n\nBữa thứ hai.\nRất vui!');
+  assert.equal(blogContent.blogContentForEditor('Nội dung văn bản thuần'), 'Nội dung văn bản thuần');
+  assert.equal(blogContent.blogContentForEditor('<p>An toàn</p><script>alert(1)</script>'), 'An toàn');
+});
+
+test('rating badges batch summaries and do not fetch comment pages', async () => {
+  const fixture = setup(() => reply([
+    { targetId: 'blog-1', averageStars: 4.5, ratingCount: 2 },
+    { targetId: 'blog-2', averageStars: null, ratingCount: 0 },
+  ]));
+  const [first, second] = await Promise.all([
+    fixture.interactions.loadRating('BLOG', 'blog-1'),
+    fixture.interactions.loadRating('BLOG', 'blog-2'),
+  ]);
+  assert.equal(fixture.calls.length, 1);
+  const url = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(url.pathname, '/api/public/content-interactions/BLOG/ratings');
+  assert.deepEqual(url.searchParams.getAll('ids'), ['blog-1', 'blog-2']);
+  assert.equal(first.averageStars, 4.5);
+  assert.equal(second.ratingCount, 0);
+});
+
+test('video ratings use the shared public summary and authenticated vote endpoints', async () => {
+  const fixture = setup(() => reply({ targetType: 'VIDEO', targetId: 'video-1', averageStars: 5, ratingCount: 1, myRating: 5 }));
+  fixture.api.setSession(auth(), true);
+  await fixture.interactions.rate('VIDEO', 'video-1', 5);
+  await fixture.interactions.removeRating('VIDEO', 'video-1');
+  await fixture.interactions.load('VIDEO', 'video-1');
+  assert.deepEqual(fixture.calls.map(call => call.url), [
+    '/api/content-interactions/VIDEO/video-1/rating',
+    '/api/content-interactions/VIDEO/video-1/rating',
+    '/api/public/content-interactions/VIDEO/video-1?page=0&size=8',
+  ]);
+  assert.deepEqual(fixture.calls.map(call => call.method), ['PUT', 'DELETE', 'GET']);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), { stars: 5 });
+  assert.ok(fixture.calls.slice(0, 2).every(call => call.headers.get('Authorization')?.startsWith('Bearer ')));
+});
+
+test('structured review submission uses multipart photos and the shared target endpoint', async () => {
+  const fixture = setup(() => reply({ id: 'review-1' }, 201));
+  fixture.api.setSession(auth(), true);
+  const review = { content: 'Dễ nấu và ngon.', stars: 5, tags: ['Dễ làm'], publicDisplayName: true };
+  const photo = new File(['image'], 'dish.png', { type: 'image/png' });
+  await fixture.interactions.submitReview('RECIPE', 'recipe-1', review, [photo]);
+  const call = fixture.calls[0];
+  assert.equal(call.url, '/api/content-interactions/RECIPE/recipe-1/reviews');
+  assert.equal(call.method, 'POST');
+  assert.equal(call.headers.get('Content-Type'), null);
+  assert.equal(call.headers.get('Authorization'), 'Bearer token-1');
+  assert.deepEqual(JSON.parse(await call.body.get('review').text()), { ...review, photoUrls: [] });
+  assert.equal(call.body.getAll('photos').length, 1);
+  assert.equal(call.body.getAll('photos')[0].name, 'dish.png');
 });
 
 test('admin blog decisions include reason and exact revision; 403 is not retried', async () => {
@@ -247,6 +363,37 @@ test('admin blog decisions include reason and exact revision; 403 is not retried
   assert.deepEqual(JSON.parse(fixture.calls[2].body), { version: 7, decision: 'REJECT', reason: 'Bổ sung nội dung gốc' });
   const denied = setup(() => reply(null, 403, 'Admin only')); denied.api.setSession(auth(), true);
   await assert.rejects(denied.blogs.review('post-1', 7, 'APPROVE', ''), /Admin only/); assert.equal(denied.calls.length, 1);
+});
+
+test('admin blog queue can filter posts whose AI moderation was unavailable', async () => {
+  const fixture = setup(() => reply({ items: [] }));
+  fixture.api.setSession(auth(), true);
+  await fixture.blogs.queue('PENDING_REVIEW', '', 0, undefined, 'UNAVAILABLE');
+  assert.equal(fixture.calls[0].url, '/api/admin/blog/posts?status=PENDING_REVIEW&page=0&size=10&aiStatus=UNAVAILABLE');
+});
+
+test('admin blog queue can filter posts whose AI moderation is in progress', async () => {
+  const fixture = setup(() => reply({ items: [] }));
+  fixture.api.setSession(auth(), true);
+  await fixture.blogs.queue('PENDING_REVIEW', '', 0, undefined, 'CHECKING');
+  assert.equal(fixture.calls[0].url, '/api/admin/blog/posts?status=PENDING_REVIEW&page=0&size=10&aiStatus=CHECKING');
+});
+
+test('admin blog archive, restore and permanent delete use revision-checked endpoints', async () => {
+  const fixture = setup(() => reply({ postId: 'post-1', version: 9, status: 'ARCHIVED' }));
+  fixture.api.setSession(auth(), true);
+  await fixture.blogs.adminArchive('post-1', 7);
+  await fixture.blogs.adminRestore('post-1', 8);
+  await fixture.blogs.adminDelete('post-1', 9);
+  assert.deepEqual(fixture.calls.map(call => call.method), ['POST', 'POST', 'DELETE']);
+  assert.deepEqual(fixture.calls.map(call => call.url), [
+    '/api/admin/blog/posts/post-1/archive',
+    '/api/admin/blog/posts/post-1/restore',
+    '/api/admin/blog/posts/post-1?version=9',
+  ]);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), { version: 7 });
+  assert.deepEqual(JSON.parse(fixture.calls[1].body), { version: 8 });
+  assert.ok(fixture.calls.every(call => call.headers.has('Authorization')));
 });
 
 test('login hashes the password, maps usernameOrEmail and keeps tokens out of storage', async () => {

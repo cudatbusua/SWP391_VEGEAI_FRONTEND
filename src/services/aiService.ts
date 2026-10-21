@@ -7,7 +7,7 @@ export const aiService = {
       throw new Error('Ngữ cảnh trò chuyện không hợp lệ. Vui lòng bắt đầu cuộc trò chuyện mới.');
     }
     const response = await apiRequest<AiChatResponse>('/ai/chat', {
-      method: 'POST', body: { message: message.trim(), sessionId, history }, timeoutMs: 90000,
+      method: 'POST', body: { message: message.trim(), sessionId, history }, timeoutMs: 60000,
     });
     if (!response.data?.reply?.trim()) throw new Error('AI chưa trả về kết quả.');
     return response.data;
@@ -17,7 +17,7 @@ export const aiService = {
     if (image.size === 0 || image.size > 5 * 1024 * 1024) throw new Error('Ảnh phải có dung lượng từ 1 byte đến 5 MB.');
     const body = new FormData();
     body.append('image', image);
-    const response = await apiRequest<FridgeScanResponse>('/ai/fridge-scan', { method: 'POST', body, timeoutMs: 90000 });
+    const response = await apiRequest<FridgeScanResponse>('/ai/fridge-scan', { method: 'POST', body, timeoutMs: 60000 });
     if (!response.data || !Array.isArray(response.data.ingredients)) throw new Error('AI chưa trả về kết quả quét.');
     return response.data;
   },

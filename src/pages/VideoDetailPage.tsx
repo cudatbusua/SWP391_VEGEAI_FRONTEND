@@ -10,6 +10,8 @@ import { safeMediaUrl } from '../utils/communityVideo';
 import type { VideoComment } from '../types/community';
 import { videoCategories } from '../types/community';
 import { communityDate, CommunityConfirm, CommunityError, CommunityLoading, CommunityPagination, VideoCard, VideoPlayer } from '../components/CommunityUi';
+import { ContentInteractionsDialog } from '../components/ContentInteractionsDialog';
+import { ContentInteractions } from '../components/ContentInteractions';
 
 function VideoComments({ videoId }: { videoId: string }) {
   const { user, isAuthenticated } = useAuth();
@@ -78,7 +80,7 @@ function VideoDetail({ videoId }: { videoId: string }) {
       {query.data.description && <p className="cm-video-description">{query.data.description.split('\n').map((line, index) => {
         const sourceUrl = safeMediaUrl(line.trim());
         return <Fragment key={index}>{index > 0 && '\n'}{sourceUrl ? <a className="cm-source-link" href={sourceUrl} target="_blank" rel="noopener noreferrer">{new URL(sourceUrl).hostname} <ExternalLink size={14} /></a> : line}</Fragment>;
-      })}</p>}<VideoComments videoId={videoId} />
+      })}</p>}<ContentInteractionsDialog type="VIDEO" id={videoId}><ContentInteractions type="VIDEO" id={videoId} /></ContentInteractionsDialog><VideoComments videoId={videoId} />
     </div>{!!recommendations.length && <aside className="cm-video-sidebar"><h2>Cùng vào bếp</h2>{recommendations.map(video => <VideoCard key={video.id} video={video} />)}</aside>}</div>}
   </div>;
 }

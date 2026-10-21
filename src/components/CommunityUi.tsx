@@ -6,6 +6,8 @@ import type { PageResponse } from '../types/api';
 import type { CommunityVideo, Question } from '../types/community';
 import { questionStatuses, videoCategories } from '../types/community';
 import { videoDuration, videoSource, videoThumbnail } from '../utils/communityVideo';
+import { ContentRatingBadge } from './ContentRatingBadge';
+import '../styles/interactionEntryPoints.css';
 import '../styles/community.css';
 
 export function CommunityGuard({ children, admin = false }: { children: ReactNode; admin?: boolean }) {
@@ -47,7 +49,7 @@ export function VideoCover({ video }: { video: Pick<CommunityVideo, 'videoUrl' |
   return <div className="cm-video-cover"><img src={videoThumbnail(video.videoUrl, video.thumbnailUrl)} alt={video.title} loading="lazy" onError={event => { if (!event.currentTarget.src.endsWith('/images/vietnamese-vegan-table.png')) event.currentTarget.src = '/images/vietnamese-vegan-table.png'; }} /><span className="cm-play-mark"><Play size={22} fill="currentColor" /></span>{!!video.durationSeconds && <span className="cm-duration">{videoDuration(video.durationSeconds)}</span>}</div>;
 }
 export function VideoCard({ video, extra }: { video: CommunityVideo; extra?: ReactNode }) {
-  return <article className="cm-video-card"><Link to={'/videos/' + video.id}><VideoCover video={video} /></Link><div className="cm-video-card-meta"><span>{videoCategories[video.category || ''] || video.category || 'Bếp chay'}</span><time>{communityDate(video.createdAt)}</time></div><h2><Link to={'/videos/' + video.id}>{video.title}</Link></h2>{video.description && <p>{video.description}</p>}{extra}</article>;
+  return <article className="cm-video-card"><Link to={'/videos/' + video.id}><VideoCover video={video} /></Link><div className="cm-video-card-meta"><span>{videoCategories[video.category || ''] || video.category || 'Bếp chay'}</span><time>{communityDate(video.createdAt)}</time></div><h2><Link to={'/videos/' + video.id}>{video.title}</Link></h2>{video.description && <p>{video.description}</p>}<ContentRatingBadge type="VIDEO" id={video.id} /><Link className="cm-video-engagement" to={'/videos/' + video.id + '#interactions'}><MessageCircle size={15} /><span>Bình luận & đánh giá</span><ArrowRight size={15} /></Link>{extra}</article>;
 }
 export function VideoPlayer({ video }: { video: CommunityVideo }) {
   const [playing, setPlaying] = useState(false);

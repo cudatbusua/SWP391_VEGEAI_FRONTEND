@@ -77,7 +77,8 @@ SWP391_VEGEAI_FRONTEND/
 /blog                     -> Bài viết đã xuất bản
 /blog/write               -> Soạn và gửi bài viết (cần đăng nhập)
 /blog/preview             -> Xem trước bản nháp và gửi kiểm duyệt (cần đăng nhập)
-/admin                    -> Tổng quan, kiểm duyệt và lịch sử admin
+/admin                    -> Tổng quan và quản lý nội dung
+/admin/ai                 -> Số liệu gọi AI và nhật ký vận hành (chỉ Admin)
 /login, /register         -> Đăng nhập và tạo tài khoản
 /forgot-password          -> Khôi phục mật khẩu
 ```
@@ -199,6 +200,7 @@ Mặc định trình duyệt gọi `/api`, Vite proxy tới `http://localhost:80
 | Quán chay trên bản đồ | `/api/places/verified/nearby`, `/api/places/verified/search` |
 | Thông báo tài khoản | `/api/notifications`, `/api/notifications/unread-count`, `/api/notifications/{id}/read`, `/api/notifications/read-all` |
 | Admin quản lý công thức / thẻ | `/api/admin/recipes`, `/api/admin/recipes/{id}`, `/api/admin/tags`, `/api/admin/tags/{id}` |
+| Admin giám sát AI | `GET /api/admin/ai/status`, `GET /api/admin/ai/audit-logs` |
 | AI Bếp Trưởng (`/ai-chef`) | `POST /api/ai/chat` |
 | Quét Tủ Lạnh (`/fridge-scan`) | `POST /api/ai/fridge-scan` (multipart field `image`) |
 

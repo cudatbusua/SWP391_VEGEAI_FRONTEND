@@ -17,6 +17,7 @@ const FridgeScanPage = lazy(() => import('./pages/FridgeScanPage').then(module =
 const FridgeInventoryPage = lazy(() => import('./pages/FridgeInventoryPage').then(module => ({ default: module.FridgeInventoryPage })));
 const NutritionCalculatorPage = lazy(() => import('./pages/NutritionCalculatorPage').then(module => ({ default: module.NutritionCalculatorPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then(module => ({ default: module.AdminPage })));
+const AdminAiPage = lazy(() => import('./pages/AdminAiPage').then(module => ({ default: module.AdminAiPage })));
 const MealPlansPage = lazy(() => import('./pages/MealPlansPage').then(module => ({ default: module.MealPlansPage })));
 const AdminRecipesPage = lazy(() => import('./pages/AdminRecipesPage').then(module => ({ default: module.AdminRecipesPage })));
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage').then(module => ({ default: module.ChangePasswordPage })));
@@ -36,6 +37,7 @@ const AdminQuestionsPage = lazy(() => import('./pages/AdminQuestionsPage').then(
 const AdminQuestionDetailPage = lazy(() => import('./pages/AdminQuestionsPage').then(module => ({ default: module.AdminQuestionDetailPage })));
 const AdminVideosPage = lazy(() => import('./pages/AdminVideosPage').then(module => ({ default: module.AdminVideosPage })));
 const AdminVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.AdminVideoEditorPage })));
+const AdminContentInteractionsPage = lazy(() => import('./pages/AdminContentInteractionsPage').then(module => ({ default: module.AdminContentInteractionsPage })));
 
 export const App: React.FC = () => {
   return (
@@ -61,6 +63,7 @@ export const App: React.FC = () => {
           <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
           <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
           <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
+          <Route path="/admin/ai" element={<AdminFeatureBoundary><AdminAiPage /></AdminFeatureBoundary>} />
           <Route path="/admin/recipes" element={<AdminFeatureBoundary><AdminRecipesPage /></AdminFeatureBoundary>} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/write" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />
@@ -81,6 +84,7 @@ export const App: React.FC = () => {
           <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos" element={<AdminFeatureBoundary><AdminVideosPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/content-interactions" element={<AdminFeatureBoundary><AdminContentInteractionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos/new" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos/:id/edit" element={<AdminFeatureBoundary><AdminVideoEditorPage /></AdminFeatureBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />

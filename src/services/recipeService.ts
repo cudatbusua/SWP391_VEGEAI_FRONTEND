@@ -1,8 +1,16 @@
 import { apiRequest } from './apiClient';
 import type { PageResponse } from '../types/api';
-import type { FridgeRecipeMatches, RecipeDetail, RecipeFilter, RecipeInput, RecipeSummary, RecipeTag } from '../types/recipe';
+import type { AdminRecipeSummary, FridgeRecipeMatches, RecipeDetail, RecipeFilter, RecipeInput, RecipeSummary, RecipeTag } from '../types/recipe';
 
 export const recipeService = {
+  async adminList(params: { keyword?: string; status?: string; page: number; size?: number }, signal?: AbortSignal): Promise<PageResponse<AdminRecipeSummary>> {
+    const query = new URLSearchParams({ page: String(params.page), size: String(params.size ?? 10) });
+    if (params.keyword?.trim()) query.set('keyword', params.keyword.trim());
+    if (params.status) query.set('status', params.status);
+    const response = await apiRequest<PageResponse<AdminRecipeSummary>>(`/admin/recipes?${query}`, { signal });
+    if (!response.data) throw new Error('Không thể tải danh sách công thức.');
+    return response.data;
+  },
   async adminDetail(id: string): Promise<RecipeDetail> {
     const response = await apiRequest<RecipeDetail>(`/admin/recipes/${encodeURIComponent(id)}`);
     if (!response.data) throw new Error('Không tìm thấy công thức.');

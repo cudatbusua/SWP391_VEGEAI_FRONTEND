@@ -91,7 +91,7 @@ const recipeIngredients: Record<string, string[]> = {
   'Salad đậu gà chanh dây': ['Đậu gà', 'Rau xanh', 'Chanh dây', 'Dầu ô-liu']
 };
 
-const cardClass = 'rounded-2xl border border-emerald-100 bg-white shadow-sm';
+const cardClass = 'rounded-2xl border border-emerald-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm text-slate-900 dark:text-slate-100';
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800';
 const demoNotice = 'Dữ liệu mẫu đang lưu trên trình duyệt. Khi có API, thay lớp demo repository bằng service mà không đổi luồng màn hình.';
 

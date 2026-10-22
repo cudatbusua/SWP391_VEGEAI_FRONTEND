@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 .vegeai-map-marker {
   display: grid;
@@ -17,10 +18,358 @@
 }
 
 @layer base {
+  :root {
+    --vege-bg: #fbfbf9;
+    --vege-surface: #ffffff;
+    --vege-subtle: #f5f4f0;
+    --vege-border: #e6e5de;
+    --vege-text-main: #19211d;
+    --vege-text-muted: #5e6b64;
+    --vege-primary: #047857;
+    --vege-primary-hover: #065f46;
+  }
+
+  html.dark {
+    color-scheme: dark;
+    --vege-bg: #0b1118;
+    --vege-surface: #121922;
+    --vege-subtle: #19222e;
+    --vege-border: #212c3b;
+    --vege-text-main: #f1f5f9;
+    --vege-text-muted: #94a3b8;
+    --vege-primary: #10b981;
+    --vege-primary-hover: #059669;
+  }
+
   body {
-    @apply bg-[#f8fafc] text-slate-800 antialiased font-sans;
+    @apply bg-[#fbfbf9] text-[#19211d] antialiased font-sans transition-colors duration-200;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
+
+  html.dark body {
+    @apply bg-[#0b1118] text-[#f1f5f9];
+  }
+}
+
+/* Global Navigation Styling & Sub-nav Bar */
+.site-navigation {
+  display: flex;
+  align-items: stretch;
+  gap: 28px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.site-navigation > a {
+  display: flex;
+  align-items: center;
+  padding: 14px 0 12px;
+  border-bottom: 2.5px solid transparent;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+html.dark .site-navigation {
+  border-top-color: #212c3b;
+  color: #94a3b8;
+}
+html.dark .site-navigation > a:hover,
+html.dark .site-navigation > a[aria-current="page"] {
+  color: #34d399;
+  border-bottom-color: #10b981;
+}
+
+/* Harmonize Custom CSS Modules (Discovery, Blog, Meal Plan, Community, Dashboard) */
+html.dark .meal-plan-page,
+html.dark .discovery-page,
+html.dark .blog-page,
+html.dark .blog-shell,
+html.dark .cm-page,
+html.dark .cm-shell,
+html.dark .fridge-scan-page,
+html.dark .dashboard-page,
+html.dark .admin-page,
+html.dark .smart-market-page {
+  background-color: #0b1118 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Discovery & Recipe Cards in Dark Mode */
+html.dark .recipe-card {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+}
+html.dark .recipe-card-body h3 {
+  color: #f1f5f9 !important;
+}
+html.dark .recipe-card-kicker,
+html.dark .recipe-card-tags,
+html.dark .recipe-card-meta {
+  color: #94a3b8 !important;
+  border-color: #212c3b !important;
+}
+html.dark .recipe-card-badge {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #34d399 !important;
+}
+html.dark .recipe-card-verified {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #34d399 !important;
+}
+html.dark .discovery-search {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-search input {
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-chef {
+  background-color: #16241d !important;
+  border-color: #065f46 !important;
+  color: #34d399 !important;
+}
+html.dark .discovery-quick-filters {
+  border-color: #212c3b !important;
+}
+html.dark .discovery-quick-filters button {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #94a3b8 !important;
+}
+html.dark .discovery-quick-filters button:hover {
+  background-color: #19222e !important;
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-quick-filters button.is-active {
+  background-color: #059669 !important;
+  border-color: #059669 !important;
+  color: #ffffff !important;
+}
+html.dark .discovery-filters {
+  border-color: #212c3b !important;
+}
+html.dark .discovery-filter-group {
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-filter-group summary {
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-filter-group summary span {
+  color: #64748b !important;
+}
+html.dark .discovery-checkbox {
+  color: #cbd5e1 !important;
+}
+html.dark .discovery-field select,
+html.dark .discovery-field input,
+html.dark .discovery-results-heading select {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-results-heading h2 {
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-results-heading h2 > span {
+  background-color: #16241d !important;
+  color: #34d399 !important;
+}
+html.dark .discovery-active-tags button {
+  background-color: #16241d !important;
+  border-color: #065f46 !important;
+  color: #34d399 !important;
+}
+html.dark .discovery-sidebar-note {
+  background-color: #16241d !important;
+  border-color: #065f46 !important;
+  color: #a7f3d0 !important;
+}
+html.dark .discovery-sidebar-note strong {
+  color: #34d399 !important;
+}
+html.dark .discovery-sidebar-note p {
+  color: #94a3b8 !important;
+}
+html.dark .discovery-journal {
+  border-color: #212c3b !important;
+}
+html.dark .discovery-journal-heading h2 {
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-journal-heading p {
+  color: #94a3b8 !important;
+}
+html.dark .discovery-journal-photo {
+  background-color: #19222e !important;
+}
+html.dark .discovery-journal-photo > span {
+  background-color: #121922 !important;
+  color: #34d399 !important;
+}
+html.dark .discovery-journal-grid h3 {
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-journal-grid p {
+  color: #94a3b8 !important;
+}
+html.dark .discovery-empty {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #94a3b8 !important;
+}
+html.dark .discovery-empty h3 {
+  color: #f1f5f9 !important;
+}
+html.dark .discovery-pagination button {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+}
+
+/* Blog & Community in Dark Mode */
+html.dark .blog-public-card,
+html.dark .blog-own-row,
+html.dark .cm-compose,
+html.dark .cm-dialog,
+html.dark .cm-review-tool,
+html.dark .aisle-card,
+html.dark .market-list-container,
+html.dark .smart-market-card {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+}
+html.dark .blog-public-card h2,
+html.dark .blog-own-info h2,
+html.dark .cm-compose h2,
+html.dark .cm-dialog-heading h2,
+html.dark .cm-review-tool h2,
+html.dark .cm-heading h1,
+html.dark .cm-video-card h2,
+html.dark .cm-video-title {
+  color: #f1f5f9 !important;
+}
+html.dark .blog-public-card-body > p,
+html.dark .blog-own-info > p,
+html.dark .blog-public-meta,
+html.dark .cm-heading p,
+html.dark .cm-review-tool p,
+html.dark .cm-video-description {
+  color: #94a3b8 !important;
+}
+html.dark .blog-search,
+html.dark .cm-search,
+html.dark .cm-select,
+html.dark .cm-field input,
+html.dark .cm-field textarea,
+html.dark .cm-field select {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+}
+html.dark .blog-search input,
+html.dark .cm-search input {
+  color: #f1f5f9 !important;
+}
+html.dark .blog-filter-bar,
+html.dark .cm-heading,
+html.dark .cm-question,
+html.dark .cm-question-list,
+html.dark .cm-comment {
+  border-color: #212c3b !important;
+}
+html.dark .cm-answer {
+  background-color: #16241d !important;
+  border-color: #059669 !important;
+  color: #f1f5f9 !important;
+}
+html.dark .cm-answer p,
+html.dark .cm-question-text {
+  color: #f1f5f9 !important;
+}
+html.dark .blog-button.secondary,
+html.dark .cm-button.secondary,
+html.dark .cm-icon {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+}
+
+/* Meal Plan Dark Mode */
+html.dark .planned-meal,
+html.dark .plan-days button,
+html.dark .plan-settings label > input,
+html.dark .plan-settings select,
+html.dark .dashboard-card {
+  background-color: #121922 !important;
+  border-color: #212c3b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .plan-period {
+  background-color: #19222e !important;
+}
+html.dark .plan-period button[aria-pressed="true"] {
+  background-color: #121922 !important;
+  color: #34d399 !important;
+}
+html.dark .plan-days button[aria-current="date"] {
+  background-color: #064e3b !important;
+  border-color: #10b981 !important;
+  color: #ecfdf5 !important;
+}
+html.dark .plan-settings,
+html.dark .plan-profile,
+html.dark .saved-plans li,
+html.dark .plan-result-heading,
+html.dark .plan-nutrients,
+html.dark .planned-details,
+html.dark .planned-details ul li {
+  border-color: #212c3b !important;
+}
+
+/* General surface adaptations for dark mode */
+html.dark .bg-white:not(.keep-light) {
+  background-color: #121922 !important;
+}
+html.dark .bg-slate-50:not(.keep-light),
+html.dark .bg-gray-50:not(.keep-light) {
+  background-color: #17212d !important;
+}
+html.dark .text-slate-900,
+html.dark .text-gray-900,
+html.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+html.dark .text-slate-700,
+html.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+html.dark .text-slate-600,
+html.dark .text-gray-600,
+html.dark .text-slate-500,
+html.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+html.dark .border-slate-200,
+html.dark .border-gray-200,
+html.dark .border-slate-100,
+html.dark .border-gray-100 {
+  border-color: #212c3b !important;
+}
+
+/* Leaflet Popup Dark Mode Compatibility */
+html.dark .leaflet-popup-content-wrapper,
+html.dark .leaflet-popup-tip {
+  background-color: #121922 !important;
+  color: #f8fafc !important;
+  border: 1px solid #212c3b;
 }
 
 /* Custom scrollbars and transitions */
@@ -31,10 +380,51 @@
 ::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
+html.dark ::-webkit-scrollbar-track {
+  background: #0b1118;
+}
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 9999px;
 }
+html.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Browser Autofill Styling - Eliminate White-on-White Autofill Glitch */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:focus,
+html.dark input:-webkit-autofill:active,
+html.dark select:-webkit-autofill,
+html.dark select:-webkit-autofill:hover,
+html.dark select:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+  caret-color: #f1f5f9 !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Leaflet Dark mode styling */
+html.dark .leaflet-tile-pane {
+  filter: brightness(0.7) invert(1) contrast(1.7) hue-rotate(185deg) saturate(0.4);
 }

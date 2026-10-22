@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../store/ThemeContext';
 import '../styles/navigation.css';
 import { AdminLayout } from './AdminLayout';
 import { UserMenu } from '../components/UserMenu';
@@ -9,76 +10,147 @@ import { NotificationBell } from '../components/NotificationBell';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAuthenticated, logout, sessionError, retrySession } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [logoutError, setLogoutError] = useState('');
   const [loggingOut, setLoggingOut] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
+
   useEffect(() => setMobileMenu(false), [location.pathname]);
+
   const handleLogout = async () => {
-    setLoggingOut(true); setLogoutError('');
+    setLoggingOut(true);
+    setLogoutError('');
     const result = await logout();
     if (!result.success) setLogoutError(result.error || 'Không thể đăng xuất.');
     setLoggingOut(false);
   };
 
   const isAdmin = user?.role === 'admin';
-  const home = isAdmin ? '/admin' : isAuthenticated ? '/dashboard' : '/';
-  const isCurrent = (path: string) => location.pathname === path || (path !== '/' && path !== '/admin' && location.pathname.startsWith(path + '/')) || (isAdmin && path === '/admin/blog' && location.pathname.startsWith('/blog/'));
-  const navItems: [string, string][] = isAdmin ? [
-    ['/admin', 'Tổng quan & tài khoản'], ['/admin/recipes', 'Công thức & dinh dưỡng'],
-    ['/admin/blog', 'Blog'], ['/admin/videos', 'Video'], ['/admin/questions', 'Hỏi đáp'],
-  ] : isAuthenticated ? [
-    ['/dashboard', 'Trang chủ'],
-    ['/', 'Khám phá công thức'],
-    ['/fridge-scan', 'Quét tủ lạnh'],
-    ['/ai-chef', 'AI bếp trưởng'],
-    ['/meal-plans', 'Kế hoạch tuần'],
-    ['/smart-market', 'Đi chợ thông minh'],
-    ['/blog', 'Blog'],
-    ['/restaurants', 'Quán chay gần đây'],
-  ] : [
-    ['/', 'Khám phá công thức'],
-    ['/smart-market', 'Đi chợ thông minh'],
-    ['/blog', 'Blog'],
-    ['/restaurants', 'Quán chay gần đây'],
+  const pathname = location.pathname;
+
+  // Active group detection
+  const isDashboardActive = pathname === '/' || pathname === '/dashboard';
+  const isDiscoverActive =
+    pathname === '/explore' ||
+    pathname.startsWith('/recipe') ||
+    pathname.startsWith('/blog') ||
+    pathname.startsWith('/videos') ||
+    pathname.startsWith('/questions') ||
+    pathname === '/restaurants';
+  const isNutritionActive =
+    pathname.startsWith('/meal-plans') ||
+    pathname === '/nutrition' ||
+    (pathname === '/settings' && (location.search.includes('tab=calendar') || location.search.includes('tab=profile')));
+  const isAiChefActive = pathname === '/ai-chef' || pathname === '/fridge-scan';
+  const isPantryActive = pathname === '/fridge' || pathname === '/smart-market';
+
+  const memberNavItems: { key: string; label: string; path: string; isActive: boolean }[] = [
+    { key: 'dashboard', label: 'Tổng quan', path: '/dashboard', isActive: isDashboardActive },
+    { key: 'discover', label: 'Khám phá', path: '/explore', isActive: isDiscoverActive },
+    { key: 'ai-chef', label: 'AI Bếp trưởng', path: '/ai-chef', isActive: isAiChefActive },
+    { key: 'pantry', label: 'Kho nguyên liệu & Đi chợ', path: '/fridge', isActive: isPantryActive },
+    { key: 'calendar', label: 'Lịch biểu & Hồ sơ', path: '/settings?tab=calendar', isActive: isNutritionActive },
+  ];
+
+  const guestNavItems: { label: string; path: string; isActive: boolean }[] = [
+    { label: 'Tổng quan', path: '/', isActive: isDashboardActive },
+    { label: 'Khám phá', path: '/explore', isActive: pathname === '/explore' || pathname.startsWith('/recipe') },
+    { label: 'Blog & Cộng đồng', path: '/blog', isActive: pathname.startsWith('/blog') },
+    { label: 'Đi chợ & Quán chay', path: '/smart-market', isActive: pathname === '/smart-market' },
+    { label: 'AI Bếp trưởng (Dùng thử)', path: '/ai-chef', isActive: pathname === '/ai-chef' },
   ];
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
 
   return (
-    <div className="vegeai-layout min-h-screen flex flex-col bg-[#f8fafc] text-slate-800 font-sans">
-      
-      {sessionError && <div role="alert" className="bg-amber-50 p-3 text-sm text-center text-amber-900">
-        {sessionError} <button onClick={retrySession} className="underline ml-2">Thử lại</button>
-      </div>}
-      {logoutError && <div role="alert" className="bg-red-50 p-3 text-sm text-center text-red-700">{logoutError}</div>}
+    <div className="vegeai-layout min-h-screen flex flex-col bg-[#fbfbf9] dark:bg-[#0b1118] text-[#19211d] dark:text-[#f1f5f9] font-sans transition-colors duration-200">
+      {sessionError && (
+        <div
+          role="alert"
+          className="bg-amber-50 dark:bg-amber-950/50 p-3 text-sm text-center text-amber-900 dark:text-amber-200 border-b border-amber-200 dark:border-amber-900"
+        >
+          {sessionError}{' '}
+          <button onClick={retrySession} className="underline ml-2 font-bold cursor-pointer">
+            Thử lại
+          </button>
+        </div>
+      )}
+      {logoutError && (
+        <div
+          role="alert"
+          className="bg-rose-50 dark:bg-rose-950/50 p-3 text-sm text-center text-rose-700 dark:text-rose-200 border-b border-rose-200 dark:border-rose-900"
+        >
+          {logoutError}
+        </div>
+      )}
 
       {/* Main Navigation Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          
-          {/* Logo */}
-          <div className="flex items-center gap-1.5 lg:gap-8">
-            <button type="button" className="sm:hidden p-1 text-gray-600" title={mobileMenu ? 'Đóng menu' : 'Mở menu'} aria-label={mobileMenu ? 'Đóng menu' : 'Mở menu'} aria-expanded={mobileMenu} aria-controls="main-mobile-navigation" onClick={() => setMobileMenu(value => !value)}>{mobileMenu ? <X size={21} /> : <Menu size={21} />}</button>
-            <Link to={home} className="flex items-center" aria-label="VEGEAI - Trang chủ">
-              <img src="/vegeai-logo.png" alt="VEGEAI" className="h-12 w-12 object-contain sm:h-14 sm:w-14" />
+      <header className="bg-white/95 dark:bg-[#121922]/95 backdrop-blur-md border-b border-[#e6e5de] dark:border-[#212c3b] sticky top-0 z-40 shadow-2xs transition-colors duration-200">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
+          {/* Logo & Mobile Menu Toggle */}
+          <div className="flex items-center gap-3 lg:gap-8">
+            <button
+              type="button"
+              className="sm:hidden p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+              title={mobileMenu ? 'Đóng menu' : 'Mở menu'}
+              aria-label={mobileMenu ? 'Đóng menu' : 'Mở menu'}
+              aria-expanded={mobileMenu}
+              onClick={() => setMobileMenu(value => !value)}
+            >
+              {mobileMenu ? <X size={21} /> : <Menu size={21} />}
+            </button>
+            <Link
+              to={isAuthenticated ? '/dashboard' : '/'}
+              className="flex items-center gap-2.5"
+              aria-label="VEGEAI - Trang chủ"
+            >
+              <img src="/vegeai-logo.png" alt="VEGEAI" className="h-10 w-10 object-contain sm:h-11 sm:w-11" />
+              <div className="hidden sm:block">
+                <span className="text-lg font-black tracking-tight text-emerald-800 dark:text-emerald-400">
+                  VEGE<span className="text-slate-900 dark:text-white">AI</span>
+                </span>
+                <span className="block text-[9.5px] uppercase font-bold tracking-widest text-slate-400 -mt-1">
+                  Dinh dưỡng xanh thông minh
+                </span>
+              </div>
             </Link>
-
           </div>
 
-          {/* Auth Actions */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Right Actions: Theme Toggle + Auth / Profile */}
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
+            {/* Direct Theme Toggle Pill */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+              aria-label={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/90 dark:border-slate-700/80 bg-slate-50/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden md:inline text-xs font-semibold">Sáng</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden md:inline text-xs font-semibold">Tối</span>
+                </>
+              )}
+            </button>
+
             {!isAuthenticated ? (
               <>
                 <Link
                   to="/login"
-                  className="px-2 sm:px-5 py-2 text-xs sm:text-sm whitespace-nowrap font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition cursor-pointer"
+                  className="px-3.5 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/60 transition cursor-pointer"
                 >
                   Đăng nhập
                 </Link>
                 <Link
                   to="/register"
-                  className="px-2 sm:px-5 py-2 text-xs sm:text-sm whitespace-nowrap font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition cursor-pointer shadow-2xs"
+                  className="px-3.5 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap font-bold text-white bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 rounded-xl transition cursor-pointer shadow-2xs"
                 >
                   Đăng ký
                 </Link>
@@ -86,46 +158,270 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             ) : (
               <div className="flex items-center gap-2 sm:gap-3">
                 <NotificationBell />
-
-                {/* Avatar dropdown includes dashboard, profile, password, and logout actions. */}
                 <UserMenu user={user} loggingOut={loggingOut} onLogout={handleLogout} />
               </div>
             )}
           </div>
-
         </div>
-        <nav aria-label="Điều hướng chính" className={`site-navigation ${mobileMenu ? 'is-collapsed' : ''}`}>
-          {navItems.map(([path, label]) => <Link key={path} to={path} aria-current={isCurrent(path) ? 'page' : undefined} className={`shrink-0 hover:text-emerald-700 ${isCurrent(path) ? 'text-emerald-700 font-bold' : ''}`}>{label}</Link>)}
+
+        {/* Primary Desktop Nav Strip (5 Core Groups) */}
+        <nav
+          aria-label="Điều hướng chính"
+          className={`site-navigation max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 border-t border-[#e6e5de] dark:border-[#212c3b] ${
+            mobileMenu ? 'is-collapsed' : ''
+          }`}
+        >
+          {isAuthenticated
+            ? memberNavItems.map(item => (
+                <Link
+                  key={item.key}
+                  to={item.path}
+                  aria-current={item.isActive ? 'page' : undefined}
+                  className={`shrink-0 py-3 text-xs sm:text-sm transition-colors hover:text-emerald-700 dark:hover:text-emerald-400 ${
+                    item.isActive
+                      ? 'text-emerald-800 dark:text-emerald-400 font-extrabold border-b-2 border-emerald-700 dark:border-emerald-400'
+                      : 'text-slate-600 dark:text-slate-400 font-semibold'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))
+            : guestNavItems.map(item => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  aria-current={item.isActive ? 'page' : undefined}
+                  className={`shrink-0 py-3 text-xs sm:text-sm transition-colors hover:text-emerald-700 dark:hover:text-emerald-400 ${
+                    item.isActive
+                      ? 'text-emerald-800 dark:text-emerald-400 font-extrabold border-b-2 border-emerald-700 dark:border-emerald-400'
+                      : 'text-slate-600 dark:text-slate-400 font-semibold'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
         </nav>
-        {mobileMenu && <nav id="main-mobile-navigation" aria-label="Điều hướng mở rộng" className="site-mobile-navigation sm:hidden grid grid-cols-2 gap-x-4 gap-y-1 px-5 py-4 border-t border-gray-100 text-gray-600">{navItems.map(([path, label]) => <Link key={path} to={path} onClick={() => setMobileMenu(false)} aria-current={isCurrent(path) ? 'page' : undefined} className={`py-2 ${isCurrent(path) ? 'text-emerald-700 font-bold' : ''}`}>{label}</Link>)}</nav>}
+
+        {/* Sub-Navigation Strip (Contextual secondary tabs per functional group) */}
+        {isAuthenticated && (
+          <>
+            {isDiscoverActive && (
+              <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
+                <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
+                    Khám phá:
+                  </span>
+                  <Link
+                    to="/explore"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/explore' || pathname.startsWith('/recipe')
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Công thức món chay
+                  </Link>
+                  <Link
+                    to="/blog"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname.startsWith('/blog')
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Blog cộng đồng
+                  </Link>
+                  <Link
+                    to="/videos"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname.startsWith('/videos')
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Video nấu ăn
+                  </Link>
+                  <Link
+                    to="/questions"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname.startsWith('/questions')
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Hỏi đáp chuyên gia
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {isNutritionActive && (
+              <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
+                <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
+                    Lịch biểu & Dinh dưỡng:
+                  </span>
+                  <Link
+                    to="/settings?tab=calendar"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/settings' && location.search.includes('tab=calendar')
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Lịch ăn 30 ngày & Bữa ăn
+                  </Link>
+                  <Link
+                    to="/meal-plans?tab=planner"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/meal-plans' && (location.search.includes('tab=planner') || !location.search.includes('tab='))
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Kế hoạch thực đơn tuần
+                  </Link>
+                  <Link
+                    to="/settings?tab=profile"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      (pathname === '/settings' && location.search.includes('tab=profile')) || (pathname === '/meal-plans' && location.search.includes('tab=nutrition'))
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Hồ sơ BMI & Vòng sức khỏe
+                  </Link>
+                  <Link
+                    to="/meal-plans?tab=saved"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/meal-plans' && location.search.includes('tab=saved')
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Thực đơn đã lưu
+                  </Link>
+                </div>
+              </div>
+            )}
+
+
+            {isAiChefActive && (
+              <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
+                <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
+                    AI Bếp trưởng:
+                  </span>
+                  <Link
+                    to="/ai-chef"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/ai-chef'
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Trò chuyện cùng AI Bếp Trưởng
+                  </Link>
+                  <Link
+                    to="/fridge-scan"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/fridge-scan'
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Quét ảnh & Nhận diện tủ lạnh
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {isPantryActive && (
+              <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
+                <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
+                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
+                    Kho nguyên liệu:
+                  </span>
+                  <Link
+                    to="/fridge"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/fridge'
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Tủ lạnh & Hạn sử dụng
+                  </Link>
+                  <Link
+                    to="/smart-market"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/smart-market'
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    Danh sách đi chợ & Bản đồ quán chay
+                  </Link>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Mobile Navigation Drawer */}
+        {mobileMenu && (
+          <nav
+            id="main-mobile-navigation"
+            aria-label="Điều hướng di động"
+            className="site-mobile-navigation sm:hidden grid grid-cols-2 gap-x-4 gap-y-1 px-5 py-4 border-t border-[#e6e5de] dark:border-[#212c3b] text-slate-600 dark:text-slate-400 bg-white dark:bg-[#121922]"
+          >
+            {(isAuthenticated ? memberNavItems : guestNavItems).map(item => (
+              <Link
+                key={item.label}
+                to={item.path}
+                onClick={() => setMobileMenu(false)}
+                className={`py-2 text-xs font-bold ${
+                  item.isActive ? 'text-emerald-800 dark:text-emerald-400' : ''
+                }`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        )}
       </header>
 
       {/* Page Content */}
-      <main className="flex-1">
-        {children}
-      </main>
+      <main className="flex-1">{children}</main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-100 py-8 text-xs text-gray-500 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 font-semibold text-gray-700">
-            <img src="/vegeai-logo.png" alt="" className="h-8 w-8 object-contain" />
-            <span>Ẩm thực chay &amp; dinh dưỡng thông minh</span>
-          </div>
-
-          <div className="flex flex-wrap justify-center items-center gap-4 text-gray-500 font-medium">
-            <a href="#" className="hover:text-emerald-600 transition">Giới thiệu</a>
-            <a href="#" className="hover:text-emerald-600 transition">Điều khoản</a>
-            <a href="#" className="hover:text-emerald-600 transition">Chính sách bảo mật</a>
-            <a href="#" className="hover:text-emerald-600 transition">Liên hệ</a>
-          </div>
-
+      <footer className="bg-white dark:bg-[#121922] border-t border-[#e6e5de] dark:border-[#212c3b] py-8 text-xs text-slate-500 dark:text-slate-400 mt-16 transition-colors duration-200">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            © 2026 VEGEAI. All rights reserved.
+            <p className="font-bold text-slate-700 dark:text-slate-300">
+              © 2026 VEGEAI. Hệ sinh thái Dinh dưỡng & Ẩm thực Chay thông minh.
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Sức khoẻ của bạn - Cảm hứng từ thiên nhiên.</p>
+          </div>
+          <div className="flex items-center gap-5 text-xs font-medium">
+            <Link to="/meal-plans" className="hover:text-emerald-700 dark:hover:text-emerald-400">
+              Dinh dưỡng & Thực đơn
+            </Link>
+            <Link to="/fridge" className="hover:text-emerald-700 dark:hover:text-emerald-400">
+              Kho nguyên liệu
+            </Link>
+            <Link to="/smart-market" className="hover:text-emerald-700 dark:hover:text-emerald-400">
+              Đi chợ & Bản đồ
+            </Link>
+            <Link to="/ai-chef" className="hover:text-emerald-700 dark:hover:text-emerald-400">
+              AI Bếp trưởng
+            </Link>
+            <Link to="/blog" className="hover:text-emerald-700 dark:hover:text-emerald-400">
+              Cộng đồng
+            </Link>
           </div>
         </div>
       </footer>
-
     </div>
   );
 };

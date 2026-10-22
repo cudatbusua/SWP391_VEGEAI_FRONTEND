@@ -1,5 +1,6 @@
-import type { AiChatMessage, AiChatResponse, FridgeScanResponse } from '../types/api';
+import type { AiChatMessage, AiChatResponse, FridgeScanResponse, GeneratedRecipeAiResponse } from '../types/api';
 import { apiRequest } from './apiClient';
+
 export const aiService = {
   async chat(message: string, sessionId?: string, history?: AiChatMessage[]): Promise<AiChatResponse> {
     if (!message.trim() || message.length > 2000) throw new Error('Tin nhắn cần có từ 1 đến 2.000 ký tự.');
@@ -12,6 +13,7 @@ export const aiService = {
     if (!response.data?.reply?.trim()) throw new Error('AI chưa trả về kết quả.');
     return response.data;
   },
+
   async scanFridge(image: File): Promise<FridgeScanResponse> {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type)) throw new Error('Vui lòng chọn ảnh JPG, PNG hoặc WEBP.');
     if (image.size === 0 || image.size > 5 * 1024 * 1024) throw new Error('Ảnh phải có dung lượng từ 1 byte đến 5 MB.');
@@ -19,6 +21,17 @@ export const aiService = {
     body.append('image', image);
     const response = await apiRequest<FridgeScanResponse>('/ai/fridge-scan', { method: 'POST', auth: 'optional', body, timeoutMs: 90000 });
     if (!response.data || !Array.isArray(response.data.ingredients)) throw new Error('AI chưa trả về kết quả quét.');
+    return response.data;
+  },
+
+  async extractRecipeFromVideo(title: string, description?: string, videoUrl?: string): Promise<GeneratedRecipeAiResponse> {
+    const response = await apiRequest<GeneratedRecipeAiResponse>('/ai/video-recipe', {
+      method: 'POST',
+      auth: 'optional',
+      body: { title, description, videoUrl },
+      timeoutMs: 90000,
+    });
+    if (!response.data) throw new Error('AI chưa trả về công thức từ video.');
     return response.data;
   },
 };

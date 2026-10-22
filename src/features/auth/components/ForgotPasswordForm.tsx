@@ -86,17 +86,17 @@ export const ForgotPasswordForm: React.FC = () => {
       
       {/* Top Refresh Icon Badge (Image 4) */}
       <div className="mb-6 flex justify-start">
-        <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center shadow-2xs">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-900 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-2xs">
           <RotateCcw className="w-6 h-6" />
         </div>
       </div>
 
       {/* Heading & Subtitle (Image 4) */}
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
           {step === 'success' ? 'Đặt lại mật khẩu thành công' : 'Khôi phục mật khẩu'}
         </h1>
-        <p className="text-sm text-gray-500 leading-relaxed">
+        <p className="text-sm text-gray-500 dark:text-slate-400 leading-relaxed">
           {step === 'request' && 'Nhập email đã đăng ký để nhận mã xác thực.'}
           {step === 'otp' && 'Nhập mã xác thực đã nhận được và thiết lập mật khẩu mới.'}
           {step === 'success' && 'Mật khẩu của bạn đã được cập nhật thành công. Hãy đăng nhập lại!'}
@@ -104,14 +104,14 @@ export const ForgotPasswordForm: React.FC = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-center gap-2">
+        <div className="mb-4 p-3.5 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 rounded-xl text-xs text-red-600 dark:text-red-300 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
           <span>{error}</span>
         </div>
       )}
 
       {infoMessage && step === 'otp' && (
-        <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
+        <div className="mb-4 p-3.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
           <span>{infoMessage}</span>
         </div>
@@ -208,18 +208,18 @@ export const ForgotPasswordForm: React.FC = () => {
       <div className="text-center mt-7">
         <Link
           to="/login"
-          className="text-xs font-semibold text-emerald-800 hover:text-emerald-900 hover:underline transition inline-flex items-center gap-1.5"
+          className="text-xs font-semibold text-emerald-800 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300 hover:underline transition inline-flex items-center gap-1.5"
         >
           <span>← Quay lại đăng nhập</span>
         </Link>
       </div>
 
       {/* Footer Info (Image 4) */}
-      <div className="mt-12 pt-6 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
+      <div className="mt-12 pt-6 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-gray-400 dark:text-slate-500">
         <span>© 2026 VEGEAI Vietnam</span>
         <div className="flex gap-3">
-          <a href="#" className="hover:text-gray-600 transition">Hỗ trợ</a>
-          <a href="#" className="hover:text-gray-600 transition">Điều khoản</a>
+          <a href="#" className="hover:text-gray-600 dark:hover:text-slate-300 transition">Hỗ trợ</a>
+          <a href="#" className="hover:text-gray-600 dark:hover:text-slate-300 transition">Điều khoản</a>
         </div>
       </div>
 

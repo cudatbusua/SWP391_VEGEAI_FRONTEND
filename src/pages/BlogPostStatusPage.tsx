@@ -74,6 +74,20 @@ export function BlogPostStatusPage({ adminMode = false }: { adminMode?: boolean 
     {post && <><header className={'blog-status-banner ' + post.status.toLowerCase()}><StatusIcon size={42} /><div><BlogBadge status={post.status} /><h1>{adminMode && post.status === 'PENDING_REVIEW' ? 'Xem xét bài viết cộng đồng' : headline}</h1><p>{post.status === 'PUBLISHED' ? 'Câu chuyện của bạn đã xuất hiện trên Blog cộng đồng VEGEAI.' : post.status === 'PENDING_REVIEW' ? 'Ban biên tập sẽ xem xét nội dung trước khi xuất bản.' : post.status === 'REJECTED' ? 'Xem góp ý từ ban biên tập, chỉnh sửa và gửi duyệt lại.' : 'Lưu những ý tưởng của bạn và gửi bài khi đã sẵn sàng.'}</p></div></header>
       <div className="blog-review-grid"><div className="blog-review-main"><div className="blog-review-title"><span className="blog-eyebrow">{blogCategories[post.category]}</span><h2>{post.title}</h2><div className="blog-public-meta"><span>{post.authorName}</span><span>{post.readingMinutes} phút đọc</span><span>Cập nhật {blogDate(post.updatedAt)}</span></div></div>
         {post.status === 'REJECTED' && <section className="blog-rejection-note"><h3><ShieldCheck size={17} /> Lý do từ chối từ ban biên tập</h3><p>{post.moderationReason}</p><span>{post.reviewerName} · {blogDate(post.reviewedAt)}</span></section>}
+        {post.aiModerationStatus && (
+          <section className={`p-4 rounded-2xl border text-xs my-4 ${
+            post.aiModerationStatus === 'FLAGGED'
+              ? 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200'
+              : 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+          }`}>
+            <div className="flex items-center gap-2 font-bold mb-1">
+              {post.aiModerationStatus === 'FLAGGED' ? '⚠️ Kết quả AI Sơ kiểm: CẢNH BÁO NỘI DUNG' : '🛡️ Kết quả AI Sơ kiểm: ĐẠT TIÊU CHUẨN'}
+            </div>
+            <p className="leading-relaxed">
+              {post.aiModerationReason || (post.aiModerationStatus === 'FLAGGED' ? 'Bài viết có dấu hiệu chứa nội dung không phù hợp hoặc vi phạm nguyên tắc ăn chay thuần khiết.' : 'Nội dung tuân thủ nguyên tắc tôn chỉ ăn chay và phong cách sống xanh VEGEAI.')}
+            </p>
+          </section>
+        )}
         <BlogCover post={{ ...post, postId: post.postId }} /><p className="blog-lead">{post.excerpt}</p><BlogBody content={post.content || ''} />
         <section className="blog-review-history"><h3><ShieldCheck size={17} /> Lịch sử bài viết</h3><ol><li><span>Tạo bản nháp</span><time>{blogDate(post.createdAt)}</time></li>{post.submittedAt && <li><span>Gửi ban biên tập</span><time>{blogDate(post.submittedAt)}</time></li>}{post.reviewedAt && <li><span>{post.status === 'PUBLISHED' ? 'Duyệt xuất bản' : 'Từ chối'} · {post.reviewerName}</span><time>{blogDate(post.reviewedAt)}</time></li>}</ol></section>
       </div>

@@ -13,7 +13,7 @@ export const userService = {
     return response.data;
   },
   async changePassword(currentPassword: string, newPassword: string, confirmNewPassword: string): Promise<void> {
-    await apiRequest('/users/me/password', { method: 'PUT', body: {
+    await apiRequest('/users/me/password-hashed', { method: 'PUT', body: {
       currentPassword: await hashPassword(currentPassword),
       newPassword: await hashPassword(newPassword),
       confirmNewPassword: await hashPassword(confirmNewPassword),

@@ -3,6 +3,8 @@ import L from 'leaflet';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Coordinates, Place } from '../services/restaurantService';
+import { useTheme } from '../store/ThemeContext';
+import { getTileLayerConfig } from '../utils/mapConfig';
 
 interface OpenStreetMapVegetarianMapProps {
   center: Coordinates;
@@ -13,7 +15,17 @@ interface OpenStreetMapVegetarianMapProps {
 
 function MapViewport({ center, selectedPlace }: Pick<OpenStreetMapVegetarianMapProps, 'center' | 'selectedPlace'>) {
   const map = useMap();
+
   useEffect(() => {
+    map.invalidateSize();
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  useEffect(() => {
+    map.invalidateSize();
     const point: [number, number] = selectedPlace
       ? [selectedPlace.lat, selectedPlace.lon]
       : [center.lat, center.lon];
@@ -32,19 +44,26 @@ function numberedIcon(number: number) {
 }
 
 export function OpenStreetMapVegetarianMap({ center, places, selectedPlace, onSelect }: OpenStreetMapVegetarianMapProps) {
+  const { theme } = useTheme();
   const [tileError, setTileError] = useState(false);
+  const tileConfig = getTileLayerConfig(theme === 'dark', 'auto');
+
   return (
-    <div className="relative h-full min-h-[420px] bg-slate-100">
+    <div className="relative h-full min-h-[420px] bg-slate-100 dark:bg-slate-900">
       <MapContainer
         center={[center.lat, center.lon]}
         zoom={14}
         scrollWheelZoom
         className="z-0 h-full min-h-[420px] w-full"
-        aria-label="Bản đồ OpenStreetMap chỉ hiển thị quán chay đã lọc"
+        style={{ height: '100%', minHeight: '420px', width: '100%' }}
+        aria-label="Bản đồ chỉ hiển thị quán chay đã lọc"
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          key={`${tileConfig.label}-${theme}`}
+          attribution={tileConfig.attribution}
+          url={tileConfig.url}
+          subdomains={tileConfig.subdomains || '0123'}
+          maxZoom={19}
           eventHandlers={{
             tileerror: () => setTileError(true),
             tileload: () => setTileError(false),
@@ -69,8 +88,8 @@ export function OpenStreetMapVegetarianMap({ center, places, selectedPlace, onSe
         ))}
       </MapContainer>
       {tileError && (
-        <p role="alert" className="absolute bottom-10 left-3 z-[1000] max-w-xs rounded-lg bg-white/95 px-3 py-2 text-xs text-slate-700 shadow">
-          Không tải được ảnh nền OpenStreetMap. Hãy kiểm tra kết nối mạng; các ghim địa điểm vẫn có thể hoạt động.
+        <p role="alert" className="absolute bottom-10 left-3 z-[1000] max-w-xs rounded-lg bg-white/95 dark:bg-slate-900/95 px-3 py-2 text-xs text-slate-700 dark:text-slate-200 shadow">
+          Không tải được ảnh nền bản đồ. Hãy kiểm tra kết nối mạng; các ghim địa điểm vẫn có thể hoạt động.
         </p>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowLeft, CalendarDays, Camera, Check, CheckCircle2, ChefHat, CircleHelp, CloudUpload, ImagePlus, Leaf, LoaderCircle, Plus, ScanLine, ShieldCheck, Snowflake, Sparkles, Trash2, Utensils, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CalendarDays, Camera, Check, CheckCircle2, ChefHat, CircleHelp, CloudUpload, ImagePlus, Leaf, LoaderCircle, PenLine, Plus, ScanLine, ShieldCheck, Snowflake, Sparkles, Trash2, Utensils, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
@@ -234,6 +234,20 @@ function ScanReview(props: ScanReviewProps) {
                 >
                   <CalendarDays size={12} />
                   <span>Thực đơn</span>
+                </Link>
+                <Link
+                  to="/blog/write"
+                  state={{
+                    recipeTitle: `[Món Chay Mới] ${recipe}`,
+                    recipeExcerpt: `Công thức sáng tạo món "${recipe}" được khám phá từ nguyên liệu tủ lạnh: ${usableItems.map(i => i.name).join(', ')}.`,
+                    recipeContent: `## Món chay sáng tạo: ${recipe}\n\n### 🥗 Nguyên liệu có sẵn từ tủ lạnh:\n${usableItems.map(i => `- ${i.name} (${i.quantity ?? 1} ${i.unit ?? 'phần'})`).join('\n')}\n\n### 👨‍🍳 Hướng dẫn nấu ăn gợi ý bởi VEGEAI:\n1. **Sơ chế**: Rửa sạch các loại rau củ và nguyên liệu bằng nước muối loãng, cắt miếng vừa ăn.\n2. **Chế biến**: Đun nóng chảo với dầu thực vật, xào thơm gia vị và cho nguyên liệu vào nấu chín tới.\n3. **Hoàn thiện**: Nêm nếm nước tương chay, hạt nêm nấm vừa khẩu vị và rắc thêm tiêu thơm, bày ra đĩa thưởng thức nóng.\n\n> ✨ *Công thức độc đáo được gợi ý từ AI Bếp Trưởng & Tủ lạnh thông minh VEGEAI.*`,
+                    recipeCategory: 'KITCHEN'
+                  }}
+                  title="Tạo bài viết Blog chia sẻ công thức món mới này cho cộng đồng"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition shadow-2xs"
+                >
+                  <PenLine size={12} />
+                  <span>Đăng Blog</span>
                 </Link>
               </div>
             </div>

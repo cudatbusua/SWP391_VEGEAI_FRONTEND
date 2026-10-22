@@ -32,6 +32,7 @@ import {
 import { MainLayout } from '../layouts/MainLayout';
 import { SmartMarketMap } from '../components/SmartMarketMap';
 import { sfx } from '../utils/soundEffects';
+import { fridgeService } from '../services/fridgeService';
 import {
   INITIAL_SMART_MARKET_ITEMS,
   type SmartMarketItem,
@@ -143,6 +144,8 @@ export function SmartMarketPage() {
   const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'MOMO' | 'COD'>('VIETQR');
   const [deliveryNote, setDeliveryNote] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<'VEGE15' | 'FREESHIP' | null>('VEGE15');
+  const [autoSyncFridge, setAutoSyncFridge] = useState(true);
+  const [syncedCount, setSyncedCount] = useState(0);
 
   const updateItems = (updater: (prev: SmartMarketItem[]) => SmartMarketItem[]) => {
     setItems(prev => {
@@ -439,14 +442,53 @@ export function SmartMarketPage() {
   }, [appliedVoucher, totalProductsPrice, totalShippingFee]);
   const grandTotal = Math.max(0, totalProductsPrice + totalShippingFee - discountAmount);
 
-  const handleCheckoutConfirm = () => {
+  const handleCheckoutConfirm = async () => {
     sfx.playSuccess();
     setCheckoutSuccess(true);
+
+    if (autoSyncFridge && multiCart.length > 0) {
+      let count = 0;
+      for (const item of multiCart) {
+        try {
+          const lower = item.name.toLowerCase();
+          let shelfLife = 5;
+          let category = 'VEGAN';
+          if (lower.includes('đậu') || lower.includes('tofu')) {
+            shelfLife = 4;
+            category = 'PROTEIN';
+          } else if (lower.includes('nấm')) {
+            shelfLife = 4;
+            category = 'FUNGUS';
+          } else if (lower.includes('cà') || lower.includes('rau') || lower.includes('cải') || lower.includes('bí')) {
+            shelfLife = 6;
+            category = 'PRODUCE';
+          } else if (lower.includes('gạo') || lower.includes('bún') || lower.includes('mì')) {
+            shelfLife = 30;
+            category = 'GRAINS';
+          }
+
+          await fridgeService.add({
+            name: item.name,
+            category,
+            quantity: item.count,
+            unit: item.unit || 'phần',
+            freshnessStatus: 'FRESH',
+            estimatedShelfLifeDays: shelfLife,
+            notes: `Mua từ ${item.storeName} qua Đi chợ thông minh`
+          });
+          count += 1;
+        } catch (e) {
+          console.warn('[SMART-MARKET] Auto-sync to fridge item error:', item.name, e);
+        }
+      }
+      setSyncedCount(count);
+    }
+
     setTimeout(() => {
       setShowCheckoutModal(false);
       setCheckoutSuccess(false);
       setMultiCart([]);
-    }, 4000);
+    }, 4500);
   };
 
   return (
@@ -902,6 +944,13 @@ export function SmartMarketPage() {
                     Hệ thống VEGEAI đã tự động tách thành <strong className="text-emerald-700 dark:text-emerald-400">{groupedOrders.length} kiện hàng riêng biệt</strong> gửi tới từng quán chay và siêu thị. Shipper sẽ liên hệ theo lộ trình từng đơn hàng!
                   </p>
 
+                  {autoSyncFridge && syncedCount > 0 && (
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-bold shadow-xs">
+                      <Sparkles className="w-4 h-4 text-emerald-600 animate-spin" />
+                      <span>Đã tự động nạp {syncedCount} nguyên liệu tươi vào Kho Tủ Lạnh (Smart Fridge) của bạn!</span>
+                    </div>
+                  )}
+
                   {/* Individual packages confirmation list */}
                   <div className="space-y-2 text-left pt-2">
                     {groupedOrders.map((group, idx) => (
@@ -1073,6 +1122,25 @@ export function SmartMarketPage() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Auto-sync to Smart Fridge Toggle */}
+                    <label className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 cursor-pointer transition hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30">
+                      <input
+                        type="checkbox"
+                        checked={autoSyncFridge}
+                        onChange={(e) => setAutoSyncFridge(e.target.checked)}
+                        className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer shrink-0"
+                      />
+                      <div className="text-left text-xs">
+                        <div className="font-extrabold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                          <span>Tự động đồng bộ vào Kho Tủ Lạnh (Smart Fridge)</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100 font-extrabold">Auto-Sync</span>
+                        </div>
+                        <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400 mt-0.5">
+                          Nguyên liệu mua sẽ lập tức được lưu vào tủ lạnh để gợi ý món ăn và theo dõi độ tươi ngon tự động.
+                        </div>
+                      </div>
+                    </label>
 
                     {/* Consolidated Totals */}
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">

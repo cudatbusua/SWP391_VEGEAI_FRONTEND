@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Save, Send, Eye, FilePenLine, Image, Video, Sparkles } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { BlogAccess, BlogBadge, BlogBody, BlogCover, BlogError } from '../components/BlogUi';
@@ -28,6 +28,7 @@ const covers = [
 
 export function BlogEditorPage() {
   const { id } = useParams();
+  const location = useLocation();
   const { isAuthenticated, user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const navigate = useNavigate();
@@ -46,9 +47,30 @@ export function BlogEditorPage() {
     if (!isAuthenticated) return;
     if (!id) {
       setPost(null);
-      setForm(initial);
+      const state = location.state as {
+        recipeTitle?: string;
+        recipeExcerpt?: string;
+        recipeContent?: string;
+        recipeCategory?: string;
+        coverImage?: string;
+      } | null;
+
+      if (state?.recipeTitle || state?.recipeContent) {
+        setForm({
+          ...initial,
+          title: state.recipeTitle || '',
+          excerpt: state.recipeExcerpt || '',
+          content: state.recipeContent || '',
+          category: (state.recipeCategory as any) || 'KITCHEN',
+          coverImage: state.coverImage || initial.coverImage,
+        });
+        setMessage('✨ Đã tự động tạo bản nháp bài viết từ công thức AI! Bạn có thể xem lại hoặc chỉnh sửa trước khi xuất bản.');
+        setDirty(true);
+      } else {
+        setForm(initial);
+        setDirty(false);
+      }
       setLoading(false);
-      setDirty(false);
       return;
     }
     const controller = new AbortController();

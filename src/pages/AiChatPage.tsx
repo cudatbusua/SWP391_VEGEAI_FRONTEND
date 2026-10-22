@@ -16,6 +16,7 @@ import {
   BookOpen,
   Search,
   Camera,
+  PenLine,
   X
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
@@ -746,6 +747,19 @@ export function AiChatPage() {
                         className="p-1 rounded text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-700 transition"
                       >
                         <Search className="w-3.5 h-3.5" />
+                      </Link>
+                      <Link
+                        to="/blog/write"
+                        state={{
+                          recipeTitle: `[Công thức AI] ${rec}`,
+                          recipeExcerpt: `Công thức chay sáng tạo "${rec}" được gợi ý từ Bếp Trưởng VEGEAI trong phiên tư vấn dinh dưỡng.`,
+                          recipeContent: `## Món chay sáng tạo: ${rec}\n\n### 💡 Giới thiệu\nCông thức được Bếp Trưởng VEGEAI sáng tạo và tối ưu hóa dinh dưỡng thuần thực vật.\n\n### 🥗 Thành phần gợi ý\n- Nguyên liệu chính tươi sạch\n- Gia vị tự nhiên: muối hồng, tiêu thơm, dầu oliu, hạt nêm chay\n\n### 👨‍🍳 Hướng dẫn nấu ăn\n1. Sơ chế sạch các loại nguyên liệu.\n2. Nấu chín tới ở nhiệt độ thích hợp để giữ trọn vi chất dinh dưỡng.\n3. Trình bày và thưởng thức ngon miệng cùng gia đình.\n\n> ✨ *Công thức được tạo bởi AI Bếp Trưởng VEGEAI.*`,
+                          recipeCategory: 'KITCHEN'
+                        }}
+                        title="Tạo bài viết Blog từ món này"
+                        className="p-1 rounded text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-700 transition"
+                      >
+                        <PenLine className="w-3.5 h-3.5" />
                       </Link>
                     </div>
                   ))}

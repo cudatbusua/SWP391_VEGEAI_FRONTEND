@@ -1,5 +1,7 @@
 import React from 'react';
-import { Leaf } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Leaf, Sun, Moon, ArrowLeft } from 'lucide-react';
+import { useTheme } from '../store/ThemeContext';
 
 export interface AuthLayoutProps {
   children: React.ReactNode;
@@ -18,8 +20,41 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   bannerDescription,
   quote
 }) => {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <div className="min-h-screen w-full relative overflow-hidden bg-gradient-to-br from-[#0c3823] via-[#092e1c] to-[#041a10] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-10 font-sans selection:bg-emerald-500 selection:text-white">
+      
+      {/* Top Floating Action Bar: Back to Home & Direct Theme Switcher */}
+      <div className="w-full max-w-6xl flex items-center justify-between mb-4 z-20 px-2 sm:px-0">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-black/30 hover:bg-black/50 text-emerald-200 hover:text-white text-xs font-semibold backdrop-blur-md border border-white/10 transition cursor-pointer shadow-xs"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Về trang chủ</span>
+        </Link>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+          aria-label={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black/30 hover:bg-black/50 text-white text-xs font-semibold backdrop-blur-md border border-white/10 transition cursor-pointer shadow-xs"
+        >
+          {theme === 'dark' ? (
+            <>
+              <Sun className="w-3.5 h-3.5 text-amber-300" />
+              <span>Giao diện Sáng</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Giao diện Tối</span>
+            </>
+          )}
+        </button>
+      </div>
       
       {/* ================= BACKGROUND DECORATIONS: RAU XANH & LÁ CÂY ================= */}
       
@@ -107,7 +142,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
       </div>
 
       {/* ================= MAIN CARD CONTAINER ================= */}
-      <div className="w-full max-w-6xl min-h-[720px] bg-white rounded-3xl shadow-2xl shadow-black/40 border border-emerald-500/20 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10 backdrop-blur-sm">
+      <div className="w-full max-w-6xl min-h-[720px] bg-white dark:bg-[#121922] rounded-3xl shadow-2xl shadow-black/40 border border-emerald-500/20 dark:border-slate-800 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10 backdrop-blur-sm transition-colors duration-200">
         
         {/* Left Column: Image Banner (Images 1, 2, 3, 4) */}
         <div className="lg:col-span-6 relative min-h-[420px] lg:min-h-full overflow-hidden bg-slate-900 flex flex-col justify-between p-8 sm:p-10 text-white">
@@ -155,7 +190,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         </div>
 
         {/* Right Column: Form Container (Images 1, 2, 3, 4) */}
-        <div className="lg:col-span-6 flex flex-col justify-center items-center p-6 sm:p-10 lg:p-14 bg-white">
+        <div className="lg:col-span-6 flex flex-col justify-center items-center p-6 sm:p-10 lg:p-14 bg-white dark:bg-[#121922] transition-colors duration-200">
           <div className="w-full max-w-md mx-auto">
             {children}
           </div>

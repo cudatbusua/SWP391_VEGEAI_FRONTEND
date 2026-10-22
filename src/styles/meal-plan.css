@@ -2,3 +2,159 @@
 .planned-meal-top>.planned-meal-image{width:126px;flex:none;border-radius:5px;overflow:hidden}.planned-meal-image>div{aspect-ratio:4/3}
 @media(max-width:850px){.meal-plan-layout{grid-template-columns:220px minmax(0,1fr);gap:22px}.planned-meal-top{gap:12px;align-items:flex-start}.planned-meal-top>.planned-meal-image{width:84px}.planned-meal h3{font-size:14px}.planned-meal{padding:15px}.plan-nutrients{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.plan-result-heading{align-items:flex-start;flex-wrap:wrap}.plan-result-heading h2{font-size:22px}}
 @media(max-width:639px){.meal-plan-page{padding:24px 16px}.meal-plan-heading h1{font-size:25px}.meal-plan-heading>a{font-size:11px}.meal-plan-layout{grid-template-columns:minmax(0,1fr);gap:24px}.plan-settings fieldset{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.plan-settings .plan-period,.plan-settings .plan-primary{grid-column:1/-1}.plan-settings label{min-width:0}.meal-plan-sidebar{display:contents}.plan-settings{grid-row:1}.plan-profile{grid-row:2;padding:0 0 18px}.meal-plan-content{grid-row:3}.meal-plan-sidebar>.saved-plans{grid-row:4}.planned-meal-top>img{width:76px;aspect-ratio:1;object-fit:cover}.planned-meal-top{gap:11px}.planned-meal-top small{font-size:9px}.planned-meal h3{font-size:14px}.planned-swap{width:28px;height:28px}.plan-empty h2{font-size:21px}.plan-result-heading p{font-size:11px}.plan-result-heading h2{font-size:22px}.plan-nutrients dd{font-size:20px}.planned-details{margin-top:14px}.plan-settings label>input{padding:11px 6px}.plan-day-heading{font-size:12px}.plan-warnings{font-size:11px;padding:12px 13px}.meal-plan-heading{gap:10px}}
+
+/* Dark Mode Overrides for Meal Planner */
+html.dark .meal-plan-page {
+  color: #f1f5f9;
+}
+html.dark .meal-plan-heading h1 {
+  color: #f1f5f9;
+}
+html.dark .meal-plan-heading > a {
+  color: #94a3b8;
+}
+html.dark .plan-settings {
+  border-bottom-color: #212c3b;
+}
+html.dark .plan-settings h2,
+html.dark .plan-profile h2 {
+  color: #f1f5f9;
+}
+html.dark .plan-settings label {
+  color: #cbd5e1;
+}
+html.dark .plan-settings label > input,
+html.dark .plan-settings select {
+  background: #16202c;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+html.dark .plan-period {
+  background: #19222e;
+}
+html.dark .plan-period button {
+  color: #94a3b8;
+}
+html.dark .plan-period button[aria-pressed=true] {
+  background: #121922;
+  color: #34d399;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+html.dark .plan-profile {
+  border-bottom-color: #212c3b;
+}
+html.dark .plan-profile p {
+  color: #94a3b8;
+}
+html.dark .saved-plans li {
+  border-bottom-color: #212c3b;
+}
+html.dark .saved-plans li strong {
+  color: #f1f5f9;
+}
+html.dark .saved-plans li small {
+  color: #94a3b8;
+}
+html.dark .saved-plans li svg {
+  color: #94a3b8;
+}
+html.dark .saved-plans nav button {
+  border-color: #212c3b;
+  background: #16202c;
+  color: #cbd5e1;
+}
+html.dark .plan-empty h2 {
+  color: #f1f5f9;
+}
+html.dark .plan-result-heading {
+  border-bottom-color: #212c3b;
+}
+html.dark .plan-result-heading h2 {
+  color: #f1f5f9;
+}
+html.dark .plan-result-heading p {
+  color: #94a3b8;
+}
+html.dark .plan-days button {
+  background: #121922;
+  border-color: #212c3b;
+  color: #94a3b8;
+}
+html.dark .plan-days button[aria-current=date] {
+  border-color: #10b981;
+  color: #ecfdf5;
+  background: #064e3b;
+}
+html.dark .plan-day-heading {
+  color: #f1f5f9;
+}
+html.dark .plan-day-heading span {
+  color: #94a3b8;
+}
+html.dark .plan-nutrients {
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+html.dark .plan-nutrients dt {
+  color: #94a3b8;
+}
+html.dark .plan-nutrients dd {
+  color: #f8fafc;
+}
+html.dark .planned-meal {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+html.dark .planned-meal h3 {
+  color: #f1f5f9;
+}
+html.dark .planned-meal-top p {
+  color: #cbd5e1;
+}
+html.dark .planned-meal-top small {
+  color: #94a3b8;
+}
+html.dark .planned-swap {
+  border-color: #212c3b;
+  color: #94a3b8;
+  background: #16202c;
+}
+html.dark .planned-swap:hover {
+  background: #1a3828;
+  color: #34d399;
+}
+html.dark .planned-details {
+  border-top-color: #212c3b;
+}
+html.dark .planned-details > button {
+  color: #94a3b8;
+}
+html.dark .planned-details ul li {
+  border-bottom-color: #212c3b;
+  color: #cbd5e1;
+}
+html.dark .planned-details ul strong {
+  color: #f1f5f9;
+}
+html.dark .planned-details ol {
+  color: #cbd5e1;
+}
+html.dark .planned-video h4 {
+  color: #f1f5f9;
+}
+html.dark .plan-warnings {
+  background: #2b220d;
+  border-left-color: #f59e0b;
+  color: #fde68a;
+}
+html.dark .plan-error {
+  background: #2b1115;
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+html.dark .plan-success {
+  background: #0f2c1d;
+  border-color: #10b981;
+  color: #6ee7b7;
+}

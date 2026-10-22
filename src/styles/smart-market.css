@@ -131,3 +131,70 @@
     height: 420px;
   }
 }
+
+/* Dark Mode Overrides for Smart Market */
+html.dark .smart-market-page {
+  color: #f1f5f9;
+}
+html.dark .smart-market-hero {
+  background: linear-gradient(135deg, #091d14 0%, #0d1e28 50%, #0b1118 100%);
+  border-bottom-color: #1a3828;
+}
+html.dark .smart-market-badge {
+  background-color: #064e3b;
+  color: #a7f3d0;
+}
+html.dark .smart-market-card {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+html.dark .smart-market-card:hover {
+  border-color: #334155;
+}
+html.dark .aisle-header {
+  background: #16202c;
+  border-bottom-color: #212c3b;
+  color: #f1f5f9;
+}
+html.dark .market-item-row {
+  border-bottom-color: #212c3b;
+}
+html.dark .market-item-row:hover {
+  background-color: #192433;
+}
+html.dark .market-item-row.is-bought {
+  background-color: #141c26;
+}
+html.dark .market-item-row.is-bought .item-name {
+  color: #64748b;
+}
+html.dark .market-store-card {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+html.dark .market-store-card:hover {
+  border-color: #059669;
+  background-color: #10261c;
+}
+html.dark .market-store-card.is-active {
+  border-color: #10b981;
+  background-color: #10261c;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+html.dark .match-pill {
+  background: #064e3b;
+  color: #a7f3d0;
+}
+html.dark .match-pill.high {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+html.dark .match-pill.partial {
+  background: #3b2a0c;
+  color: #fde68a;
+}
+html.dark .store-map-container {
+  border-color: #212c3b;
+}

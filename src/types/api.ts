@@ -16,6 +16,13 @@ export interface AuthResponse {
   role: string;
   status: string;
 }
+export interface LoginInitResponse {
+  requireOtp: boolean;
+  usernameOrEmail: string;
+  maskedEmail: string;
+  rememberMe: boolean;
+  message: string;
+}
 export interface UserProfile {
   userId: string;
   username: string;
@@ -60,6 +67,8 @@ export interface FridgeScanResponse {
     unit?: string;
     category: string;
     isVegetarian: boolean;
+    isEdible?: boolean;
+    rejectionReason?: string;
     freshness: string;
     freshnessScore?: number;
     shelfLifeEstimate?: string;
@@ -244,4 +253,20 @@ export interface AiAuditLogEntry {
   userType: string;
   status: string;
   promptSummary?: string;
+}
+
+
+export interface GeneratedRecipeAiResponse {
+  id?: string;
+  title: string;
+  description: string;
+  cookTimeMinutes: number;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  estimatedCalories: number;
+  dietaryType: string;
+  ingredients: string[];
+  instructions: string[];
+  safetyNotes?: string[];
+  createdAt?: string;
+  requiresProfileSetup?: boolean;
 }

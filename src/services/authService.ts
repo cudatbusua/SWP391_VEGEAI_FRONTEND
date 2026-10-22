@@ -1,5 +1,5 @@
 import type { User, LoginFormData, RegisterFormData, ForgotPasswordFormData, ActionResult } from '../types';
-import type { AuthResponse, UserProfile } from '../types/api';
+import type { AuthResponse, LoginInitResponse, UserProfile } from '../types/api';
 import { apiRequest, clearSession, errorMessage, hasSession, refreshSession, setSession } from './apiClient';
 import { hashPassword } from '../utils/password';
 
@@ -19,15 +19,78 @@ export const authService = {
     if (!response.data) throw new Error('Không thể tải hồ sơ người dùng.');
     return toUser(response.data);
   },
-  login(form: LoginFormData): Promise<ActionResult<User>> {
+  initLogin(form: LoginFormData): Promise<ActionResult<LoginInitResponse>> {
     return action(async () => {
-      const response = await apiRequest<AuthResponse>('/auth/login', { method: 'POST', auth: 'none',
-        body: { usernameOrEmail: form.emailOrPhone.trim(), password: await hashPassword(form.password) } });
-      if (!response.data?.accessToken) throw new Error('Máy chủ không trả về phiên đăng nhập.');
-      setSession(response.data, form.rememberMe);
+      const response = await apiRequest<LoginInitResponse>('/auth/login', {
+        method: 'POST',
+        auth: 'none',
+        body: {
+          usernameOrEmail: form.emailOrPhone.trim(),
+          password: await hashPassword(form.password),
+          rememberMe: form.rememberMe
+        }
+      });
+      if (!response.data) throw new Error('Máy chủ không phản hồi yêu cầu đăng nhập.');
+      return response.data;
+    });
+  },
+  verifyLoginOtp(usernameOrEmail: string, otp: string, rememberMe: boolean): Promise<ActionResult<User>> {
+    return action(async () => {
+      const response = await apiRequest<AuthResponse>('/auth/verify-login-otp', {
+        method: 'POST',
+        auth: 'none',
+        body: {
+          usernameOrEmail: usernameOrEmail.trim(),
+          otp: otp.trim(),
+          rememberMe
+        }
+      });
+      if (!response.data?.accessToken) throw new Error('Mã xác thực không hợp lệ hoặc máy chủ không trả về phiên.');
+      setSession(response.data, rememberMe);
       return toUser(response.data);
     });
   },
+  resendLoginOtp(usernameOrEmail: string): Promise<ActionResult<void>> {
+    return action(async () => {
+      await apiRequest('/auth/resend-login-otp', {
+        method: 'POST',
+        auth: 'none',
+        body: { usernameOrEmail: usernameOrEmail.trim() }
+      });
+    });
+  },
+  loginWithGoogle(idToken: string, rememberMe = true): Promise<ActionResult<User>> {
+    return action(async () => {
+      const response = await apiRequest<AuthResponse>('/auth/google', {
+        method: 'POST',
+        auth: 'none',
+        body: { idToken, rememberMe },
+      });
+      if (!response.data?.accessToken) throw new Error('Không nhận được phiên đăng nhập từ máy chủ.');
+      setSession(response.data, rememberMe);
+      return toUser(response.data);
+    });
+  },
+  login(form: LoginFormData): Promise<ActionResult<User>> {
+    return action(async () => {
+      const payload: Record<string, unknown> = {
+        usernameOrEmail: form.emailOrPhone.trim(),
+        password: await hashPassword(form.password),
+      };
+      if (form.rememberMe) {
+        payload.rememberMe = true;
+      }
+      const response = await apiRequest<AuthResponse>('/auth/login', {
+        method: 'POST',
+        auth: 'none',
+        body: payload,
+      });
+      if (!response.data?.accessToken) throw new Error('Máy chủ yêu cầu xác thực OTP.');
+      setSession(response.data, Boolean(form.rememberMe));
+      return toUser(response.data);
+    });
+  },
+
   register(form: RegisterFormData): Promise<ActionResult<void>> {
     return action(async () => {
       await apiRequest('/auth/register', { method: 'POST', auth: 'none', body: {

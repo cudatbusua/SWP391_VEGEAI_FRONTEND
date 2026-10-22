@@ -121,5 +121,100 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 }
 export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Có lỗi xảy ra. Vui lòng thử lại.';
+  if (!error) return 'Có lỗi xảy ra. Vui lòng thử lại.';
+
+  const msg = error instanceof Error ? error.message : String(error);
+  const code = error instanceof ApiError ? error.code : undefined;
+  const status = error instanceof ApiError ? error.status : undefined;
+
+  // 1. Session & Token errors
+  if (
+    code === 1201 ||
+    code === 1202 ||
+    code === 1203 ||
+    code === 1207 ||
+    code === 1208 ||
+    code === 1209 ||
+    status === 401 ||
+    /revoked|token.*expired|invalid.*token|token.*invalid|unauthorized/i.test(msg)
+  ) {
+    return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+  }
+
+  // 2. Authentication credentials
+  if (code === 1101 || /invalid credentials|invalid username/i.test(msg)) {
+    return 'Tên đăng nhập, email hoặc mật khẩu không chính xác.';
+  }
+
+  // 3. Account status
+  if (code === 1200 || /pending email verification/i.test(msg)) {
+    return 'Tài khoản chưa được kích hoạt email. Vui lòng kiểm tra hộp thư của bạn.';
+  }
+  if (code === 1205 || code === 1204 || /locked|disabled/i.test(msg)) {
+    return 'Tài khoản tạm thời bị khóa hoặc vô hiệu hóa. Vui lòng liên hệ quản trị viên.';
+  }
+
+  // 4. Registration conflicts
+  if (code === 1300 || /username.*already.*taken/i.test(msg)) {
+    return 'Tên đăng nhập này đã được sử dụng. Vui lòng chọn tên khác.';
+  }
+  if (code === 1301 || /email.*already.*registered/i.test(msg)) {
+    return 'Địa chỉ email này đã được đăng ký tài khoản.';
+  }
+  if (code === 1302 || /phone.*already.*in use/i.test(msg)) {
+    return 'Số điện thoại này đã được sử dụng.';
+  }
+  if (code === 1304 || /current password is incorrect/i.test(msg)) {
+    return 'Mật khẩu hiện tại không chính xác.';
+  }
+  if (code === 1305 || /new password cannot be the same/i.test(msg)) {
+    return 'Mật khẩu mới không được trùng với mật khẩu cũ.';
+  }
+
+  // 5. OTP verification
+  if (code === 1210 || /invalid otp/i.test(msg)) {
+    return 'Mã xác thực OTP không chính xác. Vui lòng kiểm tra lại.';
+  }
+  if (code === 1211 || /otp.*expired/i.test(msg)) {
+    return 'Mã xác thực OTP đã hết hạn. Vui lòng yêu cầu mã mới.';
+  }
+  if (code === 1212 || /otp.*already.*used/i.test(msg)) {
+    return 'Mã xác thực OTP này đã được sử dụng.';
+  }
+  if (code === 1213 || /wait before requesting/i.test(msg)) {
+    return 'Vui lòng chờ một chút trước khi yêu cầu mã OTP mới.';
+  }
+
+  // 6. Rate limits & Quotas
+  if (code === 1400 || code === 1401 || /too many/i.test(msg)) {
+    return 'Bạn đã thao tác quá nhanh hoặc sai quá nhiều lần. Vui lòng thử lại sau ít phút.';
+  }
+  if (code === 1402 || /guest trial limit/i.test(msg)) {
+    return 'Bạn đã sử dụng hết lượt dùng thử miễn phí. Vui lòng đăng ký hoặc đăng nhập để tiếp tục.';
+  }
+
+  // 7. Permissions & Resources
+  if (code === 1600 || status === 403 || /permission|forbidden/i.test(msg)) {
+    return 'Bạn không có quyền thực hiện thao tác này.';
+  }
+  if (code === 1500 || code === 1501 || status === 404) {
+    return 'Không tìm thấy dữ liệu yêu cầu.';
+  }
+
+  // 8. AI service
+  if (code === 1706 || /ai.*not configured/i.test(msg)) {
+    return 'Dịch vụ AI đang được cập nhật cấu hình. Vui lòng liên hệ quản trị viên hoặc thử lại sau.';
+  }
+
+  // 9. Server errors
+  if (status === 500 || status === 502 || status === 503 || status === 504 || /internal server|database.*violation|malformed/i.test(msg)) {
+    return 'Hệ thống đang bận. Vui lòng thử lại sau ít phút.';
+  }
+
+  // 10. Natural Vietnamese sentences
+  if (/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(msg)) {
+    return msg;
+  }
+
+  return 'Có lỗi xảy ra trong quá trình xử lý. Vui lòng thử lại.';
 }

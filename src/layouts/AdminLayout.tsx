@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, ChevronRight, CircleHelp, FilePenLine, LayoutDashboard, LogOut, Menu, PanelLeftClose, Search, ShieldCheck, Users, Video, X } from 'lucide-react';
+import { Activity, BookOpen, ChevronRight, CircleHelp, FilePenLine, LayoutDashboard, LogOut, Menu, Moon, PanelLeftClose, Search, ShieldCheck, Sun, Users, Video, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../store/ThemeContext';
 import '../styles/admin.css';
 
 const items = [
   { path: '/admin', label: 'Tổng quan', icon: LayoutDashboard, section: 'workspace' },
   { path: '/admin/users', label: 'Tài khoản', icon: Users, section: 'workspace' },
+  { path: '/admin/ai-monitoring', label: 'Giám sát AI', icon: Activity, section: 'workspace' },
   { path: '/admin/recipes', label: 'Công thức & dinh dưỡng', icon: BookOpen, section: 'content' },
   { path: '/admin/blog', label: 'Blog', icon: FilePenLine, section: 'content' },
   { path: '/admin/videos', label: 'Video', icon: Video, section: 'content' },
@@ -15,6 +17,7 @@ const items = [
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const { user, logout, sessionError, retrySession } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [open, setOpen] = useState(false);
@@ -76,7 +79,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     </aside>
     <div className="admin-workspace">
       <header className="admin-topbar"><div className="admin-topbar-start"><button ref={menu} type="button" className="admin-icon-button" title={mobile ? 'Mở menu quản trị' : collapsed ? 'Mở rộng menu' : 'Thu gọn menu'} aria-label="Đóng mở menu quản trị" aria-controls="admin-sidebar" aria-expanded={mobile ? open : !collapsed} onClick={toggleMenu}>{mobile || collapsed ? <Menu size={20} /> : <PanelLeftClose size={20} />}</button><div className="admin-breadcrumb"><span>Quản trị</span><ChevronRight size={14} /><strong>{current?.label || 'Nội dung'}</strong></div></div>
-        <div className="admin-topbar-actions"><div className="admin-user"><span className="admin-user-avatar">{user?.name?.charAt(0).toUpperCase() || 'A'}</span><span className="admin-user-info"><strong>{user?.name || 'Admin'}</strong><small>Quản trị viên</small></span></div></div>
+        <div className="admin-topbar-actions"><button type="button" onClick={toggleTheme} title={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'} aria-label={theme === 'dark' ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'} className="admin-icon-button">{theme === 'dark' ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} className="text-indigo-600" />}</button><div className="admin-user"><span className="admin-user-avatar">{user?.name?.charAt(0).toUpperCase() || 'A'}</span><span className="admin-user-info"><strong>{user?.name || 'Admin'}</strong><small>Quản trị viên</small></span></div></div>
       </header>
       {sessionError && <div role="alert" className="admin-global-alert">{sessionError}<button onClick={retrySession}>Thử lại</button></div>}
       {error && <div role="alert" className="admin-global-alert">{error}</div>}

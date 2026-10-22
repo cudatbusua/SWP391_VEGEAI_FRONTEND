@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Bell, Check, CheckCheck, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { notificationService, type UserNotification } from '../services/notificationService';
+import { sfx } from '../utils/soundEffects';
 
 function formatTime(value: string): string {
   const date = new Date(value);
@@ -21,10 +22,15 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const prevCountRef = useRef(0);
 
   const refresh = async (includeItems: boolean) => {
     try {
       const count = await notificationService.unreadCount();
+      if (count > prevCountRef.current && prevCountRef.current !== 0) {
+        sfx.playNotification();
+      }
+      prevCountRef.current = count;
       setUnreadCount(count);
       if (includeItems) {
         const page = await notificationService.list();
@@ -44,6 +50,7 @@ export function NotificationBell() {
 
   const toggle = async () => {
     const nextOpen = !open;
+    sfx.playTap();
     setOpen(nextOpen);
     if (nextOpen) {
       setBusy(true);

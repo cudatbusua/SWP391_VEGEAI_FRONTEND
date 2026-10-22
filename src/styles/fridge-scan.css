@@ -143,3 +143,64 @@
     width: calc(100% - 1.8rem);
   }
 }
+
+/* Dark Mode Overrides for Fridge Scan */
+html.dark .fridge-scan-page {
+  background-image: linear-gradient(180deg, #091d15 0, #0b1118 280px, #0b1118 100%);
+  color: #f1f5f9;
+}
+html.dark .fridge-scan-steps {
+  background: rgba(18, 25, 34, 0.95);
+  border-color: #212c3b;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+html.dark .fridge-scan-steps-heading {
+  color: #34d399;
+}
+html.dark .fridge-scan-step {
+  color: #94a3b8;
+}
+html.dark .fridge-scan-step:not(:last-child)::after {
+  background: #212c3b;
+}
+html.dark .fridge-scan-step > span:last-child {
+  background: #121922;
+  color: #cbd5e1;
+}
+html.dark .fridge-scan-step-number {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+html.dark .fridge-scan-step.is-current > span:last-child,
+html.dark .fridge-scan-step.is-complete > span:last-child {
+  color: #34d399;
+}
+html.dark .fridge-scan-step.is-current .fridge-scan-step-number,
+html.dark .fridge-scan-step.is-complete .fridge-scan-step-number {
+  border-color: #059669;
+  background: #059669;
+  color: #ffffff;
+}
+html.dark .fridge-scan-upload-card,
+html.dark .fridge-review-card {
+  border-color: #212c3b;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.35);
+  background: #121922;
+}
+html.dark .fridge-scan-dropzone {
+  border-color: #1a4d36;
+  background: linear-gradient(145deg, #10221a, #121922 70%);
+}
+html.dark .fridge-review-photo {
+  border-color: #212c3b;
+  background: #16202c;
+}
+html.dark .fridge-review-image {
+  border-color: #212c3b;
+}
+html.dark .fridge-review-list {
+  border-color: #212c3b;
+  background: #121922;
+  color: #f1f5f9;
+}

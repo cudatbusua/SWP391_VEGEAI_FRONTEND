@@ -8,7 +8,20 @@ export interface SmartMarketItem {
   checked: boolean;
 }
 
+
+export interface StoreCatalogItem {
+  id: string;
+  name: string;
+  price: number;
+  priceFormatted: string;
+  unit: string;
+  imageEmoji: string;
+  category: string;
+  inStock: boolean;
+}
+
 export interface SmartMarketStore {
+  catalog?: StoreCatalogItem[];
   id: string;
   name: string;
   tagline: string;
@@ -25,7 +38,7 @@ export interface SmartMarketStore {
   priceEstimate: string;
   statusBadge: string;
   badgeType: 'high' | 'medium' | 'appliance';
-  category: 'SUPERMARKET' | 'GROCERY_STORE' | 'MARKET' | 'APPLIANCE';
+  category: 'SUPERMARKET' | 'GROCERY_STORE' | 'MARKET' | 'APPLIANCE' | 'VEGAN_STORE' | 'CONVENIENCE';
   categoryLabel: string;
   notes: string;
   missingNote?: string;
@@ -237,14 +250,14 @@ export const INITIAL_SMART_MARKET_ITEMS: SmartMarketItem[] = [
 export const SMART_MARKET_STORES: SmartMarketStore[] = [
   {
     id: 'store-1',
-    name: 'Chay Xanh Mart - Cửa Hàng Thực Phẩm Chay & Hữu Cơ',
-    tagline: 'Tối ưu giỏ hàng · Rẻ hơn 12% so với bình quân',
+    name: 'Chay Xanh Mart - Cửa Hàng Chay Phú Nhuận',
+    tagline: 'Tối ưu giỏ hàng chay · Nông sản VietGAP & Đậu tươi trong ngày',
     address: '184 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM',
     distance: 'Cách 850m',
     distanceKm: 0.85,
     duration: '~3 phút đi xe',
-    rating: 4.8,
-    reviewsCount: 94,
+    rating: 4.9,
+    reviewsCount: 128,
     hours: 'Mở cửa · 07:30 - 21:00',
     matchCount: 15,
     totalNeeded: 16,
@@ -252,97 +265,121 @@ export const SMART_MARKET_STORES: SmartMarketStore[] = [
     priceEstimate: '~285.000 đ',
     statusBadge: 'Khớp 15/16 nguyên liệu',
     badgeType: 'high',
-    category: 'SUPERMARKET',
-    categoryLabel: 'Siêu thị chay hữu cơ',
+    category: 'VEGAN_STORE',
+    categoryLabel: 'Quán chay & Tiệm đồ chay',
     notes: 'Có đầy đủ nông sản Đà Lạt VietGAP, đậu khuôn tươi nóng và gia vị chay chuyên sâu.',
-    missingNote: 'Chỉ thiếu: Bột nêm rong biển Kombu (Có thể thay thế bằng nấm men dinh dưỡng có sẵn tại quầy).',
+    missingNote: 'Chỉ thiếu: Bột nêm rong biển Kombu (Có sẵn nấm men dinh dưỡng thay thế).',
     featuredItems: ['Đậu hũ non hữu cơ', 'Nấm rơm búp tươi', 'Bí đỏ hồ lô', 'Gạo lứt huyết rồng', 'Hành boa-rô'],
     lat: 10.7985,
     lon: 106.6892,
     phone: '028 3995 1284',
+    catalog: [
+      { id: 'cx-1', name: 'Đậu hũ non hữu cơ', price: 18000, priceFormatted: '18.000 đ', unit: 'Hộp 2 bìa', imageEmoji: '🧈', category: 'protein', inStock: true },
+      { id: 'cx-2', name: 'Nấm rơm búp tươi Đà Lạt', price: 35000, priceFormatted: '35.000 đ', unit: 'Khay 300g', imageEmoji: '🍄', category: 'produce', inStock: true },
+      { id: 'cx-3', name: 'Cải ngọt VietGAP sạch', price: 22000, priceFormatted: '22.000 đ', unit: 'Bó 500g', imageEmoji: '🥬', category: 'produce', inStock: true },
+      { id: 'cx-4', name: 'Hạt nêm nấm củ quả hữu cơ', price: 42000, priceFormatted: '42.000 đ', unit: 'Gói 200g', imageEmoji: '🧂', category: 'spices', inStock: true },
+      { id: 'cx-5', name: 'Nước tương Tamari ủ gỗ', price: 68000, priceFormatted: '68.000 đ', unit: 'Chai 250ml', imageEmoji: '🍶', category: 'spices', inStock: true },
+      { id: 'cx-6', name: 'Bí đỏ hồ lô dẻo ngọt', price: 25000, priceFormatted: '25.000 đ', unit: 'Quả ~1.2kg', imageEmoji: '🎃', category: 'produce', inStock: true }
+    ]
   },
   {
-    id: 'store-2',
-    name: 'Annam Gourmet Phan Xích Long',
-    tagline: 'Nhập khẩu & Organic · Đầy đủ nấm cao cấp & Tamari',
-    address: '41-43 Phan Xích Long, Phường 3, Quận Phú Nhuận, TP.HCM',
-    distance: 'Cách 1.2 km',
-    distanceKm: 1.2,
-    duration: '~5 phút đi xe',
+    id: 'store-winmart',
+    name: 'Bách Hóa Xanh & WinMart+ Phan Xích Long',
+    tagline: 'Siêu thị thực phẩm tươi sạch · Đa dạng rau củ & nấm tươi',
+    address: '92 Phan Xích Long, Phường 3, Quận Phú Nhuận, TP.HCM',
+    distance: 'Cách 650m',
+    distanceKm: 0.65,
+    duration: '~2 phút đi xe',
     rating: 4.7,
-    reviewsCount: 180,
-    hours: 'Mở cửa · 08:00 - 22:00',
+    reviewsCount: 215,
+    hours: 'Mở cửa · 06:30 - 22:00',
     matchCount: 14,
     totalNeeded: 16,
     matchPercent: 88,
-    priceEstimate: '~340.000 đ',
+    priceEstimate: '~210.000 đ',
     statusBadge: 'Khớp 14/16 nguyên liệu',
     badgeType: 'high',
     category: 'SUPERMARKET',
-    categoryLabel: 'Siêu thị cao cấp & Nhập khẩu',
-    notes: 'Đầy đủ nấm nhập khẩu, đậu gà hữu cơ Bio, nước tương Tamari Clearspring đạt chuẩn hữu cơ EU.',
-    missingNote: 'Giá trung bình cao hơn nông sản nội địa ~15%, chất lượng nguyên liệu đạt chuẩn quốc tế.',
-    featuredItems: ['Tamari Clearspring', 'Đậu gà hữu cơ Bio', 'Nấm Portobello', 'Yến mạch hữu cơ'],
-    lat: 10.7960,
-    lon: 106.6915,
-    phone: '028 3517 8899',
+    categoryLabel: 'Siêu thị thực phẩm',
+    notes: 'Rau củ chuẩn VietGAP kiểm định mỗi sáng, quầy nấm tươi phong phú, đậu hũ chiên sẵn.',
+    featuredItems: ['Cải thìa tươi', 'Nấm kim châm', 'Cà chua Đà Lạt', 'Bắp ngọt', 'Đậu hũ trắng'],
+    lat: 10.7972,
+    lon: 106.6905,
+    phone: '1900 1908',
+    catalog: [
+      { id: 'wm-1', name: 'Cải thìa xanh giòn ngọt', price: 19000, priceFormatted: '19.000 đ', unit: 'Bó 500g', imageEmoji: '🥬', category: 'produce', inStock: true },
+      { id: 'wm-2', name: 'Nấm kim châm tươi', price: 14000, priceFormatted: '14.000 đ', unit: 'Gói 150g', imageEmoji: '🍄', category: 'produce', inStock: true },
+      { id: 'wm-3', name: 'Cà chua Đà Lạt chín mọng', price: 20000, priceFormatted: '20.000 đ', unit: 'Túi 500g', imageEmoji: '🍅', category: 'produce', inStock: true },
+      { id: 'wm-4', name: 'Bắp ngọt giống Mỹ', price: 22000, priceFormatted: '22.000 đ', unit: 'Túi 2 bắp', imageEmoji: '🌽', category: 'produce', inStock: true },
+      { id: 'wm-5', name: 'Đậu hũ chiên vàng giòn', price: 16000, priceFormatted: '16.000 đ', unit: 'Hộp 3 miếng', imageEmoji: '🧈', category: 'protein', inStock: true }
+    ]
   },
   {
-    id: 'store-3',
-    name: 'Dalat GAP Store - Nông Sản Sạch Phú Nhuận',
-    tagline: 'Rau Củ Tươi Về Sáng Nay · VietGAP chuẩn kiểm nghiệm',
-    address: '152 Cô Giang, Phường 2, Quận Phú Nhuận, TP.HCM',
-    distance: 'Cách 1.6 km',
-    distanceKm: 1.6,
-    duration: '~6 phút đi xe',
+    id: 'store-thien-duyen',
+    name: 'Quán Cơm Chay Thiện Duyên & Đặc Sản Chay',
+    tagline: 'Cơm chay & Món ăn chế biến sẵn giao nhanh trong 20 phút',
+    address: '45 Cô Giang, Phường 2, Quận Phú Nhuận, TP.HCM',
+    distance: 'Cách 900m',
+    distanceKm: 0.9,
+    duration: '~3 phút đi xe',
+    rating: 4.8,
+    reviewsCount: 310,
+    hours: 'Mở cửa · 07:00 - 20:30',
+    matchCount: 16,
+    totalNeeded: 16,
+    matchPercent: 100,
+    priceEstimate: '~150.000 đ',
+    statusBadge: 'Quán chay chuẩn vị',
+    badgeType: 'high',
+    category: 'VEGAN_STORE',
+    categoryLabel: 'Quán chay & Tiệm đồ chay',
+    notes: 'Quán chay lâu năm với các món mặn chay chế biến sẵn, chả lụa chay, súp nấm hạt sen và bún lứt xào.',
+    featuredItems: ['Cơm chiên mì gói chay', 'Đậu khìa nước dừa', 'Canh chua thanh mát', 'Chả lụa chay'],
+    lat: 10.7945,
+    lon: 106.6870,
+    phone: '028 3845 6789',
+    catalog: [
+      { id: 'td-1', name: 'Cơm chiên mì gói chay giòn rụm', price: 38000, priceFormatted: '38.000 đ', unit: 'Hộp cơm đầy đủ', imageEmoji: '🍛', category: 'ready_meal', inStock: true },
+      { id: 'td-2', name: 'Đậu khìa nước dừa đưa cơm', price: 42000, priceFormatted: '42.000 đ', unit: 'Phần 2 người', imageEmoji: '🥘', category: 'ready_meal', inStock: true },
+      { id: 'td-3', name: 'Canh chua rau củ nấm thanh nhiệt', price: 35000, priceFormatted: '35.000 đ', unit: 'Tô lớn', imageEmoji: '🍲', category: 'ready_meal', inStock: true },
+      { id: 'td-4', name: 'Bún gạo lứt xào nấm ngũ sắc', price: 45000, priceFormatted: '45.000 đ', unit: 'Đĩa suất ăn', imageEmoji: '🍜', category: 'ready_meal', inStock: true },
+      { id: 'td-5', name: 'Chả lụa chay thủ công từ nấm', price: 40000, priceFormatted: '40.000 đ', unit: 'Đòn 250g', imageEmoji: '🥢', category: 'protein', inStock: true }
+    ]
+  },
+  {
+    id: 'store-convenience',
+    name: 'FamilyMart & Ministop 24h Hoàng Hoa Thám',
+    tagline: 'Cửa hàng tiện lợi 24/7 · Cơm nắm chay Onigiri & Sữa hạt dinh dưỡng',
+    address: '12 Hoàng Hoa Thám, Phường 7, Quận Bình Thạnh, TP.HCM',
+    distance: 'Cách 1.3 km',
+    distanceKm: 1.3,
+    duration: '~5 phút đi xe',
     rating: 4.6,
-    reviewsCount: 62,
-    hours: 'Mở cửa · 06:30 - 20:00',
-    matchCount: 12,
+    reviewsCount: 88,
+    hours: 'Mở cửa cả ngày · 24/24',
+    matchCount: 10,
     totalNeeded: 16,
-    matchPercent: 75,
-    priceEstimate: '~195.000 đ',
-    statusBadge: 'Khớp 12/16 nguyên liệu',
+    matchPercent: 65,
+    priceEstimate: '~90.000 đ',
+    statusBadge: 'Tiện lợi 24/7',
     badgeType: 'medium',
-    category: 'GROCERY_STORE',
-    categoryLabel: 'Cửa hàng nông sản sạch',
-    notes: 'Đầy đủ rau thơm, nấm rơm tươi búp, bí đỏ hạt dẻ, bắp ngọt hái trong ngày.',
-    missingNote: 'Thiếu các gia vị lên men đặc thù lâu năm (nước tương Tamari).',
-    featuredItems: ['Cà rốt Đà Lạt', 'Nấm đùi gà baby', 'Mướp hương', 'Bắp ngọt'],
-    lat: 10.7932,
-    lon: 106.6880,
-    phone: '028 3844 7120',
+    category: 'CONVENIENCE',
+    categoryLabel: 'Cửa hàng tiện lợi',
+    notes: 'Phục vụ bữa ăn chay nhanh: Onigiri rong biển chay, sữa hạt óc chó/đậu nành nguyên chất, bánh bao chay.',
+    featuredItems: ['Cơm nắm Onigiri chay', 'Sữa hạt đậu nành Fami', 'Bánh bao nấm chay', 'Nước khoáng Lavie'],
+    lat: 10.8035,
+    lon: 106.6940,
+    phone: '028 3551 2233',
+    catalog: [
+      { id: 'fm-1', name: 'Cơm nắm Onigiri rong biển chay', price: 16000, priceFormatted: '16.000 đ', unit: 'Cái', imageEmoji: '🍙', category: 'ready_meal', inStock: true },
+      { id: 'fm-2', name: 'Sữa đậu nành hạt óc chó hữu cơ', price: 14000, priceFormatted: '14.000 đ', unit: 'Hộp 200ml', imageEmoji: '🥛', category: 'beverage', inStock: true },
+      { id: 'fm-3', name: 'Bánh bao chay nhân nấm tươi', price: 15000, priceFormatted: '15.000 đ', unit: 'Cái nóng hổi', imageEmoji: '🥟', category: 'ready_meal', inStock: true }
+    ]
   },
   {
-    id: 'store-4',
-    name: 'Chợ Tân Định & Chợ Bến Thành (Khu Nông Sản & Đậu Hũ)',
-    tagline: 'Nông sản dân sinh tươi mới mỗi sáng · Đậu hũ nóng tại chỗ',
-    address: '336 Hai Bà Trưng, Phường Tân Định, Quận 1, TP.HCM',
-    distance: 'Cách 1.8 km',
-    distanceKm: 1.8,
-    duration: '~6 phút đi xe',
-    rating: 4.5,
-    reviewsCount: 210,
-    hours: 'Mở cửa · 05:30 - 18:30',
-    matchCount: 13,
-    totalNeeded: 16,
-    matchPercent: 81,
-    priceEstimate: '~175.000 đ',
-    statusBadge: 'Khớp 13/16 nguyên liệu',
-    badgeType: 'medium',
-    category: 'MARKET',
-    categoryLabel: 'Chợ dân sinh truyền thống',
-    notes: 'Khu sạp rau củ Đà Lạt phong phú, đậu hũ mơ nóng mới ép mẻ sáng, giá thành tiết kiệm nhất.',
-    missingNote: 'Cần tự chọn lọc nguồn hàng và hỏi kỹ xuất xứ hữu cơ.',
-    featuredItems: ['Đậu hũ nóng', 'Nấm rơm tươi', 'Hạt sen tươi Huế', 'Hành boa-rô'],
-    lat: 10.7895,
-    lon: 106.6908,
-    phone: '028 3824 1234',
-  },
-  {
-    id: 'store-5',
-    name: 'Điện Máy Xanh & Bếp Gia Dụng Phan Xích Long',
-    tagline: 'Thiết bị bảo quản thực phẩm, máy xay hạt & hộp chân không',
+    id: 'store-appliance',
+    name: 'Điện Máy Xanh & Bếp Thực Vật Phan Xích Long',
+    tagline: 'Chuỗi Điện Máy Xanh chính hãng · Hộp hút chân không & Thiết bị bảo quản',
     address: '312 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM',
     distance: 'Cách 1.1 km',
     distanceKm: 1.1,
@@ -353,15 +390,19 @@ export const SMART_MARKET_STORES: SmartMarketStore[] = [
     matchCount: 16,
     totalNeeded: 16,
     matchPercent: 100,
-    priceEstimate: 'Thiết bị bếp & bảo quản',
+    priceEstimate: 'Thiết bị & Bảo quản',
     statusBadge: 'Thiết bị & Bảo quản lạnh',
     badgeType: 'appliance',
     category: 'APPLIANCE',
-    categoryLabel: 'Thiết bị & Bảo quản',
+    categoryLabel: 'Điện Máy Xanh & Bếp',
     notes: 'Chuỗi Điện Máy Xanh chính hãng - cung cấp dụng cụ sơ chế rau củ, máy ép chậm và hộp bảo quản lạnh cho căn bếp thực vật.',
     featuredItems: ['Hộp thủy tinh chân không', 'Máy xay sữa hạt', 'Nồi áp suất nấu đậu', 'Tủ lạnh Inverter'],
     lat: 10.8010,
     lon: 106.6875,
     phone: '1800 1061',
-  },
+    catalog: [
+      { id: 'dmx-1', name: 'Bộ 3 hộp thủy tinh Lock&Lock giữ tươi rau củ', price: 189000, priceFormatted: '189.000 đ', unit: 'Bộ 3 hộp', imageEmoji: '🍱', category: 'equipment', inStock: true },
+      { id: 'dmx-2', name: 'Máy làm sữa hạt & xay mịn thực vật Tefal', price: 890000, priceFormatted: '890.000 đ', unit: 'Chiếc', imageEmoji: '⚙️', category: 'equipment', inStock: true }
+    ]
+  }
 ];

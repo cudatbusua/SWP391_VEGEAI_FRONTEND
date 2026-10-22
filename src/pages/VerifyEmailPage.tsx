@@ -40,9 +40,9 @@ export function VerifyEmailPage() {
   };
   return <AuthLayout bannerImage="https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1000&q=80"
     bannerBadge="VEGEAI" bannerTitle="Bắt đầu hành trình ăn xanh" bannerDescription="Xác minh email để kích hoạt tài khoản của bạn.">
-    <h1 className="text-3xl font-extrabold mb-4">Xác minh email</h1>
-    <p className="text-sm text-gray-600 mb-5" role="status">{message}</p>
-    {error && <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>}
+    <h1 className="text-3xl font-extrabold mb-4 text-gray-900 dark:text-white">Xác minh email</h1>
+    <p className="text-sm text-gray-600 dark:text-slate-400 mb-5" role="status">{message}</p>
+    {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>}
     {verified ? <Link to="/login"><Button fullWidth>Đăng nhập</Button></Link> : <form onSubmit={submit} className="space-y-4">
       <Input label="Email đăng ký" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
       <Input label="Mã OTP" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} required />
@@ -50,7 +50,7 @@ export function VerifyEmailPage() {
       <Button type="button" variant="outline" fullWidth disabled={busy || cooldown > 0} onClick={resend}>
         {cooldown > 0 ? `Gửi lại mã sau ${cooldown}s` : 'Gửi lại mã OTP'}
       </Button>
-      <Link className="text-sm text-emerald-700 block text-center" to="/login">Quay lại đăng nhập</Link>
+      <Link className="text-sm text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 block text-center" to="/login">Quay lại đăng nhập</Link>
     </form>}
   </AuthLayout>;
 }

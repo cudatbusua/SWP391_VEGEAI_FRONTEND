@@ -1,11 +1,12 @@
 import { apiRequest } from './apiClient';
 import type { ApiResponse, PageResponse } from '../types/api';
-import type { BlogCategory, BlogInput, BlogPost, BlogStatus } from '../types/blog';
+import type { BlogCategory, BlogComment, BlogInput, BlogPost, BlogStatus } from '../types/blog';
 
 function data<T>(response: ApiResponse<T>): T {
   if (!response.data) throw new Error('Máy chủ không trả về dữ liệu bài viết.');
   return response.data;
 }
+
 export const blogService = {
   async published(params: { keyword?: string; category?: BlogCategory | ''; page: number }, signal?: AbortSignal) {
     const query = new URLSearchParams({ page: String(params.page), size: '9' });
@@ -47,4 +48,16 @@ export const blogService = {
   async review(id: string, version: number, decision: 'APPROVE' | 'REJECT', reason: string) {
     return data(await apiRequest<BlogPost>('/admin/blog/posts/' + encodeURIComponent(id) + '/review', { method: 'POST', body: { version, decision, reason } }));
   },
+
+  // ── Comments & 5-Star Ratings ──────────────────────────────────────────────
+  async getComments(postId: string, signal?: AbortSignal): Promise<BlogComment[]> {
+    try {
+      return data(await apiRequest<BlogComment[]>('/blog/posts/' + encodeURIComponent(postId) + '/comments', { auth: 'none', signal }));
+    } catch {
+      return [];
+    }
+  },
+  async addComment(postId: string, input: { content: string; rating: number }): Promise<BlogComment> {
+    return data(await apiRequest<BlogComment>('/blog/posts/' + encodeURIComponent(postId) + '/comments', { method: 'POST', body: input }));
+  }
 };

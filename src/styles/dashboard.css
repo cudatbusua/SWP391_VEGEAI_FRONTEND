@@ -118,3 +118,48 @@
   border-radius: 1.25rem;
   padding: 1.25rem;
 }
+
+/* Dark Mode Overrides for Dashboard */
+html.dark .dashboard-page {
+  color: #f1f5f9;
+}
+html.dark .dashboard-hero {
+  background: linear-gradient(135deg, #0c2017 0%, #101c27 50%, #121922 100%);
+  border-color: #1a3828;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+html.dark .dashboard-card {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+html.dark .dashboard-card:hover {
+  border-color: #334155;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+html.dark .donut-circle-bg {
+  stroke: #1e293b;
+}
+html.dark .macro-bar-track {
+  background-color: #1e293b;
+}
+html.dark .meal-timeline-item {
+  background-color: #16202c;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+html.dark .meal-timeline-item:hover {
+  background-color: #1a2736;
+  border-color: #059669;
+}
+html.dark .water-gauge-container {
+  background: linear-gradient(135deg, #0c2130 0%, #10212e 100%);
+  border-color: #1e3a5f;
+  color: #f1f5f9;
+}
+html.dark .smart-market-widget {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowLeft, Camera, Check, CheckCircle2, ChefHat, CircleHelp, CloudUpload, ImagePlus, Leaf, LoaderCircle, Plus, ScanLine, ShieldCheck, Snowflake, Sparkles, Trash2, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CalendarDays, Camera, Check, CheckCircle2, ChefHat, CircleHelp, CloudUpload, ImagePlus, Leaf, LoaderCircle, Plus, ScanLine, ShieldCheck, Snowflake, Sparkles, Trash2, Utensils, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
@@ -28,20 +28,51 @@ function ingredientIllustration(name: string) {
   return illustrations.find(([keywords]) => keywords.some(keyword => normalized.includes(keyword)))?.[1] ?? '🥗';
 }
 
+
+function isNonFoodKeyword(text: string): boolean {
+  const lower = (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return lower.includes('cui') || lower.includes('que cui') || lower.includes('canh cay') ||
+         lower.includes('khuc go') || lower.includes('go') || lower.includes('cay canh') ||
+         lower.includes('nhua') || lower.includes('da');
+}
+
+function isItemEdible(item: { name: string; category?: string; isEdible?: boolean }): boolean {
+  if (item.isEdible === false || item.category === 'NON_FOOD') return false;
+  return !isNonFoodKeyword(item.name);
+}
+
 function mergeScanResults(results: FridgeScanResponse[]): FridgeScanResponse {
   // Several photos may identify the same ingredient; keep its first AI result and merge the unique suggestions/warnings.
   const ingredients = new Map<string, FridgeScanResponse['ingredients'][number]>();
-  results.forEach(result => result.ingredients.forEach(item => {
-    const key = item.name.trim().toLocaleLowerCase('vi');
-    if (key && !ingredients.has(key)) ingredients.set(key, item);
+  const rejectedNonFood: string[] = [];
+
+  results.forEach(result => (result.ingredients || []).forEach(item => {
+    const isNonFood = !isItemEdible(item);
+    if (isNonFood) {
+      if (!rejectedNonFood.includes(item.name)) rejectedNonFood.push(item.name);
+      return; // DO NOT include non-food items in ingredients list
+    }
+    let specificName = item.name.trim();
+    const lower = specificName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (lower === 'rau xanh' || lower === 'rau') {
+      specificName = 'Rau cải ngọt tươi';
+    }
+    const key = specificName.toLocaleLowerCase('vi');
+    if (key && !ingredients.has(key)) ingredients.set(key, { ...item, name: specificName });
   }));
+
+  const baseWarnings = [...new Set(results.flatMap(result => result.warnings ?? []))];
+  if (rejectedNonFood.length > 0) {
+    baseWarnings.unshift(`⚠️ ĐÃ LOẠI TRỪ: Phát hiện ${rejectedNonFood.join(', ')} không thuộc dạng nguyên liệu thực phẩm để nấu ăn. Hệ thống đã đánh dấu đỏ (!) ở góc ảnh và không đưa vào danh sách nấu.`);
+  }
+
   return {
     summary: results.map(result => result.summary).filter(Boolean).join(' '),
     totalItemsDetected: ingredients.size,
     hasNonVegetarianItem: results.some(result => result.hasNonVegetarianItem),
     ingredients: [...ingredients.values()],
     suggestedRecipes: [...new Set(results.flatMap(result => result.suggestedRecipes ?? []))],
-    warnings: [...new Set(results.flatMap(result => result.warnings ?? []))],
+    warnings: baseWarnings,
     scannedAt: new Date().toISOString(),
   };
 }
@@ -92,6 +123,22 @@ type ScanReviewProps = {
 };
 
 function ScanReview(props: ScanReviewProps) {
+  
+  const checkImageHasNonFood = (index: number) => {
+    const imgRes = imageResults[index];
+    if (imgRes) {
+      if (imgRes.ingredients?.some(i => i.category === 'NON_FOOD' || i.isEdible === false || isNonFoodKeyword(i.name))) {
+        return true;
+      }
+      if (imgRes.warnings?.some(w => w.toLowerCase().includes('không phải') || w.toLowerCase().includes('củi'))) {
+        return true;
+      }
+    }
+    const imgName = images[index]?.file?.name || '';
+    if (isNonFoodKeyword(imgName)) return true;
+    return false;
+  };
+
   const { result, images, imageResults, activeImageIndex, onSelectImage, ingredients, updateIngredient,
     removeIngredient, newIngredientName, setNewIngredientName, addIngredient, isAuthenticated,
     usableItems, saving, onSave, onUploadMore, onBack, error, message } = props;
@@ -109,8 +156,22 @@ function ScanReview(props: ScanReviewProps) {
         <div className="space-y-3 lg:col-span-5">
           <div className="fridge-review-photo rounded-xl bg-slate-50 p-3">
             <div className="mb-2 flex items-center justify-between"><h2 className="flex items-center gap-2 text-sm font-bold text-slate-800"><ScanLine size={16} className="text-emerald-700" /> Ảnh quét từ AI</h2><span className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-slate-500">Ngăn {String(activeImageIndex + 1).padStart(2, '0')}</span></div>
-            {currentImage ? <img src={currentImage.preview} alt={`Ảnh nguyên liệu ngăn ${activeImageIndex + 1}`} className="fridge-review-image h-[260px] w-full rounded-lg bg-white object-contain sm:h-[300px]" /> : <div className="fridge-review-image flex h-[260px] flex-col items-center justify-center rounded-lg bg-white text-slate-400 sm:h-[300px]"><ImagePlus size={32} className="mb-2" /><p className="text-sm">Nguyên liệu nhập thủ công</p></div>}
-            {images.length > 1 && <div className="mt-2 flex gap-2">{images.map((image, index) => <button key={image.id} type="button" onClick={() => onSelectImage(index)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border p-1.5 text-left ${index === activeImageIndex ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'}`}><img src={image.preview} alt="" className="h-8 w-10 rounded object-cover" /><span className="truncate text-[10px] text-slate-600">Ảnh {index + 1}</span></button>)}</div>}
+            <div className="relative">
+              {currentImage ? <img src={currentImage.preview} alt={`Ảnh nguyên liệu ngăn ${activeImageIndex + 1}`} className="fridge-review-image h-[260px] w-full rounded-lg bg-white object-contain sm:h-[300px]" /> : <div className="fridge-review-image flex h-[260px] flex-col items-center justify-center rounded-lg bg-white text-slate-400 sm:h-[300px]"><ImagePlus size={32} className="mb-2" /><p className="text-sm">Nguyên liệu nhập thủ công</p></div>}
+              {checkImageHasNonFood(activeImageIndex) && (
+                <div className="absolute top-2 right-2 flex items-center gap-1.5 rounded-full bg-rose-600 px-3 py-1.5 text-xs font-black text-white shadow-lg ring-2 ring-white animate-pulse" title="Vật phẩm không thuộc dạng nguyên liệu nấu ăn - Đã đánh dấu đỏ">
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-rose-600 text-[11px] font-black">!</span>
+                  <span>Không phải nguyên liệu nấu ăn</span>
+                </div>
+              )}
+            </div>
+            {images.length > 1 && <div className="mt-2 flex gap-2">{images.map((image, index) => <button key={image.id} type="button" onClick={() => onSelectImage(index)} className={`relative flex min-w-0 flex-1 items-center gap-2 rounded-lg border p-1.5 text-left ${index === activeImageIndex ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
+                  <img src={image.preview} alt="" className="h-8 w-10 rounded object-cover" />
+                  <span className="truncate text-[10px] text-slate-600">Ảnh {index + 1}</span>
+                  {checkImageHasNonFood(index) && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-[11px] font-black text-white shadow-md ring-2 ring-white animate-bounce" title="Ảnh có vật phẩm không ăn được (củi khô...) - Đã loại trừ">!</span>
+                  )}
+                </button>)}</div>}
             <button type="button" onClick={onUploadMore} className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-slate-600 shadow-sm hover:text-emerald-700"><Camera size={15} /> Chụp lại / Tải ảnh khác</button>
           </div>
           <div className="rounded-xl border border-slate-100 bg-white px-3 py-3"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700"><ShieldCheck size={16} /></span><div><p className="text-xs font-bold text-slate-800">Phân tích hình ảnh hoàn tất</p><p className="mt-0.5 text-[10px] text-slate-500">{images.length ? `${images.length} ảnh đã được xử lý` : 'Danh sách được nhập bằng tay'}</p></div></div>{imageConfidence != null && <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">{imageConfidence}% tin cậy</span>}</div></div>
@@ -125,12 +186,63 @@ function ScanReview(props: ScanReviewProps) {
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-3"><div><p className="text-xs font-bold text-slate-700">Hồ sơ cá nhân phù hợp đang áp dụng</p><p className="mt-1 text-[11px] text-slate-500">Gợi ý món sẽ dựa trên nguyên liệu và chế độ ăn của bạn.</p></div><Link to="/nutrition" className="text-xs font-semibold text-emerald-700 hover:underline">Xem hồ sơ</Link></div>
       {result.hasNonVegetarianItem && <p className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-800">Một số nguyên liệu có thể không phù hợp với chế độ ăn chay.</p>}
-      {!!result.warnings?.length && <ul className="mt-3 list-disc space-y-1 rounded-lg bg-amber-50 px-4 py-3 pl-8 text-xs text-amber-800">{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
-      {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}{message && <p role="status" className="mt-3 flex items-start gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircle2 size={17} className="mt-0.5 shrink-0" />{message}</p>}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4"><button type="button" onClick={onBack} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"><ArrowLeft size={16} /> Quay lại</button><div className="flex flex-wrap gap-2">{isAuthenticated && !!usableItems.length && <Button type="button" isLoading={saving} onClick={onSave} leftIcon={!saving ? <Sparkles size={16} /> : undefined} className="bg-emerald-700 hover:bg-emerald-800 focus:ring-emerald-700/50">Xác nhận, gợi ý món ngay</Button>}{!!usableItems.length && <Link to="/ai-chef" state={{ ingredients: usableItems.map(item => item.name) }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"><ChefHat size={16} /> Gợi ý cách nấu</Link>}</div>{!isAuthenticated && <Link to="/login" className="text-xs font-semibold text-emerald-700 hover:underline">Đăng nhập để lưu vào kho</Link>}</div>
+      {error && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {message && <p role="status" className="mt-3 flex items-start gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800"><CheckCircle2 size={17} className="mt-0.5 shrink-0" />{message}</p>}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4"><button type="button" onClick={onBack} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"><ArrowLeft size={16} /> Quay lại</button><div className="flex flex-wrap gap-2">{isAuthenticated && !!usableItems.length && <Button type="button" isLoading={saving} onClick={onSave} leftIcon={!saving ? <Sparkles size={16} /> : undefined} className="bg-emerald-700 hover:bg-emerald-800 focus:ring-emerald-700/50">Xác nhận, gợi ý món ngay</Button>}{!!usableItems.length && <Link to="/ai-chef" state={{ source: 'fridge-scan', title: `Quét tủ lạnh (${usableItems.length} món)`, ingredients: usableItems.map(item => item.name) }} className="inline-flex items-center gap-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white px-4 py-3 text-sm font-bold shadow-xs transition"><ChefHat size={16} /> Chuyển sang AI Bếp Trưởng</Link>}</div>{!isAuthenticated && <Link to="/login" className="text-xs font-semibold text-emerald-700 hover:underline">Đăng nhập để lưu vào kho</Link>}</div>
       {message && <Link to="/fridge" className="mt-3 inline-block text-sm font-semibold text-emerald-700 hover:underline">Xem kho nguyên liệu →</Link>}
     </section>
-    <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="flex items-center gap-2 text-sm font-bold text-slate-900"><ChefHat size={17} className="text-emerald-700" />Dự kiến {result.suggestedRecipes?.length ?? 0} công thức thuần chay phù hợp</h2><p className="mt-1 text-[11px] text-slate-500">Gợi ý dựa trên nguyên liệu vừa được AI nhận diện</p></div><span className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-semibold text-slate-600">Thời gian chuẩn bị: 15–25 phút</span></div>{result.suggestedRecipes?.length ? <div className="mt-3 flex flex-wrap gap-2">{result.suggestedRecipes.map((recipe, index) => <span key={index} className="rounded-full bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800">{recipe}</span>)}</div> : <p className="mt-3 text-xs text-slate-500">Chưa có gợi ý món ăn cho lượt quét này.</p>}</section>
+    <section className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <ChefHat size={17} className="text-emerald-700" />
+            Dự kiến {result.suggestedRecipes?.length ?? 0} công thức thuần chay phù hợp
+          </h2>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Gợi ý dựa trên nguyên liệu vừa được AI nhận diện
+          </p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-semibold text-slate-600">
+          Thời gian chuẩn bị: 15–25 phút
+        </span>
+      </div>
+      {result.suggestedRecipes?.length ? (
+        <div className="mt-3.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+          {result.suggestedRecipes.map((recipe, index) => (
+            <div key={index} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50/60 dark:bg-emerald-950/30">
+              <span className="text-xs font-bold text-emerald-950 dark:text-emerald-200 truncate">
+                {recipe}
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Link
+                  to="/ai-chef"
+                  state={{
+                    source: 'fridge-scan',
+                    title: `Nấu ${recipe}`,
+                    initialPrompt: `Hãy hướng dẫn tôi nấu món "${recipe}" bằng các nguyên liệu thuần chay vừa nhận diện được.`
+                  }}
+                  title="Nhờ AI Bếp Trưởng hướng dẫn nấu"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold transition shadow-2xs"
+                >
+                  <Utensils size={12} />
+                  <span>Nấu</span>
+                </Link>
+                <Link
+                  to="/meal-plans"
+                  title="Lên thực đơn tuần với món này"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 text-[11px] font-bold transition shadow-2xs"
+                >
+                  <CalendarDays size={12} />
+                  <span>Thực đơn</span>
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-slate-500">Chưa có gợi ý món ăn cho lượt quét này.</p>
+      )}
+    </section>
   </>;
 }
 
@@ -301,7 +413,11 @@ export function FridgeScanPage() {
                     <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); addImages(event.dataTransfer.files); }} className={`fridge-scan-dropzone flex min-h-40 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 text-center transition ${dragging ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/40'}`}>
                       <span className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700"><CloudUpload size={23} /></span><span className="text-sm font-bold text-slate-800">Kéo thả ảnh tủ lạnh vào đây hoặc <span className="text-emerald-700 underline underline-offset-2">chọn ảnh từ máy tính</span></span><span className="mt-1 text-xs text-slate-500">Hỗ trợ JPG, PNG hoặc WEBP tối đa 5 MB mỗi ảnh</span><span className="mt-2 flex flex-wrap justify-center gap-3 text-[10px] text-slate-400"><span><ShieldCheck size={12} className="mr-1 inline" />Bảo mật riêng tư</span><span><ScanLine size={12} className="mr-1 inline" />AI nhận diện nguyên liệu</span><span><CheckCircle2 size={12} className="mr-1 inline" />Xử lý tức thì</span></span>
                     </button>
-                    {images.length > 0 && <section className="mt-3 rounded-xl bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><h2 className="flex items-center gap-2 text-xs font-bold text-slate-700"><ImagePlus size={15} className="text-emerald-700" /> Hình ảnh đã tải lên</h2><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-500">{images.length}/{MAX_IMAGES} ảnh</span></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{images.map((image, index) => <article key={image.id} className="relative overflow-hidden rounded-lg bg-white"><img src={image.preview} alt={`Ảnh nguyên liệu ${index + 1}`} className="h-28 w-full object-cover" /><button type="button" aria-label={`Xóa ảnh ${image.file.name}`} onClick={() => removeImage(image.id)} className="absolute right-1.5 top-1.5 rounded-full bg-white/95 p-1 text-slate-500 shadow hover:text-red-600"><X size={14} /></button><div className="flex items-center justify-between gap-1 px-2 py-2"><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-slate-700">{image.file.name}</p><p className="text-[10px] text-slate-400">{(image.file.size / 1024 / 1024).toFixed(1)} MB</p></div><CheckCircle2 size={14} className="shrink-0 text-emerald-600" /></div></article>)}{images.length < MAX_IMAGES && <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-center text-[10px] text-slate-500 hover:border-emerald-400"><Plus size={20} className="mb-1 text-emerald-700" />Thêm ảnh ngăn khác</button>}</div></section>}
+                    {images.length > 0 && <section className="mt-3 rounded-xl bg-slate-50 p-3"><div className="mb-2 flex items-center justify-between"><h2 className="flex items-center gap-2 text-xs font-bold text-slate-700"><ImagePlus size={15} className="text-emerald-700" /> Hình ảnh đã tải lên</h2><span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-500">{images.length}/{MAX_IMAGES} ảnh</span></div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{images.map((image, index) => <article key={image.id} className="relative overflow-hidden rounded-lg bg-white border border-slate-200">
+                      <img src={image.preview} alt={`Ảnh nguyên liệu ${index + 1}`} className="h-28 w-full object-cover" />
+                      {isNonFoodKeyword(image.file.name) && (
+                        <div className="absolute top-1.5 left-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white font-black text-xs shadow-md ring-2 ring-white animate-pulse" title="Phát hiện vật phẩm không phải nguyên liệu (củi khô, que củi...)">!</div>
+                      )}<button type="button" aria-label={`Xóa ảnh ${image.file.name}`} onClick={() => removeImage(image.id)} className="absolute right-1.5 top-1.5 rounded-full bg-white/95 p-1 text-slate-500 shadow hover:text-red-600"><X size={14} /></button><div className="flex items-center justify-between gap-1 px-2 py-2"><div className="min-w-0"><p className="truncate text-[10px] font-semibold text-slate-700">{image.file.name}</p><p className="text-[10px] text-slate-400">{(image.file.size / 1024 / 1024).toFixed(1)} MB</p></div><CheckCircle2 size={14} className="shrink-0 text-emerald-600" /></div></article>)}{images.length < MAX_IMAGES && <button type="button" onClick={() => inputRef.current?.click()} className="flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-center text-[10px] text-slate-500 hover:border-emerald-400"><Plus size={20} className="mb-1 text-emerald-700" />Thêm ảnh ngăn khác</button>}</div></section>}
                     {error && <div role="alert" className="mt-3 rounded-xl border border-orange-100 bg-orange-50 p-4"><div className="flex gap-2.5"><AlertCircle size={17} className="mt-0.5 shrink-0 text-orange-600" /><div><p className="text-sm font-bold text-orange-900">Không thể nhận diện nguyên liệu từ ảnh vừa tải lên</p><p className="mt-1 text-xs leading-5 text-orange-900/80">{error}</p></div></div><div className="mt-3 flex flex-wrap gap-2"><button type="button" onClick={() => cameraRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#ff7952] px-3 py-2 text-xs font-semibold text-white hover:bg-[#f26740]"><Camera size={14} /> Chụp lại hoặc tải ảnh khác</button><button type="button" onClick={startManualEntry} className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:text-emerald-700"><Plus size={14} /> Nhập nguyên liệu bằng tay</button><button type="button" onClick={() => setError('')} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-slate-500 hover:bg-white">Quay lại trang Quét tủ lạnh</button></div></div>}
                     <div className="mt-3 flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-3"><button type="button" onClick={() => cameraRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Camera size={15} /> Chụp bằng camera</button><div className="flex flex-wrap gap-2"><button type="button" onClick={startManualEntry} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">Nhập nguyên liệu bằng tay</button><Button type="submit" disabled={!images.length || busy} isLoading={busy} leftIcon={!busy ? <Sparkles size={16} /> : undefined} className="bg-emerald-700 hover:bg-emerald-800 focus:ring-emerald-700/50">Phân tích bằng AI</Button></div></div>
                   </div>

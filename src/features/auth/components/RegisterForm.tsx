@@ -92,19 +92,19 @@ export const RegisterForm: React.FC = () => {
       
       {/* Top Badge & Header (Image 1 & 2) */}
       <div className="mb-6">
-        <span className="text-[11px] font-bold text-emerald-800 tracking-wider uppercase mb-1.5 block">
+        <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 tracking-wider uppercase mb-1.5 block">
           Đăng ký tài khoản
         </span>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
           Bắt đầu hành trình sống xanh
         </h1>
-        <p className="text-xs text-gray-500 leading-relaxed">
+        <p className="text-xs text-gray-500 dark:text-slate-400 leading-relaxed">
           Tạo tài khoản để lưu trữ thực đơn AI và công thức yêu thích.
         </p>
       </div>
 
       {generalError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 flex items-center gap-2">
+        <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 rounded-xl text-xs text-red-600 dark:text-red-300 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
           <span>{generalError}</span>
         </div>
@@ -193,7 +193,7 @@ export const RegisterForm: React.FC = () => {
 
         {/* Checkbox điều khoản (Image 1 & 2) */}
         <div className="pt-1">
-          <label className="flex items-start gap-2.5 text-xs text-gray-600 cursor-pointer select-none">
+          <label className="flex items-start gap-2.5 text-xs text-gray-600 dark:text-slate-300 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={formData.agreeTerms}
@@ -201,15 +201,15 @@ export const RegisterForm: React.FC = () => {
                 setFormData({ ...formData, agreeTerms: e.target.checked });
                 if (errors.agreeTerms) setErrors({ ...errors, agreeTerms: '' });
               }}
-              className="mt-0.5 w-4 h-4 rounded text-emerald-600 border-gray-300 focus:ring-emerald-500 shrink-0"
+              className="mt-0.5 w-4 h-4 rounded text-emerald-600 border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-emerald-500 shrink-0"
             />
             <span className="leading-normal">
               Tôi đồng ý với{' '}
-              <a href="#" className="text-emerald-700 font-semibold hover:underline">
+              <a href="#" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">
                 Điều khoản sử dụng
               </a>{' '}
               và{' '}
-              <a href="#" className="text-emerald-700 font-semibold hover:underline">
+              <a href="#" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">
                 Chính sách bảo mật
               </a>{' '}
               của VEGEAI.
@@ -217,7 +217,7 @@ export const RegisterForm: React.FC = () => {
           </label>
 
           {errors.agreeTerms && (
-            <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1 font-medium">
+            <p className="mt-1.5 text-xs text-red-500 dark:text-red-400 flex items-center gap-1 font-medium">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
               <span>{errors.agreeTerms}</span>
             </p>
@@ -238,11 +238,11 @@ export const RegisterForm: React.FC = () => {
       </form>
 
       {/* Footer link: Đã có tài khoản? Đăng nhập (Image 1 & 2) */}
-      <div className="text-center text-xs text-gray-500 mt-6">
+      <div className="text-center text-xs text-gray-500 dark:text-slate-400 mt-6">
         <span>Đã có tài khoản? </span>
         <Link
           to="/login"
-          className="font-bold text-emerald-700 hover:text-emerald-800 hover:underline transition"
+          className="font-bold text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 hover:underline transition"
         >
           Đăng nhập
         </Link>

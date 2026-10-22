@@ -56,7 +56,7 @@ export function BlogBody({ content }: { content: string }) {
 
   const document = new DOMParser().parseFromString(content, 'text/html');
   const blockedTags = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'FORM', 'SVG', 'MATH']);
-  const allowedTags = new Set(['P', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'STRONG', 'B', 'EM', 'I', 'BLOCKQUOTE', 'BR', 'A', 'HR']);
+  const allowedTags = new Set(['P', 'H2', 'H3', 'H4', 'UL', 'OL', 'LI', 'STRONG', 'B', 'EM', 'I', 'BLOCKQUOTE', 'BR', 'A', 'HR', 'IMG', 'FIGURE', 'FIGCAPTION']);
   const renderNode = (node: Node, key: string): ReactNode => {
     if (node.nodeType === Node.TEXT_NODE) return node.textContent;
     if (!(node instanceof Element) || blockedTags.has(node.tagName)) return null;
@@ -76,6 +76,22 @@ export function BlogBody({ content }: { content: string }) {
       case 'BLOCKQUOTE': return <blockquote key={key}>{children}</blockquote>;
       case 'BR': return <br key={key} />;
       case 'HR': return <hr key={key} />;
+      case 'IMG': {
+        const src = node.getAttribute('src') || '';
+        const alt = node.getAttribute('alt') || 'Ảnh minh họa bài viết';
+        const safeSrc = /^(https?:|\/|data:image\/)/i.test(src) ? src : undefined;
+        return safeSrc ? (
+          <img
+            key={key}
+            src={safeSrc}
+            alt={alt}
+            loading="lazy"
+            className="rounded-2xl max-h-[500px] w-full object-cover my-4 shadow-xs border border-slate-200/80 dark:border-slate-800"
+          />
+        ) : null;
+      }
+      case 'FIGURE': return <figure key={key} className="my-4 text-center">{children}</figure>;
+      case 'FIGCAPTION': return <figcaption key={key} className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 italic text-center">{children}</figcaption>;
       case 'A': {
         const href = node.getAttribute('href') || '';
         const safeHref = /^(https?:|\/|#)/i.test(href) ? href : undefined;

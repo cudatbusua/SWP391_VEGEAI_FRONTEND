@@ -33,14 +33,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="w-full text-left">
         {label && (
-          <label htmlFor={inputId} className="block text-xs font-semibold text-gray-700 mb-1.5">
+          <label htmlFor={inputId} className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
             {label}
           </label>
         )}
 
         <div className="relative rounded-xl shadow-2xs">
           {leftIcon && (
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-slate-500">
               {leftIcon}
             </div>
           )}
@@ -56,8 +56,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               ${showPasswordToggle || isPassword ? 'pr-11' : 'pr-4'}
               ${
                 error
-                  ? 'border border-red-500 bg-white text-gray-900 focus:ring-2 focus:ring-red-200'
-                  : 'border border-gray-200 bg-gray-50/70 text-gray-900 hover:border-gray-300 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100'
+                  ? 'border border-red-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:ring-2 focus:ring-red-200 dark:focus:ring-red-950/50'
+                  : 'border border-gray-200 dark:border-slate-700 bg-gray-50/70 dark:bg-slate-800/90 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500 hover:border-gray-300 dark:hover:border-slate-600 focus:bg-white dark:focus:bg-slate-800 focus:border-emerald-500 dark:focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 dark:focus:ring-emerald-950/50'
               }
               ${className}
             `}
@@ -68,7 +68,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer transition"
+              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer transition"
               tabIndex={-1}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -77,12 +77,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         </div>
 
         {error ? (
-          <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1 font-medium">
+          <p className="mt-1.5 text-xs text-red-500 dark:text-red-400 flex items-center gap-1 font-medium">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>{error}</span>
           </p>
         ) : helperText ? (
-          <p className="mt-1 text-xs text-gray-400">{helperText}</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">{helperText}</p>
         ) : null}
       </div>
     );

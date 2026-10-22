@@ -14,11 +14,9 @@ const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage').then(module
 const AiChatPage = lazy(() => import('./pages/AiChatPage').then(module => ({ default: module.AiChatPage })));
 const FridgeScanPage = lazy(() => import('./pages/FridgeScanPage').then(module => ({ default: module.FridgeScanPage })));
 const FridgeInventoryPage = lazy(() => import('./pages/FridgeInventoryPage').then(module => ({ default: module.FridgeInventoryPage })));
-const NutritionCalculatorPage = lazy(() => import('./pages/NutritionCalculatorPage').then(module => ({ default: module.NutritionCalculatorPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then(module => ({ default: module.AdminPage })));
 const MealPlansPage = lazy(() => import('./pages/MealPlansPage').then(module => ({ default: module.MealPlansPage })));
 const AdminRecipesPage = lazy(() => import('./pages/AdminRecipesPage').then(module => ({ default: module.AdminRecipesPage })));
-const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage').then(module => ({ default: module.ChangePasswordPage })));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(module => ({ default: module.ResetPasswordPage })));
 const BlogPage = lazy(() => import('./pages/BlogPage').then(module => ({ default: module.BlogPage })));
 const BlogDetailPage = lazy(() => import('./pages/BlogPage').then(module => ({ default: module.BlogDetailPage })));
@@ -35,33 +33,42 @@ const AdminQuestionsPage = lazy(() => import('./pages/AdminQuestionsPage').then(
 const AdminQuestionDetailPage = lazy(() => import('./pages/AdminQuestionsPage').then(module => ({ default: module.AdminQuestionDetailPage })));
 const AdminVideosPage = lazy(() => import('./pages/AdminVideosPage').then(module => ({ default: module.AdminVideosPage })));
 const AdminVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.AdminVideoEditorPage })));
+const AdminAiMonitoringPage = lazy(() => import('./pages/AdminAiMonitoringPage').then(module => ({ default: module.AdminAiMonitoringPage })));
+import { ThemeProvider } from './store/ThemeContext';
+
+const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then(module => ({ default: module.AccountSettingsPage })));
 const SmartMarketPage = lazy(() => import('./pages/SmartMarketPage').then(module => ({ default: module.SmartMarketPage })));
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        {/* Defer each route bundle until navigation so maps, admin tools and editors stay off the initial download. */}
-        <Suspense fallback={<main className="min-h-[60vh] p-10 text-center text-sm font-medium text-slate-600" role="status">Đang tải trang...</main>}>
-        <Routes>
-          <Route path="/" element={<RecipeDiscoveryPage />} />
-          <Route path="/recipe/:id" element={<RecipeDetailPage />} />
-          <Route path="/dashboard" element={<PersonalFeatureBoundary><DashboardPage /></PersonalFeatureBoundary>} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/change-password" element={<PersonalFeatureBoundary><ChangePasswordPage /></PersonalFeatureBoundary>} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/ai-chef" element={<PersonalFeatureBoundary><AiChatPage /></PersonalFeatureBoundary>} />
-          <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />
-          <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
-          <Route path="/nutrition" element={<PersonalFeatureBoundary><NutritionCalculatorPage /></PersonalFeatureBoundary>} />
-          <Route path="/meal-plans" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          {/* Defer each route bundle until navigation so maps, admin tools and editors stay off the initial download. */}
+          <Suspense fallback={<main className="min-h-[60vh] p-10 text-center text-sm font-medium text-slate-600" role="status">Đang tải trang...</main>}>
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/explore" element={<RecipeDiscoveryPage />} />
+            <Route path="/recipes" element={<Navigate to="/explore" replace />} />
+            <Route path="/recipe/:id" element={<RecipeDetailPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/settings" element={<PersonalFeatureBoundary><AccountSettingsPage /></PersonalFeatureBoundary>} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/change-password" element={<Navigate to="/settings?tab=security" replace />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/ai-chef" element={<AiChatPage />} />
+            <Route path="/fridge-scan" element={<FridgeScanPage />} />
+            <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
+            <Route path="/nutrition" element={<Navigate to="/meal-plans?tab=nutrition" replace />} />
+            <Route path="/meal-plans" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
           <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
-          <Route path="/smart-market" element={<PersonalFeatureBoundary><SmartMarketPage /></PersonalFeatureBoundary>} />
+          <Route path="/smart-market" element={<SmartMarketPage />} />
           <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
           <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
+          <Route path="/admin/ai-monitoring" element={<AdminFeatureBoundary><AdminAiMonitoringPage /></AdminFeatureBoundary>} />
           <Route path="/admin/recipes" element={<AdminFeatureBoundary><AdminRecipesPage /></AdminFeatureBoundary>} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/write" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />
@@ -89,6 +96,7 @@ export const App: React.FC = () => {
         </Suspense>
       </BrowserRouter>
     </AuthProvider>
+  </ThemeProvider>
   );
 };
 

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ShoppingBag,
+  Utensils,
   CheckCircle2,
   Circle,
   Plus,
@@ -111,6 +112,105 @@ const SUGGESTED_VEGAN_TAGS = [
   { name: 'Hạt nêm nấm củ quả', category: 'spices' }
 ];
 
+
+export interface MealCombo {
+  id: string;
+  name: string;
+  tagline: string;
+  emoji: string;
+  price: number;
+  priceFormatted: string;
+  originalPriceFormatted: string;
+  savingFormatted: string;
+  prepTime: string;
+  calories: string;
+  ingredients: { name: string; amount: string; price: number; unit: string; emoji: string }[];
+}
+
+export const MEAL_COMBOS: MealCombo[] = [
+  {
+    id: 'combo-canh-chua',
+    name: 'Canh Chua Chay Nam Bộ',
+    tagline: 'Chua thanh ngọt mát, đậm đà vị me kết hợp đậu bắp & nấm bào ngư',
+    emoji: '🍲',
+    price: 48000,
+    priceFormatted: '48.000 đ',
+    originalPriceFormatted: '60.000 đ',
+    savingFormatted: 'Tiết kiệm 12.000 đ',
+    prepTime: '20 phút',
+    calories: '280 kcal',
+    ingredients: [
+      { name: 'Cà chua Đà Lạt', amount: '2 quả (300g)', price: 10000, unit: 'gói', emoji: '🍅' },
+      { name: 'Đậu bắp xanh VietGAP', amount: '200g', price: 9000, unit: 'gói', emoji: '🫑' },
+      { name: 'Bạc hà (dọc mùng)', amount: '200g', price: 8000, unit: 'gói', emoji: '🥬' },
+      { name: 'Thơm / Dứa mật', amount: '1/2 quả', price: 9000, unit: 'phần', emoji: '🍍' },
+      { name: 'Nấm bào ngư tươi', amount: '200g', price: 12000, unit: 'hộp', emoji: '🍄' },
+    ]
+  },
+  {
+    id: 'combo-dau-hu-sot-ca',
+    name: 'Đậu Hũ Non Sốt Cà Nấm Đông Cô',
+    tagline: 'Đậu hũ non béo ngậy, sốt cà ri chua ngọt thơm ngát hành boa-rô',
+    emoji: '🧈',
+    price: 39000,
+    priceFormatted: '39.000 đ',
+    originalPriceFormatted: '47.000 đ',
+    savingFormatted: 'Tiết kiệm 8.000 đ',
+    prepTime: '15 phút',
+    calories: '320 kcal',
+    ingredients: [
+      { name: 'Đậu hũ non VietGAP', amount: '2 cây (600g)', price: 16000, unit: 'gói', emoji: '🧈' },
+      { name: 'Cà chua bi hữu cơ', amount: '250g', price: 11000, unit: 'hộp', emoji: '🍅' },
+      { name: 'Nấm đông cô tươi', amount: '150g', price: 12000, unit: 'gói', emoji: '🍄' },
+    ]
+  },
+  {
+    id: 'combo-lau-nam',
+    name: 'Lẩu Nấm Đại Bổ Thanh Đạm',
+    tagline: 'Ngọt vị nước dùng thảo mộc, bồi bổ năng lượng và tăng đề kháng',
+    emoji: '🥘',
+    price: 79000,
+    priceFormatted: '79.000 đ',
+    originalPriceFormatted: '99.000 đ',
+    savingFormatted: 'Tiết kiệm 20.000 đ',
+    prepTime: '25 phút',
+    calories: '350 kcal',
+    ingredients: [
+      { name: 'Nấm kim châm', amount: '1 gói (150g)', price: 12000, unit: 'gói', emoji: '🍄' },
+      { name: 'Nấm đùi gà baby', amount: '200g', price: 18000, unit: 'gói', emoji: '🍄' },
+      { name: 'Nấm bào ngư xám', amount: '200g', price: 14000, unit: 'gói', emoji: '🍄' },
+      { name: 'Cải thảo Đà Lạt', amount: '500g', price: 15000, unit: 'bắp', emoji: '🥬' },
+      { name: 'Bắp ngọt non', amount: '2 bắp', price: 12000, unit: 'bắp', emoji: '🌽' },
+      { name: 'Bún gạo lứt hữu cơ', amount: '300g', price: 8000, unit: 'gói', emoji: '🍜' },
+    ]
+  },
+  {
+    id: 'combo-rau-muong-xao',
+    name: 'Rau Muống Xào Tỏi Chay & Gạo Lứt',
+    tagline: 'Rau muống giòn ngọt phi boa-rô kết hợp cơm gạo lứt dẻo thơm',
+    emoji: '🥗',
+    price: 32000,
+    priceFormatted: '32.000 đ',
+    originalPriceFormatted: '38.000 đ',
+    savingFormatted: 'Tiết kiệm 6.000 đ',
+    prepTime: '12 phút',
+    calories: '380 kcal',
+    ingredients: [
+      { name: 'Rau muống nước VietGAP', amount: '1 bó (500g)', price: 5000, unit: 'bó', emoji: '🥬' },
+      { name: 'Hành boa-rô thơm', amount: '2 cây', price: 7000, unit: 'bó', emoji: '🧄' },
+      { name: 'Gạo lứt đỏ hữu cơ', amount: '500g', price: 20000, unit: 'túi', emoji: '🍚' },
+    ]
+  }
+];
+
+export const VIETGAP_5K_VEGGIES = [
+  { name: 'Cải ngọt VietGAP (500g)', price: 5000, originalPrice: '14.000đ', emoji: '🥬' },
+  { name: 'Cải thìa VietGAP (500g)', price: 5000, originalPrice: '15.000đ', emoji: '🥬' },
+  { name: 'Mồng tơi VietGAP (500g)', price: 5000, originalPrice: '12.000đ', emoji: '🌱' },
+  { name: 'Rau muống nước (500g)', price: 5000, originalPrice: '11.000đ', emoji: '🌿' },
+  { name: 'Rau dền đỏ VietGAP (500g)', price: 5000, originalPrice: '12.000đ', emoji: '🥬' },
+];
+
 export function SmartMarketPage() {
   const [items, setItems] = useState<SmartMarketItem[]>(loadInitialItems);
   const [mainView, setMainView] = useState<'map' | 'checklist'>('map');
@@ -141,6 +241,132 @@ export function SmartMarketPage() {
   const [multiCart, setMultiCart] = useState<MultiStoreCartItem[]>([]);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
+  const [cartAddToast, setCartAddToast] = useState('');
+  const [catalogSubcategory, setCatalogSubcategory] = useState<string>('ALL');
+
+  const filteredStoreCatalog = useMemo(() => {
+    if (!selectedStore?.catalog) return [];
+    if (catalogSubcategory === 'ALL') return selectedStore.catalog;
+    return selectedStore.catalog.filter(item => {
+      const lower = (item.name + ' ' + (item.category || '')).toLowerCase();
+      if (catalogSubcategory === 'VEG') {
+        return lower.includes('rau') || lower.includes('cải') || lower.includes('cà') || lower.includes('mồng tơi') || lower.includes('muống') || lower.includes('dưa') || lower.includes('bầu') || lower.includes('bí') || lower.includes('mướp') || lower.includes('củ');
+      }
+      if (catalogSubcategory === 'MUSHROOM') {
+        return lower.includes('nấm') || lower.includes('mộc nhĩ');
+      }
+      if (catalogSubcategory === 'PROTEIN') {
+        return lower.includes('đậu') || lower.includes('tofu') || lower.includes('chả') || lower.includes('sườn') || lower.includes('đạm');
+      }
+      if (catalogSubcategory === 'GRAINS') {
+        return lower.includes('gạo') || lower.includes('bún') || lower.includes('phở') || lower.includes('mì') || lower.includes('yến mạch') || lower.includes('hạt');
+      }
+      if (catalogSubcategory === 'SPICE') {
+        return lower.includes('nước tương') || lower.includes('hạt nêm') || lower.includes('tiêu') || lower.includes('ớt') || lower.includes('dầu') || lower.includes('sốt');
+      }
+      return true;
+    });
+  }, [selectedStore, catalogSubcategory]);
+
+  const handleAddComboToCart = (combo: MealCombo) => {
+    sfx.playSuccess();
+    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
+    if (!targetStore) return;
+
+    setMultiCart(prev => {
+      let next = [...prev];
+      combo.ingredients.forEach(ing => {
+        const cartItemId = `${targetStore.id}___combo_${ing.name.toLowerCase().replace(/\s+/g, '_')}`;
+        const existing = next.find(i => i.id === cartItemId);
+        if (existing) {
+          next = next.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
+        } else {
+          next.push({
+            id: cartItemId,
+            catalogItemId: `combo_${ing.name}`,
+            name: ing.name,
+            price: ing.price,
+            priceFormatted: `${ing.price.toLocaleString('vi-VN')} đ`,
+            unit: ing.unit,
+            imageEmoji: ing.emoji,
+            storeId: targetStore.id,
+            storeName: targetStore.name,
+            storeAddress: targetStore.address,
+            storeCategory: targetStore.category,
+            count: 1
+          });
+        }
+      });
+      return next;
+    });
+
+    setItems(prev => {
+      const next = [...prev];
+      combo.ingredients.forEach(ing => {
+        if (!next.some(it => it.name.toLowerCase() === ing.name.toLowerCase())) {
+          next.unshift({
+            id: `sm-combo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            name: ing.name,
+            amount: ing.amount,
+            category: 'produce',
+            categoryLabel: 'Rau củ & Quả tươi',
+            mealNote: `Combo món: ${combo.name}`,
+            checked: false
+          });
+        }
+      });
+      return next;
+    });
+
+    setCartAddToast(`Đã thêm trọn combo "${combo.name}" (${combo.ingredients.length} nguyên liệu) vào giỏ hàng và danh sách mua sắm!`);
+    setTimeout(() => setCartAddToast(''), 4500);
+  };
+
+  const handleAddVietgapVeggie = (veg: typeof VIETGAP_5K_VEGGIES[0]) => {
+    sfx.playSuccess();
+    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
+    if (!targetStore) return;
+
+    const cartItemId = `${targetStore.id}___vg_${veg.name.toLowerCase().replace(/\s+/g, '_')}`;
+    setMultiCart(prev => {
+      const existing = prev.find(i => i.id === cartItemId);
+      if (existing) {
+        return prev.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
+      }
+      return [...prev, {
+        id: cartItemId,
+        catalogItemId: `vg_${veg.name}`,
+        name: veg.name,
+        price: veg.price,
+        priceFormatted: '5.000 đ',
+        unit: 'gói 500g',
+        imageEmoji: veg.emoji,
+        storeId: targetStore.id,
+        storeName: targetStore.name,
+        storeAddress: targetStore.address,
+        storeCategory: targetStore.category,
+        count: 1
+      }];
+    });
+
+    setItems(prev => {
+      if (!prev.some(it => it.name.toLowerCase() === veg.name.toLowerCase())) {
+        return [{
+          id: `sm-vg-${Date.now()}`,
+          name: veg.name,
+          amount: '1 gói 500g',
+          category: 'produce',
+          categoryLabel: 'Rau củ & Quả tươi',
+          mealNote: 'Rau lá đồng giá 5.000đ',
+          checked: false
+        }, ...prev];
+      }
+      return prev;
+    });
+
+    setCartAddToast(`Đã thêm "${veg.name}" (5.000đ) vào giỏ hàng!`);
+    setTimeout(() => setCartAddToast(''), 3500);
+  };
   const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'MOMO' | 'COD'>('VIETQR');
   const [deliveryNote, setDeliveryNote] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<'VEGE15' | 'FREESHIP' | null>('VEGE15');
@@ -495,6 +721,14 @@ export function SmartMarketPage() {
     <MainLayout>
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
+        {/* Toast notification for adding combos and items */}
+        {cartAddToast && (
+          <div className="fixed top-20 right-6 z-50 p-4 rounded-2xl bg-emerald-800 text-white shadow-xl flex items-center gap-3 text-xs sm:text-sm font-bold animate-in fade-in slide-in-from-top-4 border border-emerald-500/40">
+            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-300" />
+            <span>{cartAddToast}</span>
+          </div>
+        )}
+
         {/* Top Header & Breadcrumb */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
           <div>
@@ -613,6 +847,136 @@ export function SmartMarketPage() {
         {/* VIEW 1: MAP & SHOPEE-FOOD/MART STORE ORDERING */}
         {mainView === 'map' && (
           <div className="space-y-6">
+
+            {/* BÁCH HÓA XANH PROMOTIONAL BANNER: RAU LÁ QUỐC DÂN 5.000Đ */}
+            <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white p-5 sm:p-6 shadow-md border border-emerald-600/40">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+                <div className="max-w-xl space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider shadow-2xs">
+                      🔥 Đồng giá 5.000đ/gói · Rau Lá Quốc Dân
+                    </span>
+                    <span className="text-xs text-emerald-200 font-semibold flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" /> Chuẩn VietGAP tươi sớm nay
+                    </span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                    Bách Hóa Xanh Chay — Rau Củ Tươi Mới Giao Nhanh 25–35 Phút
+                  </h3>
+                  <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
+                    Đồng giá 5.000đ/gói 500g rau lá quốc dân VietGAP. Giảm thêm 20% khi mua trọn combo nấu ăn theo món!
+                  </p>
+                </div>
+
+                {/* 5k Veggies Quick Add Chips */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {VIETGAP_5K_VEGGIES.map(veg => (
+                    <button
+                      key={veg.name}
+                      type="button"
+                      onClick={() => handleAddVietgapVeggie(veg)}
+                      className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white text-white hover:text-emerald-900 border border-white/20 transition shadow-2xs cursor-pointer text-left"
+                      title={`Bấm để thêm ${veg.name} (5.000đ) vào giỏ`}
+                    >
+                      <span className="text-lg">{veg.emoji}</span>
+                      <div>
+                        <div className="text-[11px] font-bold line-clamp-1">{veg.name}</div>
+                        <div className="text-[10px] flex items-center gap-1 font-extrabold text-amber-300 group-hover:text-emerald-700">
+                          <span>5.000đ</span>
+                          <span className="line-through opacity-70 text-[9px] font-normal text-slate-300 group-hover:text-slate-500">{veg.originalPrice}</span>
+                        </div>
+                      </div>
+                      <span className="w-5 h-5 rounded-full bg-emerald-500 group-hover:bg-emerald-700 text-white flex items-center justify-center font-bold text-xs shrink-0 ml-1">
+                        +
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* BÁCH HÓA XANH: HÔM NAY ĂN GÌ? - MUA NGUYÊN LIỆU THEO MÓN */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 uppercase">
+                      Bách Hóa Xanh Online
+                    </span>
+                    <span className="text-xs text-slate-400">· Chuẩn bị bữa ăn gia đình tiện lợi</span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white mt-1 flex items-center gap-2">
+                    <Utensils className="w-5 h-5 text-emerald-600" />
+                    Hôm Nay Ăn Gì? — Mua Trọn Combo Nguyên Liệu Theo Món
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    1-Click thêm đầy đủ nguyên liệu tươi ngon đã sơ chế sẵn vào giỏ đi chợ và danh sách cần mua.
+                  </p>
+                </div>
+              </div>
+
+              {/* 4 Combo Cards Grid */}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {MEAL_COMBOS.map(combo => (
+                  <div
+                    key={combo.id}
+                    className="flex flex-col justify-between p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 bg-slate-50/50 dark:bg-slate-850 hover:bg-white dark:hover:bg-slate-800 transition shadow-2xs group"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-3xl p-2 rounded-xl bg-white dark:bg-slate-700 shadow-2xs">{combo.emoji}</span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                          {combo.savingFormatted}
+                        </span>
+                      </div>
+
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-1 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition">
+                        {combo.name}
+                      </h4>
+
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-snug">
+                        {combo.tagline}
+                      </p>
+
+                      <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800 space-y-1">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Gồm {combo.ingredients.length} nguyên liệu:
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {combo.ingredients.map(ing => (
+                            <span key={ing.name} className="inline-flex items-center gap-1 text-[10px] bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                              <span>{ing.emoji}</span>
+                              <span className="truncate max-w-[90px]">{ing.name}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-black text-emerald-700 dark:text-emerald-400">
+                          {combo.priceFormatted}
+                        </div>
+                        <div className="text-[10px] text-slate-400 line-through">
+                          {combo.originalPriceFormatted}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddComboToCart(combo)}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                        title={`Mua combo ${combo.name}`}
+                      >
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                        <span>Mua combo</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="grid lg:grid-cols-12 gap-6 items-start">
 
               {/* Left Column: Stores List (ShopeeFood Style Cards) */}
@@ -810,8 +1174,33 @@ export function SmartMarketPage() {
                       Kệ Hàng & Thực Đơn Đặt Mua Trực Tuyến
                     </h3>
                     <span className="text-xs text-slate-500">
-                      {selectedStore.catalog?.length || 0} món thuần chay sẵn sàng giao
+                      {filteredStoreCatalog.length} món thuần chay sẵn sàng giao
                     </span>
+                  </div>
+
+                  {/* Bách Hóa Xanh Subcategory Filter Tabs */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-3 mb-3 border-b border-slate-100 dark:border-slate-800">
+                    {[
+                      { id: 'ALL', label: 'Tất cả' },
+                      { id: 'VEG', label: '🥬 Rau lá & Củ quả VietGAP' },
+                      { id: 'MUSHROOM', label: '🍄 Nấm tươi & Nấm khô' },
+                      { id: 'PROTEIN', label: '🌱 Đậu hũ & Đạm thực vật' },
+                      { id: 'GRAINS', label: '🍚 Gạo & Đồ khô' },
+                      { id: 'SPICE', label: '🧂 Gia vị chay' }
+                    ].map(sub => (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => { sfx.playTap(); setCatalogSubcategory(sub.id); }}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                          catalogSubcategory === sub.id
+                            ? 'bg-emerald-700 text-white shadow-2xs'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
                   </div>
 
                   {(!selectedStore.catalog || selectedStore.catalog.length === 0) ? (
@@ -820,7 +1209,7 @@ export function SmartMarketPage() {
                     </div>
                   ) : (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {selectedStore.catalog.map(catItem => {
+                      {filteredStoreCatalog.map(catItem => {
                         const cartItemId = `${selectedStore.id}___${catItem.id}`;
                         const foundInCart = multiCart.find(i => i.id === cartItemId);
                         const qty = foundInCart?.count || 0;

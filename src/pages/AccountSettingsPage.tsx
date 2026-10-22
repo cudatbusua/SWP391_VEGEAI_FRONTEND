@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User,
   ShieldCheck,
@@ -119,6 +119,13 @@ export const AccountSettingsPage: React.FC = () => {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'profile';
+
+  const handleSelectTab = (tab: string) => {
+    sfx.playTap();
+    setSearchParams({ tab });
+  };
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [, setNutrition] = useState<NutritionProfile | null>(null);
@@ -504,32 +511,89 @@ export const AccountSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Links / Anchors */}
+            {/* Quick Links / Tabs */}
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <a
-                href="#health-metrics"
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 transition"
+              <button
+                type="button"
+                onClick={() => handleSelectTab('profile')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  currentTab === 'profile'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}
               >
-                Chỉ số Calo & Vòng tròn
-              </a>
-              <a
-                href="#weekly-schedule"
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 transition"
+                Hồ sơ &amp; Thể trạng
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('calendar')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  currentTab === 'calendar'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}
               >
-                Lịch thực đơn tuần
-              </a>
-              <a
-                href="#security-section"
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 transition"
+                Lịch biểu &amp; Thực đơn
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('security')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  currentTab === 'security'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}
               >
-                Bảo mật & Đổi mật khẩu
-              </a>
+                Bảo mật &amp; OTP
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('preferences')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  currentTab === 'preferences'
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                Giao diện Sáng/Tối
+              </button>
             </div>
 
           </div>
         </section>
 
-        {/* 2. BASIC INFORMATION & PHYSICAL BIOMETRICS FORM */}
+        {/* 2. TAB NAVIGATION SWITCHER BAR */}
+        <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 overflow-x-auto shadow-2xs">
+          {[
+            { id: 'profile', label: 'Hồ sơ & Chỉ số sức khỏe', icon: Activity, desc: 'BMI, Thể trạng, Calo, Vòng vận động' },
+            { id: 'calendar', label: 'Lịch biểu & Thực đơn', icon: CalendarDays, desc: 'Lịch ăn 30 ngày, 3 bữa chính' },
+            { id: 'security', label: 'Bảo mật & Đăng nhập', icon: ShieldCheck, desc: 'Đổi mật khẩu, OTP' },
+            { id: 'preferences', label: 'Giao diện & Hệ thống', icon: Palette, desc: 'Chế độ Sáng/Tối, Riêng tư' },
+          ].map(tabItem => {
+            const Icon = tabItem.icon;
+            const isActive = currentTab === tabItem.id;
+            return (
+              <button
+                key={tabItem.id}
+                type="button"
+                onClick={() => handleSelectTab(tabItem.id)}
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition cursor-pointer flex-1 justify-center ${
+                  isActive
+                    ? 'bg-emerald-800 dark:bg-emerald-600 text-white shadow-md'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50'
+                }`}
+              >
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+                <span>{tabItem.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* TAB 1: PROFILE & HEALTH METRICS */}
+        {currentTab === 'profile' && (
+          <div className="space-y-8 animate-in fade-in duration-200">
+            {/* 2. BASIC INFORMATION & PHYSICAL BIOMETRICS FORM */}
         <section className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
@@ -918,7 +982,37 @@ export const AccountSettingsPage: React.FC = () => {
           </div>
         </section>
 
-        {/* 4. WEEKLY CALORIE CONSUMPTION & MEAL SCHEDULE */}
+                  </div>
+        )}
+
+        {/* TAB 2: CALENDAR & 30-DAY MEAL SCHEDULE */}
+        {currentTab === 'calendar' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Summary card connecting health metrics with 30-day calendar */}
+            <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shrink-0 shadow-2xs font-bold text-base">
+                  <Flame className="w-5 h-5 text-amber-300" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">
+                    Kế hoạch năng lượng cá nhân: {dailyCalorieTarget || '1.650'} kcal/ngày
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 mt-0.5">
+                    Thực đơn 30 ngày và khẩu phần 3 bữa chính được tính toán đồng bộ theo chiều cao, cân nặng và chỉ số TDEE của bạn.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectTab('profile')}
+                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 font-bold hover:bg-emerald-100 transition shadow-2xs shrink-0 cursor-pointer self-start sm:self-auto"
+              >
+                Cập nhật chỉ số sức khỏe →
+              </button>
+            </div>
+
+            {/* 4. WEEKLY CALORIE CONSUMPTION & MEAL SCHEDULE */}
         <section id="weekly-schedule" className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
@@ -1039,217 +1133,259 @@ export const AccountSettingsPage: React.FC = () => {
           </div>
         </section>
 
-        {/* 5. ACCOUNT SECURITY & PREFERENCES */}
-        <section id="security-section" className="grid lg:grid-cols-2 gap-8">
-          
-          {/* Box 1: Change Password & Security */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                Bảo mật & Đổi mật khẩu
-              </h2>
-              <button
-                type="button"
-                onClick={() => { setIsOtpResetMode(v => !v); setPasswordError(''); setPasswordSuccess(''); }}
-                className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
-              >
-                {isOtpResetMode ? 'Đổi bằng mật khẩu cũ' : 'Quên mật khẩu? (Dùng OTP)'}
-              </button>
-            </div>
+                  </div>
+        )}
 
-            {passwordSuccess && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                <span>{passwordSuccess}</span>
-              </div>
-            )}
-
-            {passwordError && (
-              <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                <span>{passwordError}</span>
-              </div>
-            )}
-
-            {!isOtpResetMode ? (
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Mật khẩu hiện tại *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={currentPassword}
-                    onChange={e => setCurrentPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Mật khẩu mới (tối thiểu 8 ký tự) *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Xác nhận mật khẩu mới *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div className="flex justify-end pt-1">
+        {/* TAB 3: ACCOUNT SECURITY */}
+        {currentTab === 'security' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            <div className="grid lg:grid-cols-12 gap-8 items-start">
+              
+              {/* Box 1: Change Password & Security */}
+              <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                    Bảo mật &amp; Đổi mật khẩu
+                  </h2>
                   <button
-                    type="submit"
-                    disabled={isChangingPassword}
-                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-black dark:bg-emerald-700 dark:hover:bg-emerald-800 text-white font-extrabold text-xs transition shadow-2xs cursor-pointer disabled:opacity-50"
+                    type="button"
+                    onClick={() => { setIsOtpResetMode(v => !v); setPasswordError(''); setPasswordSuccess(''); }}
+                    className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
                   >
-                    {isChangingPassword ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+                    {isOtpResetMode ? 'Đổi bằng mật khẩu cũ' : 'Quên mật khẩu? (Dùng OTP)'}
                   </button>
                 </div>
-              </form>
-            ) : (
-              <form onSubmit={handleResetPasswordViaOtp} className="space-y-4">
-                <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-xs text-amber-900 dark:text-amber-200">
-                  <p className="font-bold">Đặt lại mật khẩu qua mã OTP Email</p>
-                  <p className="mt-0.5 opacity-90">
-                    Hệ thống sẽ gửi mã xác thực 6 số đến email đăng ký: <strong>{profile?.email || user?.emailOrPhone}</strong>
+
+                {passwordSuccess && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                    <span>{passwordSuccess}</span>
+                  </div>
+                )}
+
+                {passwordError && (
+                  <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>{passwordError}</span>
+                  </div>
+                )}
+
+                {!isOtpResetMode ? (
+                  <form onSubmit={handleChangePassword} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Mật khẩu hiện tại *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={currentPassword}
+                        onChange={e => setCurrentPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Mật khẩu mới (tối thiểu 8 ký tự) *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Xác nhận mật khẩu mới *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="submit"
+                        disabled={isChangingPassword}
+                        className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-black dark:bg-emerald-700 dark:hover:bg-emerald-800 text-white font-extrabold text-xs transition shadow-2xs cursor-pointer disabled:opacity-50"
+                      >
+                        {isChangingPassword ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form onSubmit={handleResetPasswordViaOtp} className="space-y-4">
+                    <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-xs text-amber-900 dark:text-amber-200">
+                      <p className="font-bold">Đặt lại mật khẩu qua mã OTP Email</p>
+                      <p className="mt-0.5 opacity-90">
+                        Hệ thống sẽ gửi mã xác thực 6 số đến email đăng ký: <strong>{profile?.email || user?.emailOrPhone}</strong>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleSendResetOtp}
+                        disabled={isSendingResetOtp}
+                        className="mt-2.5 px-3 py-1.5 rounded-lg bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 font-bold transition cursor-pointer"
+                      >
+                        {isSendingResetOtp ? 'Đang gửi mã...' : 'Nhận mã OTP qua Email'}
+                      </button>
+                      {otpSentMessage && <p className="mt-2 text-emerald-700 font-semibold">{otpSentMessage}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Mã OTP 6 số *</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        placeholder="123456"
+                        value={resetOtp}
+                        onChange={e => setResetOtp(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white tracking-widest"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Mật khẩu mới *</label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Xác nhận mật khẩu *</label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="submit"
+                        disabled={isSubmittingOtpReset}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs transition shadow-2xs cursor-pointer"
+                      >
+                        {isSubmittingOtpReset ? 'Đang xác thực...' : 'Xác nhận đổi mật khẩu'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              {/* Security info overview */}
+              <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+                <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                    Trạng thái an toàn tài khoản
+                  </h3>
+                </div>
+                <div className="space-y-3.5 text-xs text-slate-600 dark:text-slate-400">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Tài khoản</span>
+                    <span className="font-bold text-slate-900 dark:text-white">@{profile?.username || user?.username}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Email khôi phục</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{profile?.email || user?.emailOrPhone || 'Chưa liên kết'}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60">
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">Phiên bảo mật JWT</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Hoạt động (Đã xác thực)
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 text-[11px] leading-relaxed">
+                    💡 <strong>Lưu ý bảo mật:</strong> Không chia sẻ mật khẩu hoặc mã OTP 6 số với bất kỳ ai để bảo vệ thông tin dinh dưỡng và tài khoản cá nhân.
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: PREFERENCES & DISPLAY THEME */}
+        {currentTab === 'preferences' && (
+          <div className="space-y-6 animate-in fade-in duration-200 max-w-3xl">
+            {/* Box 2: Appearance & Preferences */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+              <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Palette className="w-5 h-5 text-emerald-600" />
+                  Giao diện &amp; Tùy chọn hiển thị
+                </h2>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 shadow-2xs">
+                      {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-amber-500" />}
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">Chế độ giao diện</h4>
+                      <p className="text-xs text-slate-500">Chuyển đổi giữa nền sáng dịu mắt và nền tối bảo vệ mắt</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
+                    <button
+                      type="button"
+                      onClick={() => { sfx.playTap(); setTheme('light'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        theme === 'light' ? 'bg-amber-100 text-amber-900 shadow-2xs' : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      Sáng
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { sfx.playTap(); setTheme('dark'); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                        theme === 'dark' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      Tối
+                    </button>
+                  </div>
+                </div>
+
+                {/* Safety disclaimers note */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
+                  <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4 text-emerald-600" />
+                    Quyền riêng tư &amp; Bảo vệ dữ liệu sức khỏe
                   </p>
-                  <button
-                    type="button"
-                    onClick={handleSendResetOtp}
-                    disabled={isSendingResetOtp}
-                    className="mt-2.5 px-3 py-1.5 rounded-lg bg-amber-200 dark:bg-amber-900 text-amber-950 dark:text-amber-100 font-bold transition cursor-pointer"
-                  >
-                    {isSendingResetOtp ? 'Đang gửi mã...' : 'Nhận mã OTP qua Email'}
-                  </button>
-                  {otpSentMessage && <p className="mt-2 text-emerald-700 font-semibold">{otpSentMessage}</p>}
+                  <p className="leading-relaxed text-[11px]">
+                    Dữ liệu về cân nặng, chiều cao, dị ứng thực phẩm và chỉ số calo được mã hóa và lưu trữ bảo mật theo tiêu chuẩn phát triển của VEGEAI. Dữ liệu này chỉ phục vụ cho việc cá nhân hóa thực đơn cho riêng bạn.
+                  </p>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Mã OTP 6 số *</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    placeholder="123456"
-                    value={resetOtp}
-                    onChange={e => setResetOtp(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white tracking-widest"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Mật khẩu mới *</label>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    value={newPassword}
-                    onChange={e => setNewPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Xác nhận mật khẩu *</label>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="submit"
-                    disabled={isSubmittingOtpReset}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs transition shadow-2xs cursor-pointer"
-                  >
-                    {isSubmittingOtpReset ? 'Đang xác thực...' : 'Xác nhận đổi mật khẩu'}
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-
-          {/* Box 2: Appearance & Preferences */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
-            <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <Palette className="w-5 h-5 text-emerald-600" />
-                Giao diện & Tùy chọn hiển thị
-              </h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-300 shadow-2xs">
-                    {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4 text-amber-500" />}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Chế độ giao diện</h4>
-                    <p className="text-xs text-slate-500">Chuyển đổi giữa nền sáng dịu mắt và nền tối bảo vệ mắt</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600">
-                  <button
-                    type="button"
-                    onClick={() => { sfx.playTap(); setTheme('light'); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      theme === 'light' ? 'bg-amber-100 text-amber-900 shadow-2xs' : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    Sáng
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { sfx.playTap(); setTheme('dark'); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      theme === 'dark' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    Tối
-                  </button>
-                </div>
-              </div>
-
-              {/* Safety disclaimers note */}
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1.5">
-                <p className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <ShieldAlert className="w-4 h-4 text-emerald-600" />
-                  Quyền riêng tư & Bảo vệ dữ liệu sức khỏe
-                </p>
-                <p className="leading-relaxed text-[11px]">
-                  Dữ liệu về cân nặng, chiều cao, dị ứng thực phẩm và chỉ số calo được mã hóa và lưu trữ bảo mật theo tiêu chuẩn phát triển của VEGEAI. Dữ liệu này chỉ phục vụ cho việc cá nhân hóa thực đơn cho riêng bạn.
-                </p>
               </div>
             </div>
           </div>
-
-        </section>
+        )}
 
       </div>
     </MainLayout>

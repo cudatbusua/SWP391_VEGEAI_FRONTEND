@@ -50,7 +50,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     { key: 'discover', label: 'Khám phá', path: '/explore', isActive: isDiscoverActive },
     { key: 'ai-chef', label: 'AI Bếp trưởng', path: '/ai-chef', isActive: isAiChefActive },
     { key: 'pantry', label: 'Kho nguyên liệu & Đi chợ', path: '/fridge', isActive: isPantryActive },
-    { key: 'calendar', label: 'Lịch biểu & Hồ sơ', path: '/settings?tab=calendar', isActive: isNutritionActive },
+    { key: 'calendar', label: 'Lịch biểu & Thực đơn', path: '/settings?tab=calendar', isActive: isNutritionActive },
   ];
 
   const guestNavItems: { label: string; path: string; isActive: boolean }[] = [

@@ -849,11 +849,11 @@ export function SmartMarketPage() {
           <div className="space-y-6">
 
             {/* BÁCH HÓA XANH PROMOTIONAL BANNER: RAU LÁ QUỐC DÂN 5.000Đ */}
-            <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white p-5 sm:p-6 shadow-md border border-emerald-600/40">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
-                <div className="max-w-xl space-y-1.5">
+            <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white p-5 sm:p-6 shadow-md border border-emerald-600/40 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider shadow-2xs">
+                    <span className="px-3 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider shadow-2xs">
                       🔥 Đồng giá 5.000đ/gói · Rau Lá Quốc Dân
                     </span>
                     <span className="text-xs text-emerald-200 font-semibold flex items-center gap-1">
@@ -863,27 +863,42 @@ export function SmartMarketPage() {
                   <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
                     Bách Hóa Xanh Chay — Rau Củ Tươi Mới Giao Nhanh 25–35 Phút
                   </h3>
-                  <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed max-w-2xl">
                     Đồng giá 5.000đ/gói 500g rau lá quốc dân VietGAP. Giảm thêm 20% khi mua trọn combo nấu ăn theo món!
                   </p>
                 </div>
 
-                {/* 5k Veggies Quick Add Chips */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="shrink-0 flex items-center">
+                  <span className="px-3.5 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-emerald-200 flex items-center gap-1.5 shadow-2xs">
+                    <Truck className="w-4 h-4 text-amber-300" />
+                    <span>Giao tận nơi 25–35 phút</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* 5k Veggies 5-column balanced grid */}
+              <div className="pt-3 border-t border-white/15">
+                <div className="text-[11px] font-bold text-emerald-200 mb-2.5 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🥬</span>
+                  <span>Chọn nhanh rau lá đồng giá 5.000đ/500g (Bấm + để thêm vào giỏ):</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                   {VIETGAP_5K_VEGGIES.map(veg => (
                     <button
                       key={veg.name}
                       type="button"
                       onClick={() => handleAddVietgapVeggie(veg)}
-                      className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white text-white hover:text-emerald-900 border border-white/20 transition shadow-2xs cursor-pointer text-left"
+                      className="group flex items-center justify-between p-2.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-emerald-950 border border-white/15 hover:border-white transition shadow-2xs cursor-pointer text-left"
                       title={`Bấm để thêm ${veg.name} (5.000đ) vào giỏ`}
                     >
-                      <span className="text-lg">{veg.emoji}</span>
-                      <div>
-                        <div className="text-[11px] font-bold line-clamp-1">{veg.name}</div>
-                        <div className="text-[10px] flex items-center gap-1 font-extrabold text-amber-300 group-hover:text-emerald-700">
-                          <span>5.000đ</span>
-                          <span className="line-through opacity-70 text-[9px] font-normal text-slate-300 group-hover:text-slate-500">{veg.originalPrice}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xl shrink-0">{veg.emoji}</span>
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-bold truncate">{veg.name.replace(/\s*\(500g\)/i, '')}</div>
+                          <div className="text-[10px] flex items-center gap-1 font-extrabold text-amber-300 group-hover:text-emerald-700">
+                            <span>5.000đ</span>
+                            <span className="line-through opacity-70 text-[9px] font-normal text-slate-300 group-hover:text-slate-400">{veg.originalPrice}</span>
+                          </div>
                         </div>
                       </div>
                       <span className="w-5 h-5 rounded-full bg-emerald-500 group-hover:bg-emerald-700 text-white flex items-center justify-center font-bold text-xs shrink-0 ml-1">
@@ -938,17 +953,30 @@ export function SmartMarketPage() {
                         {combo.tagline}
                       </p>
 
-                      <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800 space-y-1">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Gồm {combo.ingredients.length} nguyên liệu:
+                      <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-emerald-800 dark:text-emerald-300">
+                            🌿 {combo.ingredients.length} nguyên liệu tươi
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {combo.prepTime} · {combo.calories}
+                          </span>
                         </div>
-                        <div className="flex flex-wrap gap-1">
-                          {combo.ingredients.map(ing => (
-                            <span key={ing.name} className="inline-flex items-center gap-1 text-[10px] bg-white dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
-                              <span>{ing.emoji}</span>
-                              <span className="truncate max-w-[90px]">{ing.name}</span>
-                            </span>
-                          ))}
+                        <div className="flex items-center gap-1.5 py-1 px-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/80">
+                          <div className="flex items-center -space-x-1 shrink-0">
+                            {combo.ingredients.map(ing => (
+                              <span
+                                key={ing.name}
+                                title={`${ing.name} (${ing.amount})`}
+                                className="w-5 h-5 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-[10px] shadow-2xs"
+                              >
+                                {ing.emoji}
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                            {combo.ingredients.map(i => i.name).slice(0, 2).join(', ')}...
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -977,6 +1005,24 @@ export function SmartMarketPage() {
                 ))}
               </div>
             </div>
+            {/* SECTION 2: BẢN ĐỒ & QUÁN CHAY GẦN BẠN */}
+            <div className="pt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/80 dark:border-slate-800 mb-5">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-emerald-600" />
+                    Bản Đồ Quán Chay &amp; Điểm Bán Thực Phẩm Lân Cận
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Chọn địa điểm trên bản đồ tương tác để xem chi tiết kệ hàng và đặt giao hỏa tốc.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 self-start sm:self-auto">
+                  🗺️ OpenStreetMap &amp; GPS Thực Tế
+                </span>
+              </div>
+            </div>
+
             <div className="grid lg:grid-cols-12 gap-6 items-start">
 
               {/* Left Column: Stores List (ShopeeFood Style Cards) */}
@@ -997,7 +1043,7 @@ export function SmartMarketPage() {
                     <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="Tìm quán chay, Bách Hóa Xanh, WinMart, Điện Máy Xanh..."
+                      placeholder="Tìm quán chay, Bách Hóa Xanh, WinMart, An Duyên Chay..."
                       value={storeSearch}
                       onChange={e => setStoreSearch(e.target.value)}
                       className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-white"
@@ -1005,13 +1051,12 @@ export function SmartMarketPage() {
                   </div>
 
                   {/* Category Filter Tabs */}
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
                     {[
                       { id: 'ALL', label: 'Tất cả' },
                       { id: 'VEGAN_STORE', label: '🌱 Quán Chay' },
                       { id: 'SUPERMARKET', label: '🛒 Siêu Thị' },
-                      { id: 'CONVENIENCE', label: '🏪 Tiện Lợi' },
-                      { id: 'APPLIANCE', label: '⚡ Điện Máy' }
+                      { id: 'CONVENIENCE', label: '🏪 Tiện Lợi' }
                     ].map(tab => (
                       <button
                         key={tab.id}

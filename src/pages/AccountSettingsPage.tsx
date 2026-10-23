@@ -21,7 +21,10 @@ import {
   Apple,
   Zap,
   Check,
-  ArrowRight
+  ArrowRight,
+  Calendar,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
@@ -140,6 +143,84 @@ export const AccountSettingsPage: React.FC = () => {
     const today = new Date().getDay();
     return today === 0 ? 0 : today;
   });
+
+  // Google Calendar 30-31 Day State
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(() => new Date());
+
+  // 42-cell Google Calendar month grid
+  const calendarGrid = useMemo(() => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+
+    const firstDayOfMonth = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startCol = (firstDayOfMonth.getDay() + 6) % 7;
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const cells: {
+      date: Date;
+      dayNumber: number;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+      isSelected: boolean;
+      dayOfWeek: number;
+    }[] = [];
+
+    const today = new Date();
+    const isSameDay = (d1: Date, d2: Date) =>
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate();
+
+    for (let i = startCol - 1; i >= 0; i--) {
+      const prevDate = new Date(year, month - 1, daysInPrevMonth - i);
+      cells.push({
+        date: prevDate,
+        dayNumber: daysInPrevMonth - i,
+        isCurrentMonth: false,
+        isToday: isSameDay(prevDate, today),
+        isSelected: isSameDay(prevDate, selectedCalendarDate),
+        dayOfWeek: prevDate.getDay(),
+      });
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const curDate = new Date(year, month, day);
+      cells.push({
+        date: curDate,
+        dayNumber: day,
+        isCurrentMonth: true,
+        isToday: isSameDay(curDate, today),
+        isSelected: isSameDay(curDate, selectedCalendarDate),
+        dayOfWeek: curDate.getDay(),
+      });
+    }
+
+    const remaining = 42 - cells.length;
+    for (let day = 1; day <= remaining; day++) {
+      const nextDate = new Date(year, month + 1, day);
+      cells.push({
+        date: nextDate,
+        dayNumber: day,
+        isCurrentMonth: false,
+        isToday: isSameDay(nextDate, today),
+        isSelected: isSameDay(nextDate, selectedCalendarDate),
+        dayOfWeek: nextDate.getDay(),
+      });
+    }
+
+    return cells;
+  }, [calendarMonth, selectedCalendarDate]);
+
+  const handleSelectCalendarCell = (cellDate: Date) => {
+    sfx.playTap();
+    setSelectedCalendarDate(cellDate);
+    if (cellDate.getMonth() !== calendarMonth.getMonth()) {
+      setCalendarMonth(new Date(cellDate.getFullYear(), cellDate.getMonth(), 1));
+    }
+    setSelectedDayIdx(cellDate.getDay());
+  };
 
   // Profile Form state
   const [fullName, setFullName] = useState('');
@@ -1013,7 +1094,149 @@ export const AccountSettingsPage: React.FC = () => {
             </div>
 
             {/* 4. WEEKLY CALORIE CONSUMPTION & MEAL SCHEDULE */}
-        <section id="weekly-schedule" className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
+            {/* Grid 2 Columns: Left (Google Calendar 30-31 Days) + Right (Weekly Schedule & Meals) */}
+            <div className="grid lg:grid-cols-12 gap-6 items-start">
+              {/* GOOGLE CALENDAR 30-31 NGÀY - BÊN TRÁI */}
+              <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center font-bold shadow-2xs">
+                      <Calendar className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 dark:text-white text-base">
+                        {calendarMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' }).replace(/^tháng\s+/i, 'Tháng ')}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Lịch dinh dưỡng &amp; kế hoạch ăn chay
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playTap();
+                        const today = new Date();
+                        setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+                        setSelectedCalendarDate(today);
+                        setSelectedDayIdx(today.getDay());
+                      }}
+                      className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 transition cursor-pointer"
+                      title="Quay về hôm nay"
+                    >
+                      Hôm nay
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playTap();
+                        setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1));
+                      }}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                      aria-label="Tháng trước"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playTap();
+                        setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1));
+                      }}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                      aria-label="Tháng sau"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Days of Week Header */}
+                <div className="grid grid-cols-7 text-center">
+                  {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d, idx) => (
+                    <div
+                      key={d}
+                      className={`text-[11px] font-bold py-1.5 ${
+                        idx >= 5 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
+                      }`}
+                    >
+                      {d}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 42-cell Month Grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarGrid.map((cell, idx) => {
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSelectCalendarCell(cell.date)}
+                        className={`aspect-square p-1 rounded-xl flex flex-col items-center justify-center relative transition cursor-pointer text-xs ${
+                          cell.isSelected
+                            ? 'bg-emerald-700 dark:bg-emerald-600 text-white font-extrabold shadow-sm ring-2 ring-emerald-300 dark:ring-emerald-900'
+                            : cell.isToday
+                            ? 'border-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 font-extrabold bg-emerald-50/50 dark:bg-emerald-950/30'
+                            : cell.isCurrentMonth
+                            ? 'text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'
+                            : 'text-slate-300 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-850'
+                        }`}
+                      >
+                        <span>{cell.dayNumber}</span>
+                        {/* Status dot indicator */}
+                        {cell.isCurrentMonth && (
+                          <span
+                            className={`w-1 h-1 rounded-full mt-0.5 ${
+                              cell.isSelected
+                                ? 'bg-emerald-200'
+                                : cell.isToday
+                                ? 'bg-emerald-600 dark:bg-emerald-400'
+                                : 'bg-emerald-400/60 dark:bg-emerald-600/60'
+                            }`}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Selected Date Summary & Streak Card */}
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>
+                        {selectedCalendarDate.toLocaleDateString('vi-VN', {
+                          weekday: 'long',
+                          day: 'numeric',
+                          month: 'numeric',
+                          year: 'numeric'
+                        })}
+                      </span>
+                    </span>
+                    <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                      Đang chọn
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Chuỗi ăn chay: <strong className="text-slate-700 dark:text-slate-200">14 ngày</strong> liên tục</span>
+                    </span>
+                    <span className="font-bold text-emerald-800 dark:text-emerald-300">
+                      {dailyCalorieTarget || '1.650'} kcal
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. WEEKLY CALORIE CONSUMPTION & MEAL SCHEDULE - BÊN PHẢI */}
+              <section id="weekly-schedule" className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
@@ -1073,7 +1296,7 @@ export const AccountSettingsPage: React.FC = () => {
               </h3>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3 gap-4">
               {[
                 { title: 'Bữa Sáng (07:00)', meal: currentScheduledDay.breakfast, icon: '🌅' },
                 { title: 'Bữa Trưa (12:00)', meal: currentScheduledDay.lunch, icon: '☀️' },
@@ -1132,6 +1355,7 @@ export const AccountSettingsPage: React.FC = () => {
             </div>
           </div>
         </section>
+            </div>
 
                   </div>
         )}

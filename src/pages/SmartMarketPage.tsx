@@ -34,6 +34,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { SmartMarketMap } from '../components/SmartMarketMap';
 import { sfx } from '../utils/soundEffects';
 import { fridgeService } from '../services/fridgeService';
+import { userService } from '../services/userService';
 import {
   INITIAL_SMART_MARKET_ITEMS,
   type SmartMarketItem,
@@ -211,22 +212,58 @@ export const VIETGAP_5K_VEGGIES = [
   { name: 'Rau dền đỏ VietGAP (500g)', price: 5000, originalPrice: '12.000đ', emoji: '🥬' },
 ];
 
+export const PREDEFINED_AREAS = [
+  { name: 'Thảo Điền', lat: 10.8030, lon: 106.7360, addr: 'Đường Quốc Hương, Phường Thảo Điền, TP. Thủ Đức, TP.HCM' },
+  { name: 'Phú Nhuận', lat: 10.7952, lon: 106.6855, addr: '184 Phan Xích Long, Phường 2, Q. Phú Nhuận, TP.HCM' },
+  { name: 'Quận 1', lat: 10.7769, lon: 106.7009, addr: 'Đường Nguyễn Du, Phường Bến Nghé, Quận 1, TP.HCM' },
+  { name: 'Bình Thạnh', lat: 10.8035, lon: 106.6940, addr: 'Đường Hoàng Hoa Thám, Phường 7, Q. Bình Thạnh, TP.HCM' }
+];
+
 export function SmartMarketPage() {
   const [items, setItems] = useState<SmartMarketItem[]>(loadInitialItems);
   const [mainView, setMainView] = useState<'map' | 'checklist'>('map');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unbought' | 'bought'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
-  // Stores State (Dynamic from OSM & Real GPS)
-  const [stores, setStores] = useState<SmartMarketStore[]>(() => buildAnchoredStoresForCoordinates(10.8030, 106.7360));
+  // Address requirement & gate state: If user has not confirmed an address, do not show map & stores immediately!
+  const [isAddressConfirmed, setIsAddressConfirmed] = useState<boolean>(() => {
+    return Boolean(sessionStorage.getItem(SESSION_ADDR_KEY) && sessionStorage.getItem(SESSION_GPS_KEY));
+  });
+  const [manualAddressInput, setManualAddressInput] = useState('');
+
+  // Location permission & session persistence
+  const [userLoc, setUserLoc] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_GPS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.lat && parsed?.lon) return parsed;
+      }
+    } catch {}
+    return { lat: 10.8030, lon: 106.7360 };
+  });
+
+  const [userAddress, setUserAddress] = useState(() => {
+    return sessionStorage.getItem(SESSION_ADDR_KEY) || '';
+  });
+
+  // Stores State (Only initialized if address was already confirmed in this session)
+  const [stores, setStores] = useState<SmartMarketStore[]>(() => {
+    const cachedLoc = sessionStorage.getItem(SESSION_GPS_KEY);
+    if (cachedLoc) {
+      try {
+        const parsed = JSON.parse(cachedLoc);
+        if (parsed?.lat && parsed?.lon) {
+          return buildAnchoredStoresForCoordinates(parsed.lat, parsed.lon);
+        }
+      } catch {}
+    }
+    return [];
+  });
   const [loadingStores, setLoadingStores] = useState(false);
   const [storeTypeFilter, setStoreTypeFilter] = useState<string>('ALL');
   const [selectedStore, setSelectedStore] = useState<SmartMarketStore | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
-
-  // Location permission & session persistence
-  const [userLoc, setUserLoc] = useState({ lat: 10.8030, lon: 106.7360 }); // Default centered at Thảo Điền
-  const [userAddress, setUserAddress] = useState('Đường Quốc Hương, Phường Thảo Điền, TP. Thủ Đức, TP.HCM');
   const [locationStatus, setLocationStatus] = useState<'default' | 'requesting' | 'granted' | 'denied'>('default');
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
@@ -269,6 +306,13 @@ export function SmartMarketPage() {
   }, [selectedStore, catalogSubcategory]);
 
   const handleAddComboToCart = (combo: MealCombo) => {
+    if (!isAddressConfirmed) {
+      sfx.playNotification();
+      setLocationMessage('Vui lòng cập nhật hoặc chọn địa chỉ giao hàng trước khi mua combo!');
+      const el = document.getElementById('location-section') || document.getElementById('location-bar');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
     sfx.playSuccess();
     const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
     if (!targetStore) return;
@@ -323,6 +367,13 @@ export function SmartMarketPage() {
   };
 
   const handleAddVietgapVeggie = (veg: typeof VIETGAP_5K_VEGGIES[0]) => {
+    if (!isAddressConfirmed) {
+      sfx.playNotification();
+      setLocationMessage('Vui lòng cập nhật hoặc chọn địa chỉ giao hàng trước khi chọn rau củ!');
+      const el = document.getElementById('location-section') || document.getElementById('location-bar');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
     sfx.playSuccess();
     const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
     if (!targetStore) return;
@@ -404,7 +455,7 @@ export function SmartMarketPage() {
     }
   }, []);
 
-  // Initialize session location: If already shared in this session, do not ask again!
+  // Initialize location: Only load stores if an address exists in session or in user profile
   useEffect(() => {
     const cachedLoc = sessionStorage.getItem(SESSION_GPS_KEY);
     const cachedAddr = sessionStorage.getItem(SESSION_ADDR_KEY);
@@ -415,6 +466,7 @@ export function SmartMarketPage() {
         if (coords?.lat && coords?.lon) {
           setUserLoc(coords);
           setUserAddress(cachedAddr);
+          setIsAddressConfirmed(true);
           setLocationStatus('granted');
           loadStoresForCoords(coords.lat, coords.lon);
           return;
@@ -424,8 +476,35 @@ export function SmartMarketPage() {
       }
     }
 
-    // Default load Thảo Điền
-    loadStoresForCoords(userLoc.lat, userLoc.lon);
+    // Try checking saved address from user profile
+    userService.getProfile()
+      .then(res => {
+        const profileAddr = res?.address;
+        if (profileAddr && profileAddr.trim().length > 3) {
+          const addr = profileAddr.trim();
+          setUserAddress(addr);
+          setIsAddressConfirmed(true);
+          setLocationStatus('granted');
+          sessionStorage.setItem(SESSION_ADDR_KEY, addr);
+
+          const lower = addr.toLowerCase();
+          let lat = 10.7769;
+          let lon = 106.7009;
+          if (lower.includes('thảo điền') || lower.includes('thủ đức')) {
+            lat = 10.8030; lon = 106.7360;
+          } else if (lower.includes('phú nhuận')) {
+            lat = 10.7952; lon = 106.6855;
+          } else if (lower.includes('bình thạnh')) {
+            lat = 10.8035; lon = 106.6940;
+          }
+          setUserLoc({ lat, lon });
+          sessionStorage.setItem(SESSION_GPS_KEY, JSON.stringify({ lat, lon }));
+          loadStoresForCoords(lat, lon);
+        }
+      })
+      .catch(() => {
+        // User not logged in or has no address -> Wait for user to update address!
+      });
   }, [loadStoresForCoords]);
 
   // Import from Weekly Meal Plan
@@ -459,6 +538,7 @@ export function SmartMarketPage() {
         const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
         setUserLoc(coords);
         setLocationStatus('granted');
+        setIsAddressConfirmed(true);
 
         // Persist in sessionStorage for this browser session
         sessionStorage.setItem(SESSION_GPS_KEY, JSON.stringify(coords));
@@ -490,13 +570,60 @@ export function SmartMarketPage() {
     setLocationStatus('granted');
     sessionStorage.setItem(SESSION_GPS_KEY, JSON.stringify(coords));
     sessionStorage.setItem(SESSION_ADDR_KEY, area);
+    setIsAddressConfirmed(true);
     setLocationMessage(`Đã chuyển khu vực mua sắm sang: ${area}`);
     sfx.playTap();
     await loadStoresForCoords(lat, lon);
     setTimeout(() => setLocationMessage(null), 3000);
   };
 
-  const handleToggle = (id: string) => {
+    // Manual address submission handler
+  const handleManualAddressSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualAddressInput.trim()) return;
+
+    const input = manualAddressInput.trim();
+    sfx.playTap();
+    setLocationStatus('requesting');
+    setLocationMessage('Đang định vị địa chỉ của bạn...');
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=vn&limit=1`,
+        { headers: { 'Accept': 'application/json' } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          await handleSelectPredefinedArea(input, lat, lon);
+          setManualAddressInput('');
+          return;
+        }
+      }
+    } catch (err) {
+      console.debug('Geocode error fallback:', err);
+    }
+
+    // Fallback: match known zones or default District 1
+    const lower = input.toLowerCase();
+    let lat = 10.7769;
+    let lon = 106.7009;
+    if (lower.includes('thảo điền') || lower.includes('thủ đức')) {
+      lat = 10.8030; lon = 106.7360;
+    } else if (lower.includes('phú nhuận')) {
+      lat = 10.7952; lon = 106.6855;
+    } else if (lower.includes('bình thạnh')) {
+      lat = 10.8035; lon = 106.6940;
+    } else if (lower.includes('quận 3') || lower.includes('q3')) {
+      lat = 10.7828; lon = 106.6890;
+    }
+    await handleSelectPredefinedArea(input, lat, lon);
+    setManualAddressInput('');
+  };
+
+const handleToggle = (id: string) => {
     sfx.playTap();
     updateItems(prev => prev.map(item => item.id === id ? { ...item, checked: !item.checked } : item));
   };
@@ -777,29 +904,31 @@ export function SmartMarketPage() {
         </div>
 
         {/* Real GPS Location Bar (Session-Persistent) */}
-        <div className="bg-emerald-50/80 dark:bg-slate-900/90 rounded-2xl border border-emerald-200/70 dark:border-slate-800 p-4 mb-6 shadow-2xs">
+        <div id="location-bar" className="bg-emerald-50/80 dark:bg-slate-900/90 rounded-2xl border border-emerald-200/70 dark:border-slate-800 p-4 mb-6 shadow-2xs">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
+                isAddressConfirmed ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white animate-pulse'
+              }`}>
                 <MapPin className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
-                    Vị trí hiện tại của bạn:
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">
+                    {isAddressConfirmed ? 'Vị trí giao hàng hiện tại:' : 'Chưa có địa chỉ giao hàng:'}
                   </span>
-                  {locationStatus === 'granted' ? (
+                  {isAddressConfirmed ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-                      <Check className="w-3 h-3" /> Đã kết nối GPS thực tế
+                      <Check className="w-3 h-3" /> Đã cập nhật
                     </span>
                   ) : (
-                    <span className="text-[11px] font-medium text-slate-500">
-                      (Định vị khu vực)
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">
+                      Cần cập nhật để tiếp tục
                     </span>
                   )}
                 </div>
                 <p className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-white truncate max-w-xl mt-0.5">
-                  {userAddress}
+                  {isAddressConfirmed ? userAddress : 'Vui lòng chọn hoặc cập nhật địa chỉ để tìm quán chay & đi chợ gần bạn'}
                 </p>
               </div>
             </div>
@@ -809,20 +938,15 @@ export function SmartMarketPage() {
                 type="button"
                 onClick={handleRequestLocation}
                 disabled={locationStatus === 'requesting'}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-slate-700 text-xs font-bold transition shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
               >
-                <Navigation className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{locationStatus === 'requesting' ? 'Đang định vị GPS...' : '📍 Chia sẻ vị trí GPS thực tế'}</span>
+                <Navigation className="w-3.5 h-3.5" />
+                <span>{locationStatus === 'requesting' ? 'Đang định vị GPS...' : '📍 Định vị GPS tự động'}</span>
               </button>
 
               <div className="flex items-center gap-1 text-xs">
                 <span className="text-slate-400 hidden sm:inline">Khu vực nhanh:</span>
-                {[
-                  { name: 'Thảo Điền', lat: 10.8030, lon: 106.7360, addr: 'Đường Quốc Hương, Phường Thảo Điền, TP. Thủ Đức, TP.HCM' },
-                  { name: 'Phú Nhuận', lat: 10.7952, lon: 106.6855, addr: '184 Phan Xích Long, Phường 2, Q. Phú Nhuận, TP.HCM' },
-                  { name: 'Quận 1', lat: 10.7769, lon: 106.7009, addr: 'Đường Nguyễn Du, Phường Bến Nghé, Quận 1, TP.HCM' },
-                  { name: 'Bình Thạnh', lat: 10.8035, lon: 106.6940, addr: 'Đường Hoàng Hoa Thám, Phường 7, Q. Bình Thạnh, TP.HCM' }
-                ].map(loc => (
+                {PREDEFINED_AREAS.map(loc => (
                   <button
                     key={loc.name}
                     type="button"
@@ -833,6 +957,17 @@ export function SmartMarketPage() {
                   </button>
                 ))}
               </div>
+
+              {isAddressConfirmed && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddressConfirmed(false)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  title="Thay đổi địa chỉ giao hàng"
+                >
+                  Đổi địa chỉ
+                </button>
+              )}
             </div>
           </div>
 
@@ -1006,7 +1141,7 @@ export function SmartMarketPage() {
               </div>
             </div>
             {/* SECTION 2: BẢN ĐỒ & QUÁN CHAY GẦN BẠN */}
-            <div className="pt-2">
+            <div id="map-section" className="pt-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/80 dark:border-slate-800 mb-5">
                 <div>
                   <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
@@ -1014,16 +1149,31 @@ export function SmartMarketPage() {
                     Bản Đồ Quán Chay &amp; Điểm Bán Thực Phẩm Lân Cận
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Chọn địa điểm trên bản đồ tương tác để xem chi tiết kệ hàng và đặt giao hỏa tốc.
+                    {isAddressConfirmed
+                      ? 'Chọn địa điểm trên bản đồ tương tác để xem chi tiết kệ hàng và đặt giao hỏa tốc.'
+                      : 'Vui lòng cập nhật địa chỉ để quét các quán chay & siêu thị thực tế gần bạn nhất.'}
                   </p>
                 </div>
-                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 self-start sm:self-auto">
-                  🗺️ OpenStreetMap &amp; GPS Thực Tế
-                </span>
+                {isAddressConfirmed && (
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                      🗺️ OpenStreetMap &amp; GPS Thực Tế
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddressConfirmed(false)}
+                      className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+                    >
+                      Đổi vị trí
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="grid lg:grid-cols-12 gap-6 items-start">
+            {isAddressConfirmed ? (
+              <>
+<div className="grid lg:grid-cols-12 gap-6 items-start">
 
               {/* Left Column: Stores List (ShopeeFood Style Cards) */}
               <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs h-[680px] flex flex-col">
@@ -1319,6 +1469,73 @@ export function SmartMarketPage() {
                   )}
                 </div>
 
+              </div>
+            )}
+
+              </>
+            ) : (
+              <div id="location-section" className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8 sm:p-12 text-center max-w-2xl mx-auto shadow-xs space-y-6 animate-in fade-in duration-300">
+                <div className="w-16 h-16 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center mx-auto shadow-2xs">
+                  <MapPin className="w-8 h-8 text-emerald-600" />
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                    Vui lòng cập nhật địa chỉ để tiếp tục
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
+                    VEGEAI sẽ tự động quét các quán chay, siêu thị nông sản và cửa hàng thực phẩm thực tế gần bạn nhất dựa trên vị trí chính xác.
+                  </p>
+                </div>
+
+                <div className="space-y-4 max-w-md mx-auto">
+                  <button
+                    type="button"
+                    onClick={handleRequestLocation}
+                    disabled={locationStatus === 'requesting'}
+                    className="w-full py-3.5 px-5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-sm transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    <span>{locationStatus === 'requesting' ? 'Đang định vị GPS vệ tinh...' : '📍 Định vị GPS vị trí hiện tại của tôi'}</span>
+                  </button>
+
+                  <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                    <span>hoặc chọn khu vực nhanh</span>
+                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {PREDEFINED_AREAS.map(loc => (
+                      <button
+                        key={loc.name}
+                        type="button"
+                        onClick={() => handleSelectPredefinedArea(loc.addr, loc.lat, loc.lon)}
+                        className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:border-emerald-300 font-bold text-xs text-slate-700 dark:text-slate-200 transition cursor-pointer"
+                      >
+                        {loc.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Manual street address input */}
+                  <form onSubmit={handleManualAddressSubmit} className="flex items-center gap-2 pt-2">
+                    <input
+                      type="text"
+                      placeholder="Nhập địa chỉ giao hàng của bạn..."
+                      value={manualAddressInput}
+                      onChange={e => setManualAddressInput(e.target.value)}
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!manualAddressInput.trim()}
+                      className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:opacity-90 disabled:opacity-40 transition cursor-pointer shrink-0"
+                    >
+                      Xác nhận
+                    </button>
+                  </form>
+                </div>
               </div>
             )}
 

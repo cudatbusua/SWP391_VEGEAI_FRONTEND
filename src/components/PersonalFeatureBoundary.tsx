@@ -9,6 +9,6 @@ export function PersonalFeatureBoundary({ children }: { children: ReactNode }) {
   if (isLoading) return <MainLayout><p role="status" className="p-8 text-center">Đang tải phiên đăng nhập...</p></MainLayout>;
   if (user?.role === 'admin') return <Navigate to="/admin" replace />;
   // Guests may browse only exploration, published blogs, public Q&A, and verified restaurants.
-  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
-  return children;
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  return <>{children}</>;
 }

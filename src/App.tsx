@@ -3,10 +3,13 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './store/AuthContext';
 import { PersonalFeatureBoundary } from './components/PersonalFeatureBoundary';
 import { AdminFeatureBoundary } from './components/AdminFeatureBoundary';
+import { GuestOnlyBoundary } from './components/GuestOnlyBoundary';
+import { useAuth } from './hooks/useAuth';
 
 const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
 const RegisterPage = lazy(() => import('./pages/RegisterPage').then(module => ({ default: module.RegisterPage })));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then(module => ({ default: module.ForgotPasswordPage })));
+const ForbiddenPage = lazy(() => import('./pages/ForbiddenPage').then(module => ({ default: module.ForbiddenPage })));
 const RecipeDiscoveryPage = lazy(() => import('./pages/RecipeDiscoveryPage').then(module => ({ default: module.RecipeDiscoveryPage })));
 const RecipeDetailPage = lazy(() => import('./pages/RecipeDetailPage').then(module => ({ default: module.RecipeDetailPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(module => ({ default: module.DashboardPage })));
@@ -39,6 +42,14 @@ import { ThemeProvider } from './store/ThemeContext';
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then(module => ({ default: module.AccountSettingsPage })));
 const SmartMarketPage = lazy(() => import('./pages/SmartMarketPage').then(module => ({ default: module.SmartMarketPage })));
 
+const DashboardRoute: React.FC = () => {
+  const { user, isAuthenticated } = useAuth();
+  if (isAuthenticated && user?.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+  return <DashboardPage />;
+};
+
 export const App: React.FC = () => {
   return (
     <ThemeProvider>
@@ -47,16 +58,17 @@ export const App: React.FC = () => {
           {/* Defer each route bundle until navigation so maps, admin tools and editors stay off the initial download. */}
           <Suspense fallback={<main className="min-h-[60vh] p-10 text-center text-sm font-medium text-slate-600" role="status">Đang tải trang...</main>}>
           <Routes>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<DashboardRoute />} />
             <Route path="/explore" element={<RecipeDiscoveryPage />} />
             <Route path="/recipes" element={<Navigate to="/explore" replace />} />
             <Route path="/recipe/:id" element={<RecipeDetailPage />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardRoute />} />
+            <Route path="/forbidden" element={<ForbiddenPage />} />
             <Route path="/settings" element={<PersonalFeatureBoundary><AccountSettingsPage /></PersonalFeatureBoundary>} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/login" element={<GuestOnlyBoundary><LoginPage /></GuestOnlyBoundary>} />
+            <Route path="/register" element={<GuestOnlyBoundary><RegisterPage /></GuestOnlyBoundary>} />
+            <Route path="/forgot-password" element={<GuestOnlyBoundary><ForgotPasswordPage /></GuestOnlyBoundary>} />
+            <Route path="/reset-password" element={<GuestOnlyBoundary><ResetPasswordPage /></GuestOnlyBoundary>} />
             <Route path="/change-password" element={<Navigate to="/settings?tab=security" replace />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/ai-chef" element={<AiChatPage />} />
@@ -83,9 +95,9 @@ export const App: React.FC = () => {
           <Route path="/questions/mine" element={<PersonalFeatureBoundary><QuestionsPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine/:id" element={<PersonalFeatureBoundary><QuestionDetailPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/:id" element={<QuestionDetailPage />} />
-          <Route path="/videos" element={<PersonalFeatureBoundary><VideosPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos" element={<VideosPage />} />
           <Route path="/videos/saved" element={<PersonalFeatureBoundary><VideosPage saved /></PersonalFeatureBoundary>} />
-          <Route path="/videos/:id" element={<PersonalFeatureBoundary><VideoDetailPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/:id" element={<VideoDetailPage />} />
           <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos" element={<AdminFeatureBoundary><AdminVideosPage /></AdminFeatureBoundary>} />

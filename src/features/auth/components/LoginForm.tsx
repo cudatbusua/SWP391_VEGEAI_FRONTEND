@@ -10,8 +10,20 @@ export const LoginForm: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const requestedPath: unknown = location.state?.from;
-  const destination = typeof requestedPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition)(?:\/[A-Za-z0-9-]+)*$/.test(requestedPath)
-    ? requestedPath : null;
+  const rawPath = typeof requestedPath === 'string'
+    ? requestedPath
+    : (typeof requestedPath === 'object' && requestedPath && 'pathname' in requestedPath)
+      ? (requestedPath as { pathname: string }).pathname
+      : null;
+  const destination = typeof rawPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition|settings|fridge)(?:\/[A-Za-z0-9-]+)*$/.test(rawPath)
+    ? rawPath : null;
+
+  const resolveDestination = (role?: string): string => {
+    if (role === 'admin') {
+      return (destination && destination.startsWith('/admin')) ? destination : '/admin';
+    }
+    return (destination && !destination.startsWith('/admin')) ? destination : '/dashboard';
+  };
 
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
@@ -65,7 +77,7 @@ export const LoginForm: React.FC = () => {
           try {
             const res = await loginWithGoogle(response.credential, formData.rememberMe);
             if (res.success && res.data) {
-              navigate(destination || '/', { replace: true });
+              navigate(resolveDestination(res.data?.role), { replace: true });
             } else {
               setGeneralError(res.error || 'Đăng nhập bằng Google không thành công.');
             }
@@ -148,7 +160,7 @@ export const LoginForm: React.FC = () => {
       if (res.success && res.data) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          navigate(destination || (res.data?.role === 'admin' ? '/admin' : '/dashboard'), { replace: true });
+          navigate(resolveDestination(res.data?.role), { replace: true });
         }, 800);
       } else {
         setGeneralError(res.error || 'Mã xác thực OTP không chính xác hoặc đã hết hạn.');

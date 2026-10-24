@@ -6,6 +6,7 @@ import { useTheme } from '../store/ThemeContext';
 import '../styles/navigation.css';
 import { AdminLayout } from './AdminLayout';
 import { UserMenu } from '../components/UserMenu';
+import { SettingsMenu } from '../components/SettingsMenu';
 import { NotificationBell } from '../components/NotificationBell';
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -159,6 +160,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               <div className="flex items-center gap-2 sm:gap-3">
                 <NotificationBell />
                 <UserMenu user={user} loggingOut={loggingOut} onLogout={handleLogout} />
+                <SettingsMenu />
               </div>
             )}
           </div>

@@ -616,28 +616,6 @@ export const AccountSettingsPage: React.FC = () => {
               >
                 Lịch biểu &amp; Thực đơn
               </button>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('security')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'security'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Bảo mật &amp; OTP
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('preferences')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'preferences'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Giao diện Sáng/Tối
-              </button>
             </div>
 
           </div>
@@ -648,8 +626,6 @@ export const AccountSettingsPage: React.FC = () => {
           {[
             { id: 'profile', label: 'Hồ sơ & Chỉ số sức khỏe', icon: Activity, desc: 'BMI, Thể trạng, Calo, Vòng vận động' },
             { id: 'calendar', label: 'Lịch biểu & Thực đơn', icon: CalendarDays, desc: 'Lịch ăn 30 ngày, 3 bữa chính' },
-            { id: 'security', label: 'Bảo mật & Đăng nhập', icon: ShieldCheck, desc: 'Đổi mật khẩu, OTP' },
-            { id: 'preferences', label: 'Giao diện & Hệ thống', icon: Palette, desc: 'Chế độ Sáng/Tối, Riêng tư' },
           ].map(tabItem => {
             const Icon = tabItem.icon;
             const isActive = currentTab === tabItem.id;

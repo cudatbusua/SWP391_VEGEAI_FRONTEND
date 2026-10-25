@@ -263,6 +263,7 @@ export function SmartMarketPage() {
   const [loadingStores, setLoadingStores] = useState(false);
   const [storeTypeFilter, setStoreTypeFilter] = useState<string>('ALL');
   const [selectedStore, setSelectedStore] = useState<SmartMarketStore | null>(null);
+  const [recenterTrigger, setRecenterTrigger] = useState(0);
   const [storeSearch, setStoreSearch] = useState('');
   const [locationStatus, setLocationStatus] = useState<'default' | 'requesting' | 'granted' | 'denied'>('default');
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
@@ -536,6 +537,8 @@ export function SmartMarketPage() {
     navigator.geolocation.getCurrentPosition(
       async pos => {
         const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        setSelectedStore(null);
+        setRecenterTrigger(prev => prev + 1);
         setUserLoc(coords);
         setLocationStatus('granted');
         setIsAddressConfirmed(true);
@@ -564,6 +567,8 @@ export function SmartMarketPage() {
 
   // Switch predefined location area
   const handleSelectPredefinedArea = async (area: string, lat: number, lon: number) => {
+    setSelectedStore(null);
+    setRecenterTrigger(prev => prev + 1);
     setUserAddress(area);
     const coords = { lat, lon };
     setUserLoc(coords);
@@ -1305,6 +1310,12 @@ const handleToggle = (id: string) => {
                     selectedStore={selectedStore}
                     userLocation={userLoc}
                     onSelect={(s) => setSelectedStore(s)}
+                    recenterTrigger={recenterTrigger}
+                    onRecenter={() => {
+                      setSelectedStore(null);
+                      setRecenterTrigger(prev => prev + 1);
+                      sfx.playTap();
+                    }}
                   />
                 </div>
               </div>
@@ -1598,7 +1609,7 @@ const handleToggle = (id: string) => {
                   {autoSyncFridge && syncedCount > 0 && (
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-bold shadow-xs">
                       <Sparkles className="w-4 h-4 text-emerald-600 animate-spin" />
-                      <span>Đã tự động nạp {syncedCount} nguyên liệu tươi vào Kho Tủ Lạnh (Smart Fridge) của bạn!</span>
+                      <span>Đã tự động nạp {syncedCount} nguyên liệu tươi vào Tủ Bếp Của Tôi (Smart Fridge)!</span>
                     </div>
                   )}
 
@@ -1784,7 +1795,7 @@ const handleToggle = (id: string) => {
                       />
                       <div className="text-left text-xs">
                         <div className="font-extrabold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
-                          <span>Tự động đồng bộ vào Kho Tủ Lạnh (Smart Fridge)</span>
+                          <span>Tự động đồng bộ vào Tủ Bếp Của Tôi (Smart Fridge)</span>
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-200 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100 font-extrabold">Auto-Sync</span>
                         </div>
                         <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400 mt-0.5">

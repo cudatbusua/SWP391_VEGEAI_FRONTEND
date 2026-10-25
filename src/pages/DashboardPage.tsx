@@ -800,7 +800,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
               <Link to="/fridge" className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline">
-                Mở kho tủ lạnh →
+                Mở Tủ Bếp Của Tôi →
               </Link>
             </div>
 
@@ -825,7 +825,7 @@ export const DashboardPage: React.FC = () => {
                     to="/register"
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white dark:bg-slate-800 text-stone-800 dark:text-slate-200 border border-stone-200 dark:border-slate-700 text-xs font-bold transition"
                   >
-                    <UserPlus size={14} /> Đăng ký để lưu kho
+                    <UserPlus size={14} /> Đăng ký để lưu Tủ Bếp
                   </Link>
                 </div>
               </div>

@@ -36,7 +36,7 @@ export function isNonFoodKeyword(text: string): boolean {
     'cui kho', 'que cui', 'khuc go', 'mieng go', 'cay cui', 'canh cay', 'than cay',
     'cay canh', 'cay xanh', 'chau cay',
     'dong la', 'la kho', 'la rung', 'la muc', 'co dai',
-    'soi da', 'hon da', 'cuc da', 'da soi', 'gach da',
+    'soi da', 'hon da', 'cuc da', 'da soi', 'gach da', 'tang da', 'khoi da', 'nui da', 'nui', 'reu', 'khoang vat',
     'rac thai', 'tui nilon', 'chai nhua', 'do nhua', 'phe lieu'
   ];
 
@@ -522,14 +522,14 @@ function ScanReview(props: ScanReviewProps) {
 
         {!isAuthenticated && (
           <Link to="/login" className="text-xs font-semibold text-emerald-700 hover:underline">
-            Đăng nhập để lưu vào kho
+            Đăng nhập để lưu vào Tủ Bếp Của Tôi
           </Link>
         )}
       </div>
 
       {message && (
         <Link to="/fridge" className="mt-3 inline-block text-sm font-semibold text-emerald-700 hover:underline">
-          Xem kho nguyên liệu tủ lạnh →
+          Xem Tủ Bếp Của Tôi →
         </Link>
       )}
     </section>
@@ -754,7 +754,7 @@ export function FridgeScanPage() {
     setSaving(true); setError(''); setMessage('');
     try {
       const saved = await fridgeService.confirmScan({ ...result, ingredients });
-      setMessage(`Đã lưu ${saved.totalProcessed} nguyên liệu vào kho (${saved.newlyAddedCount} mới, ${saved.updatedExistingCount} được cập nhật).`);
+      setMessage(`Đã lưu ${saved.totalProcessed} nguyên liệu vào Tủ Bếp Của Tôi (${saved.newlyAddedCount} mới, ${saved.updatedExistingCount} được cập nhật).`);
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setSaving(false); }
   };

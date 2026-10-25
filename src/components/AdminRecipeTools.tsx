@@ -5,7 +5,7 @@ import { recipeService } from '../services/recipeService';
 import { errorMessage } from '../services/apiClient';
 import type { RecipeTag } from '../types/recipe';
 
-const groups = { DIETARY_TYPE: 'Trường phái', COOKING_METHOD: 'Cách chế biến', DISH_CATEGORY: 'Loại món', NUTRITION_GOAL: 'Dinh dưỡng', OCCASION: 'Hoàn cảnh', DIETARY_RESTRICTION: 'Kiêng / dị ứng' };
+const groups = { DIETARY_TYPE: 'Trường phái', COOKING_METHOD: 'Cách chế biến', DISH_CATEGORY: 'Loại món', NUTRITION_GOAL: 'Dinh dưỡng', OCCASION: 'Nhu cầu & Dịp nấu', DIETARY_RESTRICTION: 'Kiêng / dị ứng' };
 export function AdminRecipeTools() {
   const [version, setVersion] = useState(0);
   const [tags, setTags] = useState<RecipeTag[]>([]);

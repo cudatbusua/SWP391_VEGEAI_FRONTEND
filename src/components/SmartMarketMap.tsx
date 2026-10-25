@@ -12,9 +12,19 @@ interface SmartMarketMapProps {
   selectedStore: SmartMarketStore | null;
   onSelect(store: SmartMarketStore): void;
   userLocation: { lat: number; lon: number };
+  recenterTrigger?: number;
+  onRecenter?(): void;
 }
 
-function MapViewport({ center, selectedStore }: { center: { lat: number; lon: number }; selectedStore: SmartMarketStore | null }) {
+function MapViewport({
+  center,
+  selectedStore,
+  recenterTrigger,
+}: {
+  center: { lat: number; lon: number };
+  selectedStore: SmartMarketStore | null;
+  recenterTrigger?: number;
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -32,7 +42,7 @@ function MapViewport({ center, selectedStore }: { center: { lat: number; lon: nu
       ? [selectedStore.lat, selectedStore.lon]
       : [center.lat, center.lon];
     map.flyTo(point, selectedStore ? 16 : 14, { duration: 0.6 });
-  }, [center.lat, center.lon, map, selectedStore]);
+  }, [center.lat, center.lon, map, selectedStore, recenterTrigger]);
   return null;
 }
 
@@ -65,7 +75,7 @@ const userMarkerIcon = L.divIcon({
   iconAnchor: [12, 12],
 });
 
-export function SmartMarketMap({ stores, selectedStore, onSelect, userLocation }: SmartMarketMapProps) {
+export function SmartMarketMap({ stores, selectedStore, onSelect, userLocation, recenterTrigger, onRecenter }: SmartMarketMapProps) {
   const { theme } = useTheme();
   const [tileError, setTileError] = useState(false);
   const [styleMode, setStyleMode] = useState<MapStyleMode>('auto');
@@ -81,7 +91,7 @@ export function SmartMarketMap({ stores, selectedStore, onSelect, userLocation }
         className="h-full w-full z-10"
         style={{ height: '100%', minHeight: '460px', width: '100%' }}
       >
-        <MapViewport center={userLocation} selectedStore={selectedStore} />
+        <MapViewport center={userLocation} selectedStore={selectedStore} recenterTrigger={recenterTrigger} />
 
         <TileLayer
           key={`${tileConfig.label}-${theme}-${styleMode}`}
@@ -230,6 +240,19 @@ export function SmartMarketMap({ stores, selectedStore, onSelect, userLocation }
           <Navigation size={14} className="text-amber-700 dark:text-amber-400" />
           <span>Đang chuyển đổi máy chủ bản đồ dự phòng...</span>
         </div>
+      )}
+
+      {/* Floating GPS button on Map for quick 1-click re-center */}
+      {onRecenter && (
+        <button
+          type="button"
+          onClick={onRecenter}
+          className="absolute bottom-6 right-4 z-[400] flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200/90 dark:border-slate-700 shadow-md text-xs font-bold text-slate-700 dark:text-slate-200 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+          title="Quay lại vị trí của tôi"
+        >
+          <Navigation size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />
+          <span>Vị trí của tôi</span>
+        </button>
       )}
     </div>
   );

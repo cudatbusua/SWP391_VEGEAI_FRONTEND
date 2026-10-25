@@ -24,7 +24,8 @@ import {
   ArrowRight,
   Calendar,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Target
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
@@ -36,7 +37,7 @@ import { mealPlanService } from '../services/mealPlanService';
 import { sfx } from '../utils/soundEffects';
 import { HealthActivityRings } from '../components/HealthActivityRings';
 import { dietLabels, calculateBmr, calculateTdee } from '../utils/nutritionProfile';
-import type { UserProfile, UpdateUserProfile, NutritionProfile } from '../types/api';
+import type { UserProfile, UpdateUserProfile, NutritionProfile, ActivityLevel, NutritionGoal } from '../types/api';
 import type { MealPlan } from '../types/mealPlan';
 import { errorMessage } from '../services/apiClient';
 
@@ -233,6 +234,8 @@ export const AccountSettingsPage: React.FC = () => {
   const [dailyCalorieTarget, setDailyCalorieTarget] = useState<number | ''>('');
   const [dietaryPreferences, setDietaryPreferences] = useState('VEGETARIAN');
   const [selectedAllergies, setSelectedAllergies] = useState<string[]>([]);
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel>('MODERATE');
+  const [goal, setGoal] = useState<NutritionGoal>('MAINTAIN');
 
   // Password Form state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -284,6 +287,8 @@ export const AccountSettingsPage: React.FC = () => {
 
       if (nutrRes.status === 'fulfilled' && nutrRes.value) {
         setNutrition(nutrRes.value);
+        if (nutrRes.value.activityLevel) setActivityLevel(nutrRes.value.activityLevel);
+        if (nutrRes.value.goal) setGoal(nutrRes.value.goal);
       }
 
       if (plansRes.status === 'fulfilled' && plansRes.value.items.length > 0) {
@@ -337,9 +342,30 @@ export const AccountSettingsPage: React.FC = () => {
 
       const updated = await userService.updateProfile(payload);
       setProfile(updated);
+
+      if (heightCm && weightKg && dateOfBirth) {
+        try {
+          const nutr = await nutritionService.saveProfile({
+            gender: gender === 'MALE' ? 'MALE' : 'FEMALE',
+            dateOfBirth,
+            heightCm: Number(heightCm),
+            weightKg: Number(weightKg),
+            activityLevel: activityLevel || 'MODERATE',
+            goal: goal || 'MAINTAIN',
+            customDailyCalories: dailyCalorieTarget === '' ? null : Number(dailyCalorieTarget),
+            phoneNumber: phoneNumber.trim() || undefined,
+            dietaryPreferences: dietaryPreferences || 'VEGETARIAN',
+            allergies: selectedAllergies.join(','),
+          });
+          setNutrition(nutr);
+        } catch (syncErr) {
+          console.warn('Sync nutrition profile directly:', syncErr);
+        }
+      }
+
       sfx.playSuccess();
       setProfileSuccess('Hồ sơ cá nhân và chỉ số dinh dưỡng đã được cập nhật thành công!');
-      setTimeout(() => setProfileSuccess(''), 5000);
+      setTimeout(() => setProfileSuccess(''), 6000);
     } catch (err) {
       setProfileError(errorMessage(err));
     } finally {
@@ -513,7 +539,18 @@ export const AccountSettingsPage: React.FC = () => {
     return 1450;
   }, [hNum, wNum, age, gender]);
 
-  const tdee = useMemo(() => calculateTdee(bmr, 1.375), [bmr]);
+  const activityMultiplier = useMemo(() => {
+    switch (activityLevel) {
+      case 'SEDENTARY': return 1.2;
+      case 'LIGHT': return 1.375;
+      case 'MODERATE': return 1.55;
+      case 'ACTIVE': return 1.725;
+      case 'VERY_ACTIVE': return 1.9;
+      default: return 1.375;
+    }
+  }, [activityLevel]);
+
+  const tdee = useMemo(() => calculateTdee(bmr, activityMultiplier), [bmr, activityMultiplier]);
 
   // Calorie Input vs Output
   const calorieInput = dailyCalorieTarget === '' ? 1450 : Number(dailyCalorieTarget);
@@ -592,53 +629,7 @@ export const AccountSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Links / Tabs */}
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleSelectTab('profile')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'profile'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Hồ sơ &amp; Thể trạng
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('calendar')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'calendar'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Lịch biểu &amp; Thực đơn
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('security')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'security'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Bảo mật &amp; OTP
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('preferences')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'preferences'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Giao diện Sáng/Tối
-              </button>
-            </div>
+
 
           </div>
         </section>
@@ -697,9 +688,18 @@ export const AccountSettingsPage: React.FC = () => {
           </div>
 
           {profileSuccess && (
-            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2.5">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-              <span>{profileSuccess}</span>
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>{profileSuccess}</span>
+              </div>
+              <Link
+                to="/meal-plans"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition shadow-2xs"
+              >
+                <span>Tạo thực đơn AI ngay</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           )}
 
@@ -769,54 +769,92 @@ export const AccountSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Grid 2: Physical Biometrics (Height, Weight, Target Calories) */}
-            <div className="grid sm:grid-cols-3 gap-4 p-5 rounded-2xl bg-emerald-50/50 dark:bg-slate-800/50 border border-emerald-100 dark:border-slate-800">
-              <div>
-                <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
-                  <Scale className="w-4 h-4 text-emerald-600" />
-                  Chiều cao (cm)
-                </label>
-                <input
-                  type="number"
-                  min="100"
-                  max="250"
-                  placeholder="Ví dụ: 168"
-                  value={heightCm}
-                  onChange={e => setHeightCm(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
-                />
+            {/* Grid 2: Physical Biometrics (Height, Weight, Target Calories, Activity, Goal) */}
+            <div className="p-5 rounded-2xl bg-emerald-50/50 dark:bg-slate-800/50 border border-emerald-100 dark:border-slate-800 space-y-4">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
+                    <Scale className="w-4 h-4 text-emerald-600" />
+                    Chiều cao (cm)
+                  </label>
+                  <input
+                    type="number"
+                    min="100"
+                    max="250"
+                    placeholder="Ví dụ: 168"
+                    value={heightCm}
+                    onChange={e => setHeightCm(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
+                    <Activity className="w-4 h-4 text-emerald-600" />
+                    Cân nặng hiện tại (kg)
+                  </label>
+                  <input
+                    type="number"
+                    min="30"
+                    max="200"
+                    placeholder="Ví dụ: 58"
+                    value={weightKg}
+                    onChange={e => setWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
+                    <Flame className="w-4 h-4 text-amber-500" />
+                    Mục tiêu Calo nạp/ngày (kcal)
+                  </label>
+                  <input
+                    type="number"
+                    min="800"
+                    max="4000"
+                    placeholder="Mặc định: 1500"
+                    value={dailyCalorieTarget}
+                    onChange={e => setDailyCalorieTarget(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-emerald-600" />
-                  Cân nặng hiện tại (kg)
-                </label>
-                <input
-                  type="number"
-                  min="30"
-                  max="200"
-                  placeholder="Ví dụ: 58"
-                  value={weightKg}
-                  onChange={e => setWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
-                />
-              </div>
+              <div className="grid sm:grid-cols-2 gap-4 pt-3 border-t border-emerald-100 dark:border-slate-700/60">
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
+                    <Activity className="w-4 h-4 text-emerald-600" />
+                    Mức độ vận động
+                  </label>
+                  <select
+                    value={activityLevel}
+                    onChange={e => setActivityLevel(e.target.value as ActivityLevel)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
+                  >
+                    <option value="SEDENTARY">Ít vận động (làm việc văn phòng)</option>
+                    <option value="LIGHT">Vận động nhẹ (tập 1-3 ngày/tuần)</option>
+                    <option value="MODERATE">Vận động vừa (tập 3-5 ngày/tuần)</option>
+                    <option value="ACTIVE">Năng động (tập 6-7 ngày/tuần)</option>
+                    <option value="VERY_ACTIVE">Rất năng động (vận động viên)</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
-                  <Flame className="w-4 h-4 text-amber-500" />
-                  Mục tiêu Calo nạp/ngày (kcal)
-                </label>
-                <input
-                  type="number"
-                  min="800"
-                  max="4000"
-                  placeholder="Mặc định: 1500"
-                  value={dailyCalorieTarget}
-                  onChange={e => setDailyCalorieTarget(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
-                />
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
+                    <Target className="w-4 h-4 text-emerald-600" />
+                    Mục tiêu thể trạng
+                  </label>
+                  <select
+                    value={goal}
+                    onChange={e => setGoal(e.target.value as NutritionGoal)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
+                  >
+                    <option value="MAINTAIN">Giữ cân (Duy trì cân nặng)</option>
+                    <option value="LOSE_WEIGHT">Giảm cân an toàn (−500 kcal)</option>
+                    <option value="GAIN_MUSCLE">Tăng cơ / Tăng cân (+300 kcal)</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -1084,13 +1122,23 @@ export const AccountSettingsPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('profile')}
-                className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 font-bold hover:bg-emerald-100 transition shadow-2xs shrink-0 cursor-pointer self-start sm:self-auto"
-              >
-                Cập nhật chỉ số sức khỏe →
-              </button>
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleSelectTab('profile')}
+                  className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 font-bold hover:bg-emerald-100 dark:hover:bg-slate-700 transition shadow-2xs cursor-pointer"
+                >
+                  Cập nhật BMI &amp; Thể trạng →
+                </button>
+                <Link
+                  to="/meal-plans"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold transition shadow-2xs"
+                  title="Đi đến trang Kế hoạch Thực đơn Tuần AI &amp; Danh sách thực đơn đã lưu"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Kế hoạch tuần &amp; Đã lưu →
+                </Link>
+              </div>
             </div>
 
             {/* 4. WEEKLY CALORIE CONSUMPTION & MEAL SCHEDULE */}
@@ -1249,10 +1297,10 @@ export const AccountSettingsPage: React.FC = () => {
             </div>
 
             <Link
-              to="/meal-planner"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 transition shadow-2xs self-start sm:self-auto"
+              to="/meal-plans"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition shadow-2xs self-start sm:self-auto"
             >
-              <span>Mở Thực Đơn Tuần Chi Tiết</span>
+              <span>Kế hoạch Thực đơn Tuần AI &amp; Đã lưu</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>

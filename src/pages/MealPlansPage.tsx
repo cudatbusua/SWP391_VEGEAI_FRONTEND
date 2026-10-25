@@ -657,12 +657,22 @@ function PlannerHub() {
                 {!profile.busy && !profile.error && !profile.data && (
                   <div>
                     <p>Bạn chưa thiết lập chỉ số cơ thể. Hãy cập nhật ngay bên cạnh để AI lập thực đơn.</p>
-                    <Link
-                      to="/settings?tab=profile"
-                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400"
-                    >
-                      Thiết lập Hồ sơ Thể trạng & BMI <ArrowUpRight size={14} />
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-3 mt-2">
+                      <Link
+                        to="/settings?tab=profile"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400"
+                      >
+                        Thiết lập Hồ sơ Thể trạng & BMI <ArrowUpRight size={14} />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={profile.refresh}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-emerald-600 cursor-pointer"
+                        title="Tải lại kiểm tra chỉ số dinh dưỡng"
+                      >
+                        <RefreshCw size={12} /> Tải lại hồ sơ
+                      </button>
+                    </div>
                   </div>
                 )}
                 {profile.data && (

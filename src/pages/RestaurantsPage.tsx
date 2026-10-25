@@ -11,6 +11,8 @@ export function RestaurantsPage() {
   const [query, setQuery] = useState('');
   const [radius, setRadius] = useState('5');
   const [center, setCenter] = useState<Coordinates>(DEFAULT_CENTER);
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [recenterTrigger, setRecenterTrigger] = useState(0);
   const [places, setPlaces] = useState<Place[]>([]);
   const [selected, setSelected] = useState<Place | null>(null);
   const [busy, setBusy] = useState(false);
@@ -19,12 +21,14 @@ export function RestaurantsPage() {
 
   const selectPlace = useCallback((place: Place) => setSelected(place), []);
 
-  const load = async (point: Coordinates) => {
+  const load = async (point: Coordinates, isGps = false) => {
     setCenter(point);
+    if (isGps) setUserLocation(point);
     setSelected(null);
     setPlaces([]);
     setSearched(false);
     setBusy(true);
+    setRecenterTrigger(prev => prev + 1);
     try {
       const results = await restaurantService.verifiedRestaurantsNearby(point, Number(radius));
       setPlaces(results);
@@ -53,7 +57,11 @@ export function RestaurantsPage() {
       const results = await restaurantService.searchVerifiedRestaurants(query.trim(), undefined, Number(radius));
       setPlaces(results);
       setSearched(true);
-      if (results[0]) setCenter({ lat: results[0].lat, lon: results[0].lon });
+      if (results[0]) {
+        const point = { lat: results[0].lat, lon: results[0].lon };
+        setCenter(point);
+        setRecenterTrigger(prev => prev + 1);
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể tìm quán chay.');
     } finally {
@@ -64,15 +72,31 @@ export function RestaurantsPage() {
   const locate = async () => {
     setBusy(true);
     setError('');
+    setSelected(null);
     try {
       if (!navigator.geolocation) throw new Error('Trình duyệt không hỗ trợ vị trí. Hãy tìm theo khu vực.');
       const position = await new Promise<GeolocationPosition>((resolve, reject) =>
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000, maximumAge: 60000 }));
-      await load({ lat: position.coords.latitude, lon: position.coords.longitude });
+      const userCoords = { lat: position.coords.latitude, lon: position.coords.longitude };
+      setUserLocation(userCoords);
+      setCenter(userCoords);
+      setRecenterTrigger(prev => prev + 1);
+      await load(userCoords, true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không lấy được vị trí. Hãy cho phép truy cập vị trí hoặc tìm theo khu vực.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleRecenterToUser = () => {
+    setSelected(null);
+    if (userLocation) {
+      setCenter(userLocation);
+      setRecenterTrigger(prev => prev + 1);
+      void load(userLocation, true);
+    } else {
+      void locate();
     }
   };
 
@@ -102,7 +126,7 @@ export function RestaurantsPage() {
           </select>
         </label>
         <Button type="submit" disabled={busy || !query.trim()} leftIcon={<Search size={16} />}>Tìm quán</Button>
-        <Button type="button" variant="outline" disabled={busy} onClick={() => void locate()} leftIcon={<LocateFixed size={16} />}>Vị trí của tôi</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={handleRecenterToUser} leftIcon={<LocateFixed size={16} />}>Vị trí của tôi</Button>
       </form>
 
       {error && <p role="alert" className="mb-4 rounded-xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-950/50 p-4 text-sm text-red-800 dark:text-red-300">{error}</p>}
@@ -156,7 +180,15 @@ export function RestaurantsPage() {
               target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">OpenStreetMap <ArrowUpRight size={13} /></a>
           </div>
           <div className="h-[460px] sm:h-[560px]">
-            <OpenStreetMapVegetarianMap center={center} places={places} selectedPlace={selected} onSelect={selectPlace} />
+            <OpenStreetMapVegetarianMap
+              center={center}
+              places={places}
+              selectedPlace={selected}
+              onSelect={selectPlace}
+              userLocation={userLocation}
+              recenterTrigger={recenterTrigger}
+              onRecenter={handleRecenterToUser}
+            />
           </div>
         </section>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, LogOut, Palette, ShieldCheck, Activity, CalendarDays } from 'lucide-react';
+import { ChevronDown, LogOut, Palette, ShieldCheck, Activity, CalendarDays, Sparkles } from 'lucide-react';
 import type { User as AuthUser } from '../types/auth';
 
 interface UserMenuProps {
@@ -93,8 +93,20 @@ export function UserMenu({ user, loggingOut, onLogout }: UserMenuProps) {
           >
             <CalendarDays className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <div>
-              <span className="block font-semibold">Lịch biểu & Thực đơn</span>
-              <span className="block text-[11px] text-slate-400">Lịch ăn 30 ngày, phân bổ bữa sáng - trưa - tối, calo tuần</span>
+              <span className="block font-semibold">Lịch biểu &amp; Bữa ăn</span>
+              <span className="block text-[11px] text-slate-400">Lịch ăn 30 ngày, phân bổ bữa sáng - trưa - tối</span>
+            </div>
+          </Link>
+
+          <Link
+            to="/meal-plans"
+            role="menuitem"
+            className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <div>
+              <span className="block font-semibold">Kế hoạch thực đơn tuần &amp; Đã lưu</span>
+              <span className="block text-[11px] text-slate-400">Lập thực đơn AI 7 ngày, quản lý thực đơn đã lưu</span>
             </div>
           </Link>
 

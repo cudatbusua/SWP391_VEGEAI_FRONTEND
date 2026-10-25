@@ -17,20 +17,52 @@ import {
   Search,
   Camera,
   PenLine,
-  X
+  Square,
+  X,
+  Calendar,
+  AlertTriangle,
+  CheckCircle2,
+  Activity,
+  Flame,
+  ShieldAlert
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { aiService } from '../services/aiService';
 import { errorMessage } from '../services/apiClient';
 import { useAuth } from '../hooks/useAuth';
+import { HealthActivityRings } from '../components/HealthActivityRings';
+import { fridgeService } from '../services/fridgeService';
+import { userService } from '../services/userService';
+import type { UserProfile, FridgeItem } from '../types/api';
 
 export type SessionCategory = 'fridge-scan' | 'ai-chef';
+
+export interface ChatIngredientItem {
+  name: string;
+  category?: string;
+  isVegetarian?: boolean;
+  freshness?: string;
+  freshnessScore?: number;
+  shelfLifeEstimate?: string;
+  storageTip?: string;
+  confidence?: number;
+  checked?: boolean;
+}
+
+export interface ChatIngredientsPoll {
+  items: ChatIngredientItem[];
+  status: 'pending' | 'confirmed' | 'dismissed';
+  confirmedCount?: number;
+  confirmedAt?: string;
+}
 
 export interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   time: string;
   image?: string;
+  ingredientsPoll?: ChatIngredientsPoll;
+  recommendedRecipes?: string[];
 }
 
 export interface ChatSession {
@@ -47,6 +79,7 @@ const DEFAULT_SUGGESTIONS = [
   { icon: Soup, title: 'Nấu từ nguyên liệu có sẵn', text: 'Tôi có đậu phụ non, nấm đùi gà và cà chua bi. Gợi ý 3 món chay cho bữa tối.' },
   { icon: Timer, title: 'Bữa ngon trong 20 phút', text: 'Gợi ý một bữa cơm chay thanh đạm dễ nấu trong 20 phút, kèm định lượng chi tiết.' },
   { icon: Leaf, title: 'Đổi vị cho ngày hôm nay', text: 'Gợi ý 3 món chay phong cách Việt Nam thanh mát, ít dầu mỡ, nguyên liệu dễ mua.' },
+  { icon: Calendar, title: 'Lên thực đơn tuần 7 ngày', text: 'Lên giúp tôi một thực đơn tuần 7 ngày cân bằng dinh dưỡng, giàu đạm và phù hợp với chỉ số thể trạng của tôi.' },
 ];
 
 function formatTime(timestamp: number | string): string {
@@ -101,6 +134,16 @@ export function AiChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setBusy(false);
+    setIsAnalyzingImage(false);
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -126,6 +169,129 @@ export function AiChatPage() {
   const removeSelectedImage = () => {
     setSelectedImage(null);
     setImagePreview(null);
+  };
+
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [expiringItems, setExpiringItems] = useState<FridgeItem[]>([]);
+  const [showHealthDrawer, setShowHealthDrawer] = useState(false);
+  const [pollSavingId, setPollSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      userService.getProfile().then(setUserProfile).catch(() => {});
+      fridgeService.expiringSoon(2).then(setExpiringItems).catch(() => {});
+    }
+  }, [user]);
+
+  const handleTogglePollItem = (sessionMsgIdx: number, itemIdx: number) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id !== activeSessionId) return s;
+      const newMessages = [...s.messages];
+      const targetMsg = { ...newMessages[sessionMsgIdx] };
+      if (!targetMsg.ingredientsPoll) return s;
+      const newItems = targetMsg.ingredientsPoll.items.map((it, idx) =>
+        idx === itemIdx ? { ...it, checked: !it.checked } : it
+      );
+      targetMsg.ingredientsPoll = { ...targetMsg.ingredientsPoll, items: newItems };
+      newMessages[sessionMsgIdx] = targetMsg;
+      return { ...s, messages: newMessages, updatedAt: Date.now() };
+    }));
+  };
+
+  const handleConfirmPoll = async (sessionMsgIdx: number) => {
+    if (!user) {
+      alert('Vui lòng đăng nhập tài khoản để lưu nguyên liệu vào Tủ Bếp Của Tôi nhé!');
+      return;
+    }
+    const msg = currentSession?.messages[sessionMsgIdx];
+    if (!msg || !msg.ingredientsPoll) return;
+    const selected = msg.ingredientsPoll.items.filter(i => i.checked !== false);
+    if (selected.length === 0) {
+      alert('Vui lòng tích chọn ít nhất 1 nguyên liệu.');
+      return;
+    }
+
+    setPollSavingId(`${sessionMsgIdx}`);
+    try {
+      for (const item of selected) {
+        await fridgeService.add({
+          name: item.name,
+          category: item.category || 'VEGAN',
+          isVegetarian: item.isVegetarian ?? true,
+          quantity: 1,
+          unit: 'phần',
+          freshnessStatus: (item.freshness || 'FRESH') as any,
+          estimatedShelfLifeDays: item.shelfLifeEstimate ? (Number(item.shelfLifeEstimate.match(/\d+/)?.[0]) || 3) : 3,
+          storageTip: item.storageTip,
+          notes: `Quét từ AI Bếp Trưởng: ${item.shelfLifeEstimate || '3-5 ngày'}`
+        });
+      }
+      fridgeService.expiringSoon(2).then(setExpiringItems).catch(() => {});
+      setSessions(prev => prev.map(s => {
+        if (s.id !== activeSessionId) return s;
+        const newMessages = [...s.messages];
+        newMessages[sessionMsgIdx] = {
+          ...newMessages[sessionMsgIdx],
+          ingredientsPoll: {
+            ...newMessages[sessionMsgIdx].ingredientsPoll!,
+            status: 'confirmed',
+            confirmedCount: selected.length,
+            confirmedAt: formatTime(Date.now())
+          }
+        };
+        return { ...s, messages: newMessages, updatedAt: Date.now() };
+      }));
+    } catch (err) {
+      alert('Không thể lưu nguyên liệu vào Tủ Bếp: ' + errorMessage(err));
+    } finally {
+      setPollSavingId(null);
+    }
+  };
+
+  const handleDismissPoll = (sessionMsgIdx: number) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id !== activeSessionId) return s;
+      const newMessages = [...s.messages];
+      if (newMessages[sessionMsgIdx]?.ingredientsPoll) {
+        newMessages[sessionMsgIdx] = {
+          ...newMessages[sessionMsgIdx],
+          ingredientsPoll: {
+            ...newMessages[sessionMsgIdx].ingredientsPoll!,
+            status: 'dismissed'
+          }
+        };
+      }
+      return { ...s, messages: newMessages, updatedAt: Date.now() };
+    }));
+  };
+
+  const sendQuickPrompt = (promptText: string) => {
+    setInput(promptText);
+    setTimeout(() => {
+      const form = document.querySelector('form') as HTMLFormElement | null;
+      if (form) form.requestSubmit();
+    }, 50);
+  };
+
+  const handleCookOnTheSpot = (recipeTitle: string) => {
+    sendQuickPrompt(`Bếp trưởng hãy hướng dẫn chi tiết từng bước nấu món "${recipeTitle}" ngay tại chỗ (nguyên liệu, sơ chế, cách nấu, thời gian) nhé!`);
+  };
+
+  const handleAddToMealPlan = (recipeTitle: string) => {
+    sendQuickPrompt(`Gợi ý cách xếp món "${recipeTitle}" vào thực đơn tuần của tôi (nên ăn vào bữa trưa hay tối thứ mấy để cân bằng calo và dinh dưỡng).`);
+  };
+
+  const handleRescueExpiringItems = () => {
+    if (expiringItems.length === 0) return;
+    const names = expiringItems.map(i => i.name).join(', ');
+    sendQuickPrompt(`Trong Tủ Bếp Của Tôi đang có nguyên liệu sắp hết hạn: ${names}. Hãy hướng dẫn 2 món chay thanh đạm để nấu hết nguyên liệu này ngay hôm nay nhé!`);
+  };
+
+  const handleRequestWeeklyPlan = () => {
+    const tdeeText = userProfile?.dailyCalorieTarget ? `khoảng ${userProfile.dailyCalorieTarget} kcal/ngày` : 'cân bằng calo';
+    const dietText = userProfile?.dietaryPreferences ? `theo chế độ ${userProfile.dietaryPreferences}` : 'chay lành mạnh';
+    const allergyText = userProfile?.allergies ? `, tuyệt đối không dùng ${userProfile.allergies}` : '';
+    sendQuickPrompt(`Hãy lên giúp tôi một thực đơn tuần 7 ngày chi tiết (từ Thứ Hai đến Chủ Nhật, gồm Bữa Sáng, Bữa Trưa, Bữa Tối) ${dietText}, mục tiêu ${tdeeText}${allergyText}.`);
   };
 
   // Persist sessions
@@ -303,18 +469,22 @@ export function AiChatPage() {
       return s;
     }));
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       let finalPrompt = userText;
       let detectedRecipes: string[] = [];
+      let detectedPoll: ChatIngredientsPoll | undefined = undefined;
 
       if (currentImg) {
         setIsAnalyzingImage(true);
         try {
-          const scanRes = await aiService.scanFridge(currentImg);
+          const scanRes = await aiService.scanFridge(currentImg, controller.signal);
           if (scanRes && scanRes.ingredients && scanRes.ingredients.length > 0) {
             const isNonFood = (name: string) => {
               const l = name.toLowerCase();
-              return l.includes('củi') || l.includes('que') || l.includes('gỗ') || l.includes('đá') || l.includes('nhựa') || l.includes('bụi cây') || l.includes('hoạt hình');
+              return l.includes('củi') || l.includes('que') || l.includes('gỗ') || l.includes('đá') || l.includes('nhựa') || l.includes('bụi cây') || l.includes('hoạt hình') || l.includes('rêu') || l.includes('khoáng') || l.includes('núi') || l.includes('sỏi');
             };
             const edibleIngredients = scanRes.ingredients.filter(i => i.isEdible !== false && i.category !== 'NON_FOOD' && !isNonFood(i.name));
             const nonFoodIngredients = scanRes.ingredients.filter(i => i.isEdible === false || i.category === 'NON_FOOD' || isNonFood(i.name));
@@ -322,25 +492,41 @@ export function AiChatPage() {
             if (edibleIngredients.length > 0) {
               const ingNames = edibleIngredients.map(i => i.name).join(', ');
               detectedRecipes = scanRes.suggestedRecipes || [];
+              detectedPoll = {
+                status: 'pending',
+                items: edibleIngredients.map(i => ({
+                  name: i.name,
+                  category: i.category,
+                  isVegetarian: i.isVegetarian,
+                  freshness: i.freshness,
+                  freshnessScore: i.freshnessScore,
+                  shelfLifeEstimate: i.shelfLifeEstimate || '3-5 ngày',
+                  storageTip: i.storageTip,
+                  confidence: i.confidence,
+                  checked: true,
+                }))
+              };
+
               let promptIntro = userText
-                ? `Tôi vừa gửi ảnh tủ lạnh/món ăn. AI thị giác nhận diện được các nguyên liệu ăn được: ${ingNames}. Yêu cầu của tôi: ${userText}`
-                : `Tôi vừa gửi ảnh tủ lạnh. Qua hình ảnh nhận diện được các nguyên liệu thực phẩm ăn được: ${ingNames}. Hãy phân tích độ tươi, lưu ý bảo quản và gợi ý 3 món chay ngon nhất, kèm hướng dẫn chế biến nhanh.`;
+                ? `Tôi vừa gửi ảnh chụp nguyên liệu cho Tủ Bếp Của Tôi. AI thị giác nhận diện được: ${ingNames}. Yêu cầu của tôi: ${userText}`
+                : `Tôi vừa gửi ảnh chụp nguyên liệu cho Tủ Bếp Của Tôi. Qua hình ảnh nhận diện được các nguyên liệu: ${ingNames}. Hãy phân tích độ tươi, lưu ý bảo quản và gợi ý 3 món chay ngon nhất, kèm hướng dẫn chế biến nhanh.`;
               if (nonFoodIngredients.length > 0) {
                 promptIntro += ` (Lưu ý: Có vật phẩm trong ảnh không ăn được đã được AI tự động loại trừ: ${nonFoodIngredients.map(i => i.name).join(', ')}).`;
               }
               finalPrompt = promptIntro;
             } else if (nonFoodIngredients.length > 0) {
               const nonFoodNames = nonFoodIngredients.map(i => i.name).join(', ');
-              finalPrompt = `Tôi vừa tải lên một hình ảnh và AI nhận diện thấy các vật thể: ${nonFoodNames}. Những thứ này KHÔNG phải là nguyên liệu thực phẩm ăn được để nấu ăn (ví dụ như củi khô, tranh vẽ hoạt hình, hoặc đồ dùng gia đình). Bếp trưởng hãy giải thích lịch sự rằng những vật phẩm này không ăn được và hướng dẫn tôi chụp ảnh nguyên liệu rau củ quả, đậu hũ hoặc thực phẩm ăn được thực tế.`;
+              finalPrompt = `Tôi vừa tải lên một hình ảnh và AI nhận diện thấy các vật thể: ${nonFoodNames}. Những thứ này KHÔNG phải là nguyên liệu thực phẩm ăn được để nấu ăn (ví dụ như khối đá, rêu, que củi, tranh vẽ hoặc đồ vật gia đình). Bếp trưởng hãy giải thích lịch sự rằng những vật phẩm này không ăn được và hướng dẫn tôi chụp ảnh nguyên liệu rau củ quả, đậu hũ hoặc thực phẩm ăn được thực tế.`;
             } else {
-              finalPrompt = userText || 'Tôi vừa gửi ảnh nguyên liệu nấu ăn, hãy tư vấn giúp tôi các món chay thơm ngon phù hợp.';
+              finalPrompt = userText || 'Tôi vừa gửi một hình ảnh nhưng AI không phát hiện thấy nguyên liệu thực phẩm ăn được nào trong ảnh. Bếp trưởng hãy giải thích lịch sự rằng ảnh không có nguyên liệu thực phẩm và hướng dẫn tôi chụp ảnh rau củ quả hoặc nguyên liệu nấu ăn thực tế nhé.';
             }
           } else {
-            finalPrompt = userText || 'Tôi vừa gửi ảnh nguyên liệu nấu ăn, hãy tư vấn giúp tôi các món chay thơm ngon phù hợp.';
+            finalPrompt = userText || 'Tôi vừa gửi một hình ảnh nhưng AI không phát hiện thấy nguyên liệu thực phẩm ăn được nào trong ảnh. Bếp trưởng hãy giải thích lịch sự rằng ảnh không có nguyên liệu thực phẩm và hướng dẫn tôi chụp ảnh rau củ quả hoặc nguyên liệu nấu ăn thực tế nhé.';
           }
-        } catch (scanErr) {
+        } catch (scanErr: any) {
+          if (controller.signal.aborted || scanErr?.name === 'AbortError') throw scanErr;
           console.warn('Vision analysis fallback:', scanErr);
-          finalPrompt = userText || 'Tôi gửi ảnh nguyên liệu nấu ăn, hãy tư vấn giúp tôi các món chay thơm ngon phù hợp.';
+          finalPrompt = userText || 'Tôi vừa tải lên một hình ảnh nhưng hệ thống AI nhận diện đang bận hoặc không đọc được nguyên liệu. Bếp trưởng hãy nhắc nhở tôi kiểm tra lại ảnh hoặc chụp lại rau củ quả thực tế nhé.';
         } finally {
           setIsAnalyzingImage(false);
         }
@@ -351,12 +537,13 @@ export function AiChatPage() {
         text: m.text.slice(0, 4000)
       }));
 
-      const response = await aiService.chat(finalPrompt, currentSession.sessionId, history);
+      const response = await aiService.chat(finalPrompt, currentSession.sessionId, history, controller.signal);
 
       const aiMsg: ChatMessage = {
         sender: 'ai',
         text: response.reply,
-        time: formatTime(Date.now())
+        time: formatTime(Date.now()),
+        ingredientsPoll: detectedPoll
       };
 
       const combinedRecipes = Array.from(new Set([
@@ -376,7 +563,25 @@ export function AiChatPage() {
         }
         return s;
       }));
-    } catch (err) {
+    } catch (err: any) {
+      if (controller.signal.aborted || err?.name === 'AbortError') {
+        const stoppedMsg: ChatMessage = {
+          sender: 'ai',
+          text: '*(Bạn đã dừng phản hồi này)*',
+          time: formatTime(Date.now())
+        };
+        setSessions(prev => prev.map(s => {
+          if (s.id === currentSession.id) {
+            return {
+              ...s,
+              messages: [...s.messages, stoppedMsg],
+              updatedAt: Date.now()
+            };
+          }
+          return s;
+        }));
+        return;
+      }
       const errTxt = errorMessage(err);
       const isQuota = /hết lượt|guest trial|quota/i.test(errTxt);
       if (isQuota) {
@@ -401,7 +606,9 @@ export function AiChatPage() {
         setInput(userText);
       }
     } finally {
+      abortControllerRef.current = null;
       setBusy(false);
+      setIsAnalyzingImage(false);
     }
   };
 
@@ -634,6 +841,105 @@ export function AiChatPage() {
               </div>
             </div>
 
+            {/* Mini Health Context & Expiry Alert Bar */}
+            <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50">
+              {/* Proactive Expiry Alert if any */}
+              {expiringItems.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/60 text-xs">
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      <strong>Tủ Bếp Của Tôi:</strong> Có <strong>{expiringItems.length}</strong> nguyên liệu sắp hết hạn ({expiringItems.map(i => i.name).slice(0, 3).join(', ')}{expiringItems.length > 3 ? '...' : ''})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRescueExpiringItems}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] transition cursor-pointer shadow-2xs shrink-0"
+                  >
+                    <Soup className="w-3 h-3" />
+                    <span>Gợi ý món giải cứu ngay</span>
+                  </button>
+                </div>
+              )}
+
+              {/* User Health & Nutrition Pill Bar */}
+              <div className="px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Hồ sơ Bếp Trưởng:</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                    <Flame className="w-3 h-3 text-orange-500" />
+                    TDEE ~{userProfile?.dailyCalorieTarget || 1850} kcal
+                  </span>
+                  {userProfile?.dietaryPreferences && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300">
+                      <Leaf className="w-3 h-3 text-teal-600" />
+                      {userProfile.dietaryPreferences}
+                    </span>
+                  )}
+                  {userProfile?.allergies && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300">
+                      <ShieldAlert className="w-3 h-3 text-rose-600" />
+                      Kiêng: {userProfile.allergies}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRequestWeeklyPlan}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 text-slate-700 dark:text-slate-200 font-semibold text-[11px] transition cursor-pointer shadow-2xs"
+                    title="Nhờ AI lên thực đơn tuần 7 ngày theo thể trạng"
+                  >
+                    <Calendar className="w-3 h-3 text-emerald-600" />
+                    <span>Lên thực đơn tuần</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowHealthDrawer(v => !v)}
+                    className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+                  >
+                    {showHealthDrawer ? 'Thu gọn vòng chỉ số ▴' : 'Vòng chỉ số BMR/BMI ▾'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible Health Activity Rings Drawer */}
+              {showHealthDrawer && (
+                <div className="px-6 py-3 border-t border-slate-200/60 dark:border-slate-800 bg-white/50 dark:bg-slate-900/60 animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="w-full sm:w-auto">
+                      <HealthActivityRings
+                        calories={userProfile?.dailyCalorieTarget || 1420}
+                        calorieTarget={userProfile?.dailyCalorieTarget ? userProfile.dailyCalorieTarget + 400 : 1950}
+                        heightCm={userProfile?.heightCm}
+                        weightKg={userProfile?.weightKg}
+                        compact={true}
+                        showDetails={true}
+                      />
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                      <p className="font-bold text-slate-700 dark:text-slate-200">
+                        💡 Trợ lý AI liên kết đa dịch vụ:
+                      </p>
+                      <p>• Tự động đối chiếu BMR / TDEE để cân bằng năng lượng từng bữa.</p>
+                      <p>• Tuyệt đối cảnh báo & loại trừ các món dính chất dị ứng của bạn.</p>
+                      <Link
+                        to="/settings?tab=nutrition"
+                        className="inline-block mt-1 font-bold text-emerald-700 dark:text-emerald-400 hover:underline"
+                      >
+                        Chỉnh sửa chỉ số tại Cài đặt hồ sơ →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Chat Messages Body */}
             <div role="log" aria-live="polite" className="flex-1 overflow-y-auto p-6 space-y-6">
               
@@ -706,14 +1012,123 @@ export function AiChatPage() {
                       </div>
                     )}
                     <div className="whitespace-pre-wrap font-sans break-words">{msg.text}</div>
+
+                    {/* Zalo-style Poll Confirmation Card for Fridge Inventory */}
+                    {msg.ingredientsPoll && (
+                      <div className="mt-3 rounded-2xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-850 p-4 shadow-sm animate-in fade-in duration-300 text-slate-800 dark:text-slate-100">
+                        <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-emerald-200 dark:border-emerald-800/80">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">🧺</span>
+                            <div>
+                              <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                                Xác nhận nguyên liệu cho "Tủ Bếp Của Tôi"
+                              </h4>
+                              <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                                AI phát hiện {msg.ingredientsPoll.items.length} nguyên liệu có thể lưu kho
+                              </p>
+                            </div>
+                          </div>
+                          {msg.ingredientsPoll.status === 'confirmed' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-2xs">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Đã lưu kho
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Items List with Checkboxes */}
+                        <div className="space-y-2 mb-3">
+                          {msg.ingredientsPoll.items.map((item, itemIdx) => (
+                            <label
+                              key={itemIdx}
+                              className={`flex items-start gap-2.5 p-2 rounded-xl border text-xs transition cursor-pointer ${
+                                item.checked !== false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 shadow-2xs'
+                                  : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 opacity-60'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                disabled={msg.ingredientsPoll?.status !== 'pending'}
+                                checked={item.checked !== false}
+                                onChange={() => handleTogglePollItem(idx, itemIdx)}
+                                className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-slate-900 dark:text-white truncate">
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 shrink-0">
+                                    {item.freshness === 'FRESH' ? 'Tươi xanh' : 'Cần dùng sớm'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                                  <span>⏳ Hạn dùng: ~{item.shelfLifeEstimate || '3-5 ngày'}</span>
+                                  {item.storageTip && <span>• 💡 {item.storageTip}</span>}
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+
+                        {/* Poll Actions */}
+                        {msg.ingredientsPoll.status === 'pending' ? (
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={pollSavingId === `${idx}`}
+                              onClick={() => handleConfirmPoll(idx)}
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition cursor-pointer disabled:opacity-50"
+                            >
+                              {pollSavingId === `${idx}` ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              )}
+                              <span>Thêm vào Tủ Bếp Của Tôi</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDismissPoll(idx)}
+                              className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-xs transition cursor-pointer"
+                            >
+                              Bỏ qua
+                            </button>
+                          </div>
+                        ) : msg.ingredientsPoll.status === 'confirmed' ? (
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 bg-white/70 dark:bg-slate-900/60 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                            <span>✓ Đã lưu {msg.ingredientsPoll.confirmedCount} nguyên liệu vào Tủ Bếp lúc {msg.ingredientsPoll.confirmedAt}.</span>
+                            <Link to="/fridge" className="underline font-bold hover:text-emerald-950 dark:hover:text-emerald-200">
+                              Mở Tủ Bếp →
+                            </Link>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic">
+                            (Đã bỏ qua lưu vào Tủ Bếp - Bếp trưởng chỉ tư vấn công thức nấu)
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
 
               {busy && (
-                <div className="flex items-center gap-3 text-xs text-emerald-700 dark:text-emerald-400 font-semibold animate-pulse">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{isAnalyzingImage ? 'Bếp trưởng đang quét và nhận diện nguyên liệu trong ảnh...' : 'Bếp trưởng đang chuẩn bị câu trả lời dinh dưỡng...'}</span>
+                <div className="flex items-center justify-between p-3 px-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs animate-in fade-in duration-200 shadow-2xs">
+                  <div className="flex items-center gap-2.5 text-emerald-800 dark:text-emerald-300 font-bold">
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>{isAnalyzingImage ? 'Bếp trưởng đang quét và nhận diện ảnh...' : 'Bếp trưởng đang chuẩn bị câu trả lời dinh dưỡng...'}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleStopGeneration}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/60 font-bold text-xs transition cursor-pointer shadow-2xs shrink-0"
+                    title="Dừng tạo phản hồi"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <span>Dừng lại</span>
+                  </button>
                 </div>
               )}
 
@@ -727,40 +1142,67 @@ export function AiChatPage() {
                   <Utensils className="w-3.5 h-3.5" />
                   Công thức chay được Bếp trưởng gợi ý trong phiên này:
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {currentSession.recommendedRecipes.map((rec, i) => (
                     <div
                       key={i}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 shadow-2xs"
+                      className="flex flex-col justify-between p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-slate-800 dark:text-slate-100 shadow-2xs text-xs"
                     >
-                      <span className="font-bold">{rec}</span>
-                      <Link
-                        to={`/explore?keyword=${encodeURIComponent(rec)}`}
-                        title="Tìm công thức trong thư viện"
-                        className="p-1 rounded text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-700 transition"
-                      >
-                        <BookOpen className="w-3.5 h-3.5" />
-                      </Link>
-                      <Link
-                        to={`/restaurants?search=${encodeURIComponent(rec)}`}
-                        title="Tìm quán chay có món này"
-                        className="p-1 rounded text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-700 transition"
-                      >
-                        <Search className="w-3.5 h-3.5" />
-                      </Link>
-                      <Link
-                        to="/blog/write"
-                        state={{
-                          recipeTitle: `[Công thức AI] ${rec}`,
-                          recipeExcerpt: `Công thức chay sáng tạo "${rec}" được gợi ý từ Bếp Trưởng VEGEAI trong phiên tư vấn dinh dưỡng.`,
-                          recipeContent: `## Món chay sáng tạo: ${rec}\n\n### 💡 Giới thiệu\nCông thức được Bếp Trưởng VEGEAI sáng tạo và tối ưu hóa dinh dưỡng thuần thực vật.\n\n### 🥗 Thành phần gợi ý\n- Nguyên liệu chính tươi sạch\n- Gia vị tự nhiên: muối hồng, tiêu thơm, dầu oliu, hạt nêm chay\n\n### 👨‍🍳 Hướng dẫn nấu ăn\n1. Sơ chế sạch các loại nguyên liệu.\n2. Nấu chín tới ở nhiệt độ thích hợp để giữ trọn vi chất dinh dưỡng.\n3. Trình bày và thưởng thức ngon miệng cùng gia đình.\n\n> ✨ *Công thức được tạo bởi AI Bếp Trưởng VEGEAI.*`,
-                          recipeCategory: 'KITCHEN'
-                        }}
-                        title="Tạo bài viết Blog từ món này"
-                        className="p-1 rounded text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-700 transition"
-                      >
-                        <PenLine className="w-3.5 h-3.5" />
-                      </Link>
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="font-bold text-emerald-900 dark:text-emerald-200 line-clamp-1">{rec}</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Link
+                            to={`/explore?keyword=${encodeURIComponent(rec)}`}
+                            title="Tìm công thức trong thư viện"
+                            className="p-1 rounded text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-700 transition"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                          </Link>
+                          <Link
+                            to={`/restaurants?search=${encodeURIComponent(rec)}`}
+                            title="Tìm quán chay có món này"
+                            className="p-1 rounded text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-700 transition"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* 3 Interactive Actions: Nấu tại chỗ, Thêm vào thực đơn, Đăng bài */}
+                      <div className="flex flex-wrap items-center gap-1 pt-1.5 border-t border-slate-100 dark:border-slate-700/60 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => handleCookOnTheSpot(rec)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 font-bold transition cursor-pointer"
+                          title="Bếp trưởng hướng dẫn từng bước nấu món này ngay trong chat"
+                        >
+                          <Utensils className="w-3 h-3" />
+                          <span>Nấu tại chỗ</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAddToMealPlan(rec)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 hover:bg-teal-100 font-semibold transition cursor-pointer"
+                          title="Hỏi AI cách xếp món này vào thực đơn tuần"
+                        >
+                          <Calendar className="w-3 h-3" />
+                          <span>Thêm vào tuần</span>
+                        </button>
+                        <Link
+                          to="/blog/write"
+                          state={{
+                            recipeTitle: `[Công thức AI] ${rec}`,
+                            recipeExcerpt: `Công thức chay sáng tạo "${rec}" được gợi ý từ Bếp Trưởng VEGEAI trong phiên tư vấn dinh dưỡng.`,
+                            recipeContent: `## Món chay sáng tạo: ${rec}\n\n### 💡 Giới thiệu\nCông thức được Bếp Trưởng VEGEAI sáng tạo và tối ưu hóa dinh dưỡng thuần thực vật.\n\n### 🥗 Thành phần gợi ý\n- Nguyên liệu chính tươi sạch\n- Gia vị tự nhiên: muối hồng, tiêu thơm, dầu oliu, hạt nêm chay\n\n### 👨‍🍳 Hướng dẫn nấu ăn\n1. Sơ chế sạch các loại nguyên liệu.\n2. Nấu chín tới ở nhiệt độ thích hợp để giữ trọn vi chất dinh dưỡng.\n3. Trình bày và thưởng thức ngon miệng cùng gia đình.\n\n> ✨ *Công thức được tạo bởi AI Bếp Trưởng VEGEAI.*`,
+                            recipeCategory: 'KITCHEN'
+                          }}
+                          title="Tạo bài viết Blog từ món này"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 font-semibold transition"
+                        >
+                          <PenLine className="w-3 h-3" />
+                          <span>Đăng bài</span>
+                        </Link>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -833,13 +1275,25 @@ export function AiChatPage() {
                   className="w-full resize-none bg-transparent text-xs sm:text-sm p-1.5 outline-hidden text-slate-800 dark:text-white placeholder:text-slate-400"
                 />
 
-                <button
-                  type="submit"
-                  disabled={busy || (!input.trim() && !selectedImage)}
-                  className="shrink-0 w-10 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
-                >
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-5 h-5" />}
-                </button>
+                {busy ? (
+                  <button
+                    type="button"
+                    onClick={handleStopGeneration}
+                    className="shrink-0 w-10 h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+                    title="Dừng sinh phản hồi"
+                  >
+                    <Square className="w-4 h-4 fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!input.trim() && !selectedImage}
+                    className="shrink-0 w-10 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+                    title="Gửi tin nhắn"
+                  >
+                    <ArrowUp className="w-5 h-5" />
+                  </button>
+                )}
               </form>
 
               <div className="flex items-center justify-between mt-2 text-[11px] text-slate-400">

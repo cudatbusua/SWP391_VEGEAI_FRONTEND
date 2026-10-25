@@ -41,7 +41,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   const isNutritionActive =
     pathname.startsWith('/meal-plans') ||
     pathname === '/nutrition' ||
-    (pathname === '/settings' && (location.search.includes('tab=calendar') || location.search.includes('tab=profile')));
+    (pathname === '/settings' && location.search.includes('tab=calendar'));
   const isAiChefActive = pathname === '/ai-chef' || pathname === '/fridge-scan';
   const isPantryActive = pathname === '/fridge' || pathname === '/smart-market';
 
@@ -49,7 +49,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     { key: 'dashboard', label: 'Tổng quan', path: '/dashboard', isActive: isDashboardActive },
     { key: 'discover', label: 'Khám phá', path: '/explore', isActive: isDiscoverActive },
     { key: 'ai-chef', label: 'AI Bếp trưởng', path: '/ai-chef', isActive: isAiChefActive },
-    { key: 'pantry', label: 'Kho nguyên liệu & Đi chợ', path: '/fridge', isActive: isPantryActive },
+    { key: 'pantry', label: 'Tủ Bếp & Đi chợ', path: '/fridge', isActive: isPantryActive },
     { key: 'calendar', label: 'Lịch biểu & Thực đơn', path: '/settings?tab=calendar', isActive: isNutritionActive },
   ];
 
@@ -281,16 +281,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                   >
                     Kế hoạch thực đơn tuần
                   </Link>
-                  <Link
-                    to="/settings?tab=profile"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      (pathname === '/settings' && location.search.includes('tab=profile')) || (pathname === '/meal-plans' && location.search.includes('tab=nutrition'))
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
-                  >
-                    Hồ sơ BMI & Vòng sức khỏe
-                  </Link>
+
                   <Link
                     to="/meal-plans?tab=saved"
                     className={`px-3 py-1 rounded-lg transition shrink-0 ${
@@ -340,7 +331,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
                 <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
                   <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
-                    Kho nguyên liệu:
+                    Tủ Bếp Của Tôi:
                   </span>
                   <Link
                     to="/fridge"
@@ -408,7 +399,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               Dinh dưỡng & Thực đơn
             </Link>
             <Link to="/fridge" className="hover:text-emerald-700 dark:hover:text-emerald-400">
-              Kho nguyên liệu
+              Tủ Bếp Của Tôi
             </Link>
             <Link to="/smart-market" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               Đi chợ & Bản đồ

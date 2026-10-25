@@ -60,7 +60,7 @@ export function FridgeInventoryPage() {
       if (editingId) await fridgeService.update(editingId, body);
       else await fridgeService.add(body);
       setForm(emptyForm); setEditingId(''); setFormOpen(false);
-      setMessage(editingId ? 'Đã cập nhật nguyên liệu trong kho.' : 'Đã thêm nguyên liệu vào kho.');
+      setMessage(editingId ? 'Đã cập nhật nguyên liệu trong Tủ Bếp.' : 'Đã thêm nguyên liệu vào Tủ Bếp.');
       await load();
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
@@ -80,9 +80,9 @@ export function FridgeInventoryPage() {
   };
 
   const remove = async (item: FridgeItem) => {
-    if (!window.confirm(`Xóa ${item.name} khỏi kho lạnh?`)) return;
+    if (!window.confirm(`Xóa ${item.name} khỏi Tủ Bếp?`)) return;
     setError('');
-    try { await fridgeService.remove(item.itemId); setMessage(`Đã xóa ${item.name} khỏi kho.`); await load(); }
+    try { await fridgeService.remove(item.itemId); setMessage(`Đã xóa ${item.name} khỏi Tủ Bếp.`); await load(); }
     catch (reason) { setError(errorMessage(reason)); }
   };
 
@@ -93,7 +93,7 @@ export function FridgeInventoryPage() {
     <header className="relative overflow-hidden rounded-3xl border border-emerald-100 dark:border-emerald-950/60 bg-gradient-to-br from-emerald-50 via-white to-teal-50 dark:from-emerald-950/40 dark:via-slate-900 dark:to-teal-950/30 p-6 shadow-sm sm:p-9">
       <div className="pointer-events-none absolute -right-8 -top-16 h-64 w-64 rounded-full border-[32px] border-emerald-900/[0.04] dark:border-emerald-500/[0.05]" />
       <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
-        <div className="max-w-2xl"><span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 dark:bg-emerald-900/60 px-3 py-1.5 text-xs font-bold tracking-wide text-emerald-900 dark:text-emerald-300"><Snowflake size={14} /> KHO THỰC PHẨM CỦA BẠN</span><h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Mở tủ, biết ngay có gì.</h1><p className="mt-3 max-w-xl text-sm leading-6 text-slate-700 dark:text-slate-300">Theo dõi độ tươi và hạn dùng, tận dụng nguyên liệu đang có để lên món nhanh hơn.</p></div>
+        <div className="max-w-2xl"><span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 dark:bg-emerald-900/60 px-3 py-1.5 text-xs font-bold tracking-wide text-emerald-900 dark:text-emerald-300"><Snowflake size={14} /> TỦ BẾP CỦA BẠN</span><h1 className="mt-4 text-3xl font-extrabold tracking-tight text-slate-950 dark:text-white sm:text-4xl">Mở tủ, biết ngay có gì.</h1><p className="mt-3 max-w-xl text-sm leading-6 text-slate-700 dark:text-slate-300">Theo dõi độ tươi và hạn dùng, tận dụng nguyên liệu đang có để lên món nhanh hơn.</p></div>
         <div className="flex flex-wrap gap-3"><Button variant="outline" onClick={load} leftIcon={<RefreshCw className="h-4 w-4" />}>Làm mới</Button><Button onClick={() => setFormOpen(value => !value)} aria-expanded={formOpen} aria-controls="add-fridge-item" leftIcon={formOpen ? <X size={17} /> : <Plus size={17} />}>{formOpen ? 'Đóng biểu mẫu' : 'Thêm nguyên liệu'}</Button></div>
       </div>
     </header>
@@ -106,7 +106,7 @@ export function FridgeInventoryPage() {
           className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs sm:text-sm font-bold bg-emerald-800 dark:bg-emerald-600 text-white shadow-xs cursor-pointer"
         >
           <Snowflake size={16} />
-          <span>Tủ lạnh & Hạn sử dụng</span>
+          <span>Tủ Bếp & Hạn sử dụng</span>
         </button>
         <Link
           to="/smart-market"
@@ -123,7 +123,7 @@ export function FridgeInventoryPage() {
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 transition shadow-2xs"
         >
           <Camera size={14} />
-          <span>AI Quét tủ lạnh</span>
+          <span>AI Quét Tủ Bếp</span>
         </Link>
         <Link
           to="/ai-chef"
@@ -138,7 +138,7 @@ export function FridgeInventoryPage() {
     {error && <p role="alert" className="rounded-2xl border border-red-100 dark:border-red-900 bg-red-50 dark:bg-red-950/50 p-4 text-sm text-red-700 dark:text-red-300">{error}</p>}
     {message && <p role="status" className="rounded-2xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/50 p-4 text-sm text-emerald-800 dark:text-emerald-300">{message}</p>}
 
-    <section aria-label="Tổng quan kho lạnh" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="Tổng quan Tủ Bếp" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {[
         { label: 'Đang có trong tủ', value: summary.totalActiveItems, hint: 'nguyên liệu', icon: Refrigerator, tone: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400' },
         { label: 'Còn tươi', value: summary.freshCount, hint: 'sẵn sàng sử dụng', icon: Leaf, tone: 'bg-lime-50 dark:bg-lime-950/60 text-lime-700 dark:text-lime-400' },
@@ -151,7 +151,7 @@ export function FridgeInventoryPage() {
 
     <div className={`grid items-start gap-6 ${formOpen ? 'xl:grid-cols-[350px_minmax(0,1fr)]' : ''}`}>
       {formOpen && <form id="add-fridge-item" onSubmit={submit} className="scroll-mt-6 rounded-3xl border border-emerald-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm sm:p-6">
-        <div className="mb-5 flex items-start gap-3"><span className="rounded-xl bg-emerald-50 dark:bg-emerald-950/60 p-2.5 text-emerald-700 dark:text-emerald-400"><PackagePlus size={20} /></span><div><h2 className="font-bold text-slate-900 dark:text-white">{editingId ? 'Cập nhật nguyên liệu' : 'Thêm vào kho'}</h2><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Ghi nhanh những gì bạn đang có trong tủ.</p></div></div>
+        <div className="mb-5 flex items-start gap-3"><span className="rounded-xl bg-emerald-50 dark:bg-emerald-950/60 p-2.5 text-emerald-700 dark:text-emerald-400"><PackagePlus size={20} /></span><div><h2 className="font-bold text-slate-900 dark:text-white">{editingId ? 'Cập nhật nguyên liệu' : 'Thêm vào Tủ Bếp'}</h2><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Ghi nhanh những gì bạn đang có trong tủ.</p></div></div>
         <div className="space-y-4">
           <Input label="Tên nguyên liệu" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ví dụ: đậu hũ non" />
           <div className="grid grid-cols-2 gap-3"><Input label="Số lượng" type="number" min="0" step="0.1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} placeholder="1" /><Input label="Đơn vị" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder="hộp, bó, kg..." /></div>
@@ -164,9 +164,9 @@ export function FridgeInventoryPage() {
       </form>}
 
       <section className="min-w-0 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 border-b border-slate-100 dark:border-slate-800 pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Danh sách của bạn</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">Nguyên liệu trong kho</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Lọc theo trạng thái hoặc tìm một nguyên liệu.</p></div><label className="relative block w-full sm:max-w-xs"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input aria-label="Tìm nguyên liệu" value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm nguyên liệu..." className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-emerald-100" /></label></div>
+        <div className="flex flex-col gap-4 border-b border-slate-100 dark:border-slate-800 pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Danh sách của bạn</p><h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-white">Nguyên liệu trong Tủ Bếp</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Lọc theo trạng thái hoặc tìm một nguyên liệu.</p></div><label className="relative block w-full sm:max-w-xs"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input aria-label="Tìm nguyên liệu" value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm nguyên liệu..." className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white py-2.5 pl-10 pr-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 focus:ring-2 focus:ring-emerald-100" /></label></div>
         <div className="flex flex-wrap items-center justify-between gap-3 py-4"><div className="flex flex-wrap gap-2">{(Object.entries(statusLabels) as [FridgeItemStatus, string][]).map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => setStatus(value)} className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${status === value ? 'bg-emerald-800 dark:bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 hover:text-emerald-800 dark:hover:text-emerald-400'}`}>{label}</button>)}</div><span className="text-xs text-slate-400">{visibleItems.length} nguyên liệu</span></div>
-        {loading ? <div role="status" className="grid gap-3 md:grid-cols-2"><div className="h-36 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" /><div className="h-36 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" /></div> : visibleItems.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-5 py-12 text-center"><span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-sm"><Snowflake size={23} /></span><h3 className="mt-4 font-bold text-slate-800 dark:text-white">{search ? 'Chưa tìm thấy nguyên liệu' : 'Kho này đang trống'}</h3><p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500 dark:text-slate-400">{search ? 'Thử từ khóa khác hoặc xóa nội dung tìm kiếm.' : status === 'ACTIVE' ? 'Thêm nguyên liệu thủ công hoặc quét tủ lạnh để bắt đầu lưu kho.' : `Chưa có nguyên liệu nào ở mục “${statusLabels[status]}”.`}</p>{!search && status === 'ACTIVE' && <div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => setFormOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-800 dark:bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900"><Plus size={16} /> Thêm nguyên liệu</button><Link to="/fridge-scan" className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-slate-700"><Snowflake size={16} /> Quét tủ lạnh</Link></div>}</div> : <div className="grid gap-3 md:grid-cols-2">{visibleItems.map(item => {
+        {loading ? <div role="status" className="grid gap-3 md:grid-cols-2"><div className="h-36 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" /><div className="h-36 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" /></div> : visibleItems.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 px-5 py-12 text-center"><span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-400 shadow-sm"><Snowflake size={23} /></span><h3 className="mt-4 font-bold text-slate-800 dark:text-white">{search ? 'Chưa tìm thấy nguyên liệu' : 'Tủ Bếp này đang trống'}</h3><p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500 dark:text-slate-400">{search ? 'Thử từ khóa khác hoặc xóa nội dung tìm kiếm.' : status === 'ACTIVE' ? 'Thêm nguyên liệu thủ công hoặc quét tủ lạnh để bắt đầu lưu vào Tủ Bếp.' : `Chưa có nguyên liệu nào ở mục “${statusLabels[status]}”.`}</p>{!search && status === 'ACTIVE' && <div className="mt-4 flex flex-wrap justify-center gap-2"><button type="button" onClick={() => setFormOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-800 dark:bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-900"><Plus size={16} /> Thêm nguyên liệu</button><Link to="/fridge-scan" className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-slate-700"><Snowflake size={16} /> Quét tủ lạnh</Link></div>}</div> : <div className="grid gap-3 md:grid-cols-2">{visibleItems.map(item => {
           const urgent = item.isExpired || item.freshnessStatus === 'SPOILED';
           const soon = item.isExpiringSoon || item.freshnessStatus === 'USABLE';
           const tone = urgent ? 'border-rose-200 dark:border-rose-900 bg-rose-50/30 dark:bg-rose-950/20' : soon ? 'border-amber-200 dark:border-amber-900 bg-amber-50/30 dark:bg-amber-950/20' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850';

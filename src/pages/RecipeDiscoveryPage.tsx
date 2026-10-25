@@ -9,14 +9,13 @@ import { errorMessage } from '../services/apiClient';
 import type { PageResponse } from '../types/api';
 import type { RecipeSummary, RecipeTag } from '../types/recipe';
 
-const groups: Record<string, string> = { dietaryType: 'Trường phái', cookingMethod: 'Cách chế biến', dishCategory: 'Loại món', nutritionGoal: 'Dinh dưỡng', occasion: 'Hoàn cảnh', dietaryRestriction: 'Kiêng / dị ứng' };
+const groups: Record<string, string> = { dietaryType: 'Trường phái', cookingMethod: 'Cách chế biến', dishCategory: 'Loại món', nutritionGoal: 'Dinh dưỡng', occasion: 'Nhu cầu & Dịp nấu', dietaryRestriction: 'Kiêng / dị ứng' };
 
 export function RecipeDiscoveryPage() {
   const [keyword, setKeyword] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [tags, setTags] = useState<Record<string, RecipeTag[]>>({});
   const [included, setIncluded] = useState<string[]>([]);
-  const [excluded, setExcluded] = useState<string[]>([]);
   const [mode, setMode] = useState<'AND' | 'OR'>('AND');
   const [time, setTime] = useState('');
   const [calories, setCalories] = useState('');
@@ -39,7 +38,7 @@ export function RecipeDiscoveryPage() {
     setLoading(true); setError('');
     const timer = setTimeout(() => {
       const [sortBy, sortDirection] = sort.split(':');
-      recipeService.filter({ keyword: keyword.trim() || undefined, includeTagCodes: included, excludeTagCodes: excluded,
+      recipeService.filter({ keyword: keyword.trim() || undefined, includeTagCodes: included,
         inclusionMode: mode, maxCookTime: time ? Number(time) : undefined, maxCalories: calories ? Number(calories) : undefined,
         minProtein: protein ? Number(protein) : undefined, difficulty: difficulty || undefined, sortBy, sortDirection, page, size: 12,
       }, controller.signal).then(result => { if (!controller.signal.aborted) setData(result); })
@@ -47,13 +46,13 @@ export function RecipeDiscoveryPage() {
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
-  }, [keyword, included, excluded, mode, time, calories, protein, difficulty, sort, page, reload]);
-  const toggle = (code: string, exclusion: boolean) => {
-    const setter = exclusion ? setExcluded : setIncluded;
-    setter(previous => previous.includes(code) ? previous.filter(value => value !== code) : [...previous, code]); setPage(0);
+  }, [keyword, included, mode, time, calories, protein, difficulty, sort, page, reload]);
+  const toggle = (code: string) => {
+    setIncluded(previous => previous.includes(code) ? previous.filter(value => value !== code) : [...previous, code]);
+    setPage(0);
   };
-  const reset = () => { setKeyword(''); setIncluded([]); setExcluded([]); setMode('AND'); setTime(''); setCalories(''); setProtein(''); setDifficulty(''); setSort('newest:desc'); setPage(0); };
-  const activeCount = included.length + excluded.length + [time, calories, protein, difficulty].filter(Boolean).length;
+  const reset = () => { setKeyword(''); setIncluded([]); setMode('AND'); setTime(''); setCalories(''); setProtein(''); setDifficulty(''); setSort('newest:desc'); setPage(0); };
+  const activeCount = included.length + [time, calories, protein, difficulty].filter(Boolean).length;
   const availableTags = Object.values(tags).flat();
   const quickFilters = [
     { name: 'Tất cả', code: '', icon: <Leaf size={16} /> },
@@ -80,14 +79,13 @@ export function RecipeDiscoveryPage() {
           <div className="discovery-filter-heading"><h2><SlidersHorizontal size={16} /> Bộ lọc</h2><button onClick={reset}>Đặt lại</button></div>
           <label className="discovery-field">Kết hợp thẻ<select value={mode} onChange={event => { setMode(event.target.value as 'AND' | 'OR'); setPage(0); }}><option value="AND">Tất cả thẻ đã chọn</option><option value="OR">Bất kỳ thẻ đã chọn</option></select></label>
           {tagError && <p role="alert" className="discovery-error">{tagError}</p>}
-          {Object.entries(tags).map(([group, values]) => values?.length ? <details key={group} open={group === 'dietaryType'} className="discovery-filter-group"><summary>{groups[group] || group}<span>{values.length}</span></summary><div>{values.map(tag => <label key={tag.code} className="discovery-checkbox"><input type="checkbox" checked={included.includes(tag.code)} onChange={() => toggle(tag.code, false)} /><span>{tag.name}</span></label>)}</div></details> : null)}
+          {Object.entries(tags).map(([group, values]) => values?.length ? <details key={group} open={group === 'dietaryType'} className="discovery-filter-group"><summary>{groups[group] || group}<span>{values.length}</span></summary><div>{values.map(tag => <label key={tag.code} className="discovery-checkbox"><input type="checkbox" checked={included.includes(tag.code)} onChange={() => toggle(tag.code)} /><span>{tag.name}</span></label>)}</div></details> : null)}
           <details className="discovery-filter-group"><summary>Thời gian & dinh dưỡng</summary><div className="discovery-numeric"><label className="discovery-field">Thời gian tối đa (phút)<input type="number" min="1" value={time} onChange={event => { setTime(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Calo tối đa<input type="number" min="1" value={calories} onChange={event => { setCalories(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Đạm tối thiểu (g)<input type="number" min="0" value={protein} onChange={event => { setProtein(event.target.value); setPage(0); }} placeholder="Không giới hạn" /></label><label className="discovery-field">Độ khó<select value={difficulty} onChange={event => { setDifficulty(event.target.value); setPage(0); }}><option value="">Tất cả</option><option value="EASY">Dễ</option><option value="MEDIUM">Vừa</option><option value="HARD">Khó</option></select></label></div></details>
-          <details className="discovery-filter-group"><summary>Loại trừ thẻ</summary><div>{availableTags.map(tag => <label key={tag.code} className="discovery-checkbox"><input type="checkbox" aria-label={'Loại trừ ' + tag.name} checked={excluded.includes(tag.code)} onChange={() => toggle(tag.code, true)} /><span>{tag.name}</span></label>)}</div></details>
           <div className="discovery-sidebar-note"><CheckCheck size={18} /><div><strong>Nấu ngon, ăn lành</strong><p>Kiểm tra thành phần để chọn món phù hợp với chế độ ăn của bạn.</p></div></div>
         </aside>
         <section className="discovery-results" aria-busy={loading}>
           <div className="discovery-results-heading"><div><span className="discovery-section-label">CẢM HỨNG CHO BỮA ĂN</span><h2>{keyword ? 'Kết quả tìm kiếm' : 'Món ngon đáng thử'}<span>{data?.totalElements ?? 0}</span></h2></div><select aria-label="Sắp xếp công thức" value={sort} onChange={event => { setSort(event.target.value); setPage(0); }}><option value="newest:desc">Mới nhất</option><option value="calories:asc">Calo thấp nhất</option><option value="cookTime:asc">Nấu nhanh nhất</option><option value="protein:desc">Đạm cao nhất</option></select></div>
-          {(included.length > 0 || excluded.length > 0) && <div className="discovery-active-tags">{[...included.map(code => ({ code, exclusion: false })), ...excluded.map(code => ({ code, exclusion: true }))].map(item => <button key={(item.exclusion ? 'exclude-' : '') + item.code} onClick={() => toggle(item.code, item.exclusion)}>{item.exclusion ? 'Loại trừ: ' : ''}{availableTags.find(tag => tag.code === item.code)?.name || item.code}<X size={13} /></button>)}</div>}
+          {included.length > 0 && <div className="discovery-active-tags">{included.map(code => <button key={code} onClick={() => toggle(code)}>{availableTags.find(tag => tag.code === code)?.name || code}<X size={13} /></button>)}</div>}
           {loading && !data && <div className="recipe-grid" role="status" aria-label="Đang tải công thức">{[0, 1, 2].map(value => <div className="recipe-skeleton" key={value}><div /><span /><span /></div>)}</div>}
           {error && <div role="alert" className="discovery-empty"><RefreshCw size={28} /><h3>Chưa thể tải món ăn</h3><p>{error}</p><button onClick={() => setReload(value => value + 1)}>Thử lại</button></div>}
           {!loading && !error && !data?.items.length && <div role="status" className="discovery-empty"><Soup size={36} /><h3>Chưa có món phù hợp</h3><p>Thử đổi từ khóa hoặc giảm bớt bộ lọc.</p><button onClick={reset}>Đặt lại bộ lọc</button></div>}

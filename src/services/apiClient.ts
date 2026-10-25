@@ -127,7 +127,23 @@ export function errorMessage(error: unknown): string {
   const code = error instanceof ApiError ? error.code : undefined;
   const status = error instanceof ApiError ? error.status : undefined;
 
-  // 1. Session & Token errors
+  // 1. Authentication credentials & login rate limit (Ưu tiên kiểm tra trước status 401)
+  if (code === 1101 || /invalid credentials|invalid username/i.test(msg)) {
+    return 'Tên đăng nhập, email hoặc mật khẩu không chính xác.';
+  }
+  if (code === 1102 || /too many|attempts exceeded/i.test(msg)) {
+    return 'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.';
+  }
+
+  // 2. Account status
+  if (code === 1200 || /pending email verification/i.test(msg)) {
+    return 'Tài khoản chưa được kích hoạt email. Vui lòng kiểm tra hộp thư của bạn.';
+  }
+  if (code === 1205 || code === 1204 || /locked|disabled/i.test(msg)) {
+    return 'Tài khoản tạm thời bị khóa hoặc vô hiệu hóa. Vui lòng liên hệ quản trị viên.';
+  }
+
+  // 3. Session & Token errors
   if (
     code === 1201 ||
     code === 1202 ||
@@ -139,19 +155,6 @@ export function errorMessage(error: unknown): string {
     /revoked|token.*expired|invalid.*token|token.*invalid|unauthorized/i.test(msg)
   ) {
     return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-  }
-
-  // 2. Authentication credentials
-  if (code === 1101 || /invalid credentials|invalid username/i.test(msg)) {
-    return 'Tên đăng nhập, email hoặc mật khẩu không chính xác.';
-  }
-
-  // 3. Account status
-  if (code === 1200 || /pending email verification/i.test(msg)) {
-    return 'Tài khoản chưa được kích hoạt email. Vui lòng kiểm tra hộp thư của bạn.';
-  }
-  if (code === 1205 || code === 1204 || /locked|disabled/i.test(msg)) {
-    return 'Tài khoản tạm thời bị khóa hoặc vô hiệu hóa. Vui lòng liên hệ quản trị viên.';
   }
 
   // 4. Registration conflicts

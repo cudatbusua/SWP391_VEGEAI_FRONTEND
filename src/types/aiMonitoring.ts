@@ -1,88 +1,102 @@
-export type TimeRange = 'TODAY' | 'LAST_24_HOURS' | 'LAST_7_DAYS' | 'LAST_30_DAYS';
-export type EventLevel = 'SUCCESS' | 'FAILED' | 'FLAGGED';
-export type ServiceHealth = 'HEALTHY' | 'WARNING' | 'DOWN' | 'NO_DATA';
-export type CoreStatus = 'LIVE' | 'DEGRADED' | 'NO_DATA';
+// Admin AI monitoring (/api/admin/ai/monitoring). The backend never stores prompts, images or AI responses.
+
+export type AiTimeRange = 'TODAY' | 'LAST_24_HOURS' | 'LAST_7_DAYS' | 'LAST_30_DAYS';
+export type AiEventLevel = 'SUCCESS' | 'FAILED' | 'FLAGGED';
+export type AiServiceHealth = 'HEALTHY' | 'WARNING' | 'DOWN' | 'NO_DATA';
+export type AiCoreStatus = 'LIVE' | 'DEGRADED' | 'NO_DATA';
 
 export interface AiServiceStatus {
   operation: string;
-  health: ServiceHealth;
+  health: AiServiceHealth;
   totalRequests: number;
   failedRequests: number;
-  successRatePercentage?: number;
-  averageLatencyMs?: number;
-  lastStatus?: string;
-  lastCalledAt?: string;
-  model?: string;
+  successRatePercentage?: number | null;
+  averageLatencyMs?: number | null;
+  lastStatus?: string | null;
+  lastCalledAt?: string | null;
+  model?: string | null;
 }
 
 export interface AiMonitoringOverview {
   generatedAt: string;
-  coreStatus: CoreStatus;
+  coreStatus: AiCoreStatus;
   totalRequests: number;
   previousTotalRequests: number;
-  requestTrendPercentage?: number;
-  p95LatencyMs?: number;
-  averageLatencyMs?: number;
-  successRatePercentage?: number;
+  requestTrendPercentage?: number | null;
+  p95LatencyMs?: number | null;
+  averageLatencyMs?: number | null;
+  successRatePercentage?: number | null;
   failedRequests: number;
   moderationChecks: number;
   moderationFlagged: number;
-  flaggedRatePercentage?: number;
+  flaggedRatePercentage?: number | null;
   totalTokens: number;
   guestRequestsToday: number;
   auditEntryCount: number;
   systemLogCount: number;
-  systemLogSince?: string;
+  systemLogSince?: string | null;
   services: AiServiceStatus[];
 }
 
-export interface AiMonitoringEvent {
+export interface AiEvent {
   requestId: string;
   timestamp: string;
   operation: string;
   model: string;
-  userType: string;
-  userId?: string;
-  userName?: string;
+  userType?: string | null;
+  userId?: string | null;
+  userName?: string | null;
   status: string;
-  outcome?: string;
-  errorType?: string;
+  outcome?: string | null;
+  errorType?: string | null;
   latencyMs: number;
-  promptTokens?: number;
-  responseTokens?: number;
-  totalTokens?: number;
+  promptTokens?: number | null;
+  responseTokens?: number | null;
+  totalTokens?: number | null;
   locked: boolean;
 }
 
 export interface AiAuditEntry {
   id: string;
   timestamp: string;
-  adminName?: string;
+  adminName?: string | null;
   action: string;
   targetType: string;
   targetId: string;
-  targetLabel?: string;
-  aiVerdict?: string;
-  aiAgreedWithAdmin?: boolean;
-  detail?: string;
+  targetLabel?: string | null;
+  aiVerdict?: string | null;
+  aiAgreedWithAdmin?: boolean | null;
+  detail?: string | null;
 }
 
-export interface AiSystemLogEntry {
+export interface SystemLogEntry {
   id: number;
   timestamp: string;
   level: string;
   logger: string;
   loggerName: string;
   thread: string;
-  message: string;
-  error?: string;
+  message?: string | null;
+  error?: string | null;
 }
 
 export interface AiReplayResult {
   sourceRequestId: string;
   status: string;
   latencyMs: number;
-  totalTokens?: number;
-  errorType?: string;
-  message: string;
+  totalTokens?: number | null;
+  errorType?: string | null;
+  message?: string | null;
+}
+
+export interface AiEventFilters {
+  range: AiTimeRange;
+  operation: string;
+  level: AiEventLevel | '';
+  search: string;
+}
+
+export interface SystemLogFilters {
+  level: string;
+  search: string;
 }

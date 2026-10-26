@@ -36,7 +36,7 @@ const AdminQuestionsPage = lazy(() => import('./pages/AdminQuestionsPage').then(
 const AdminQuestionDetailPage = lazy(() => import('./pages/AdminQuestionsPage').then(module => ({ default: module.AdminQuestionDetailPage })));
 const AdminVideosPage = lazy(() => import('./pages/AdminVideosPage').then(module => ({ default: module.AdminVideosPage })));
 const AdminVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.AdminVideoEditorPage })));
-const AdminAiMonitoringPage = lazy(() => import('./pages/AdminAiMonitoringPage').then(module => ({ default: module.AdminAiMonitoringPage })));
+const AdminAiPage = lazy(() => import('./pages/AdminAiPage').then(module => ({ default: module.AdminAiPage })));
 import { ThemeProvider } from './store/ThemeContext';
 
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then(module => ({ default: module.AccountSettingsPage })));
@@ -80,7 +80,7 @@ export const App: React.FC = () => {
           <Route path="/smart-market" element={<SmartMarketPage />} />
           <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
           <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
-          <Route path="/admin/ai-monitoring" element={<AdminFeatureBoundary><AdminAiMonitoringPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/ai-monitoring" element={<AdminFeatureBoundary><AdminAiPage /></AdminFeatureBoundary>} />
           <Route path="/admin/recipes" element={<AdminFeatureBoundary><AdminRecipesPage /></AdminFeatureBoundary>} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/write" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />

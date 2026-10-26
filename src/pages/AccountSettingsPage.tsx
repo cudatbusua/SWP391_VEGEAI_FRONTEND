@@ -639,8 +639,6 @@ export const AccountSettingsPage: React.FC = () => {
           {[
             { id: 'profile', label: 'Hồ sơ & Chỉ số sức khỏe', icon: Activity, desc: 'BMI, Thể trạng, Calo, Vòng vận động' },
             { id: 'calendar', label: 'Lịch biểu & Thực đơn', icon: CalendarDays, desc: 'Lịch ăn 30 ngày, 3 bữa chính' },
-            { id: 'security', label: 'Bảo mật & Đăng nhập', icon: ShieldCheck, desc: 'Đổi mật khẩu, OTP' },
-            { id: 'preferences', label: 'Giao diện & Hệ thống', icon: Palette, desc: 'Chế độ Sáng/Tối, Riêng tư' },
           ].map(tabItem => {
             const Icon = tabItem.icon;
             const isActive = currentTab === tabItem.id;

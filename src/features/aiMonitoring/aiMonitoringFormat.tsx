@@ -6,9 +6,11 @@ export const OPERATIONS: Record<string, { label: string; matrix: string; tone: s
   FRIDGE_SCAN: { label: 'AI Tủ Lạnh', matrix: 'Vision OCR & Tủ Lạnh', tone: 'amber', success: 'Nhận diện nguyên liệu từ ảnh tủ lạnh' },
   MEAL_PLAN_RANKING: { label: 'AI Thực Đơn', matrix: 'AI Lập Thực Đơn', tone: 'violet', success: 'Xếp hạng món cho kế hoạch thực đơn tuần' },
   NUTRITION_CHAT: { label: 'AI Bếp Trưởng', matrix: 'AI Bếp Trưởng (Chat)', tone: 'rose', success: 'Tư vấn món chay và dinh dưỡng cho người dùng' },
+  RECIPE_GENERATION: { label: 'AI Tạo Công Thức', matrix: 'AI Tạo Công Thức', tone: 'cyan', success: 'Tạo công thức chay theo yêu cầu người dùng' },
+  VIDEO_RECIPE: { label: 'AI Công Thức Từ Video', matrix: 'AI Đọc Công Thức Video', tone: 'amber', success: 'Trích xuất công thức từ video nấu ăn' },
   REPLAY_TEST: { label: 'Replay Test', matrix: 'Kiểm thử Replay', tone: 'slate', success: 'Kiểm thử kết nối model (Replay)' },
 };
-export const MATRIX_OPERATIONS = ['CONTENT_MODERATION', 'FRIDGE_SCAN', 'NUTRITION_CHAT', 'MEAL_PLAN_RANKING'];
+export const MATRIX_OPERATIONS = ['CONTENT_MODERATION', 'FRIDGE_SCAN', 'NUTRITION_CHAT', 'MEAL_PLAN_RANKING', 'RECIPE_GENERATION', 'VIDEO_RECIPE'];
 export const USER_TYPES: Record<string, string> = { GUEST: 'Khách vãng lai', MEMBER: 'Thành viên', SYSTEM: 'Hệ thống' };
 export const LEVEL_LABEL: Record<AiEventLevel, string> = { SUCCESS: 'Thành công', FLAGGED: 'Gắn cờ', FAILED: 'Lỗi' };
 export const HEALTH_LABEL: Record<AiServiceHealth, string> = { HEALTHY: 'Hoạt động tốt', WARNING: 'Tải cao', DOWN: 'Sự cố', NO_DATA: 'Chưa có dữ liệu' };

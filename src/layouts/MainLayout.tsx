@@ -55,11 +55,10 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
   ];
 
   const guestNavItems: { label: string; path: string; isActive: boolean }[] = [
-    { label: 'Tổng quan', path: '/', isActive: isDashboardActive },
     { label: 'Khám phá', path: '/explore', isActive: pathname === '/explore' || pathname.startsWith('/recipe') },
-    { label: 'Blog & Cộng đồng', path: '/blog', isActive: pathname.startsWith('/blog') },
-    { label: 'Đi chợ & Quán chay', path: '/smart-market', isActive: pathname === '/smart-market' },
-    { label: 'AI Bếp trưởng (Dùng thử)', path: '/ai-chef', isActive: pathname === '/ai-chef' },
+    { label: 'Blog', path: '/blog', isActive: pathname.startsWith('/blog') },
+    { label: 'Hỏi đáp', path: '/questions', isActive: pathname.startsWith('/questions') },
+    { label: 'Quán chay gần đây', path: '/restaurants', isActive: pathname === '/restaurants' },
   ];
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
@@ -395,6 +394,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             <p className="text-[11px] text-slate-400 mt-0.5">Sức khoẻ của bạn - Cảm hứng từ thiên nhiên.</p>
           </div>
           <div className="flex items-center gap-5 text-xs font-medium">
+            {isAuthenticated ? <>
             <Link to="/meal-plans" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               Dinh dưỡng & Thực đơn
             </Link>
@@ -407,6 +407,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             <Link to="/ai-chef" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               AI Bếp trưởng
             </Link>
+            </> : <Link to="/restaurants" className="hover:text-emerald-700 dark:hover:text-emerald-400">Quán chay gần đây</Link>}
             <Link to="/blog" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               Cộng đồng
             </Link>

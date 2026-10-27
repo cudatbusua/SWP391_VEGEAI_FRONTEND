@@ -30,7 +30,7 @@ function AskQuestion() {
     {sent && <div role="status" className="cm-alert"><p>Câu hỏi đã được gửi và đang chờ duyệt.</p><Link className="cm-success-link" to={'/questions/mine/' + sent.id}>Xem câu hỏi của tôi <ArrowRight size={15} /></Link></div>}
     {isLoading ? <CommunityLoading /> : isAuthenticated ? <form onSubmit={send} className="cm-form"><label className="cm-field">Nội dung câu hỏi<textarea aria-label="Nội dung câu hỏi" value={content} onChange={event => setContent(event.target.value)} maxLength={5000} minLength={5} required disabled={busy} rows={5} placeholder="Ví dụ: Ngâm và nấu các loại đậu thế nào cho ngon?" /><small>{content.length}/5000</small></label><button className="cm-button full" disabled={busy || content.trim().length < 5}>{busy ? <Loader2 className="cm-spin" size={16} /> : <Send size={16} />} Gửi câu hỏi</button></form>
       : <Link className="cm-button full" to="/login" state={{ from: '/questions' }}><Send size={16} /> Đăng nhập để đặt câu hỏi</Link>}
-    <div className="cm-side-links"><Link to="/videos"><span>Vào bếp cùng VEGEAI</span><Video size={17} /></Link><Link to="/"><span>Tìm cảm hứng cho bữa chay</span><ArrowRight size={16} /></Link></div>
+    <div className="cm-side-links">{isAuthenticated && <Link to="/videos"><span>Vào bếp cùng VEGEAI</span><Video size={17} /></Link>}<Link to="/explore"><span>Tìm cảm hứng cho bữa chay</span><ArrowRight size={16} /></Link></div>
   </div></aside>;
 }
 function QuestionList({ mine }: { mine: boolean }) {

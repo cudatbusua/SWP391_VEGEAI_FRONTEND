@@ -11,6 +11,12 @@ interface BackendPlace {
   address?: string; category: PlaceCategory; rating?: number; isOpenNow?: boolean; openNow?: boolean;
   photoUrl?: string; openStreetMapUrl?: string; googleMapsUrl?: string; attribution?: string; types?: string[]; isVerified?: boolean;
 }
+function exclusiveVegetarianRestaurants(values: BackendPlace[]): BackendPlace[] {
+  return values.filter(value => value.category === 'RESTAURANT' && value.isVerified === true
+    && !value.placeId.startsWith('mock_')
+    && value.types?.some(type => /^diet:(?:vegetarian|vegan)=only$/i.test(type)
+      || /^cuisine=(?:vegetarian|vegan)(?:[;,](?:vegetarian|vegan))*$/i.test(type)));
+}
 function mapPlaces(values: BackendPlace[]): Place[] {
   return values.filter(value => Number.isFinite(value.latitude) && Number.isFinite(value.longitude)).map(value => ({
     id: value.placeId,
@@ -49,16 +55,16 @@ export const restaurantService = {
     return mapPlaces(response.data);
   },
   async verifiedRestaurantsNearby(center: Coordinates, radius = 5): Promise<Place[]> {
-    const params = new URLSearchParams({ lat: String(center.lat), lng: String(center.lon), radius: String(radius * 1000), category: 'ALL' });
-    const response = await apiRequest<BackendPlace[]>('/places/nearby?' + params, { auth: 'none', timeoutMs: 45000 });
+    const params = new URLSearchParams({ lat: String(center.lat), lng: String(center.lon), radius: String(radius * 1000) });
+    const response = await apiRequest<BackendPlace[]>('/places/verified/nearby?' + params, { auth: 'none', timeoutMs: 45000 });
     if (!response.data) throw new Error('Máy chủ không trả về danh sách quán chay.');
-    return mapPlaces(response.data);
+    return mapPlaces(exclusiveVegetarianRestaurants(response.data));
   },
   async searchVerifiedRestaurants(query: string, center?: Coordinates, radius = 10): Promise<Place[]> {
     const params = new URLSearchParams({ query: query.trim(), radius: String(radius * 1000) });
     if (center) { params.set('lat', String(center.lat)); params.set('lng', String(center.lon)); }
-    const response = await apiRequest<BackendPlace[]>('/places/search?' + params, { auth: 'none', timeoutMs: 45000 });
+    const response = await apiRequest<BackendPlace[]>('/places/verified/search?' + params, { auth: 'none', timeoutMs: 45000 });
     if (!response.data) throw new Error('Máy chủ không trả về kết quả quán chay.');
-    return mapPlaces(response.data);
+    return mapPlaces(exclusiveVegetarianRestaurants(response.data));
   },
 };

@@ -86,3 +86,23 @@ export interface AiReplayResult {
   errorType?: string;
   message: string;
 }
+
+// Compatibility names used by the newer main-branch monitoring workspace.
+export type AiTimeRange = TimeRange;
+export type AiEventLevel = EventLevel;
+export type AiServiceHealth = ServiceHealth;
+export type AiCoreStatus = CoreStatus;
+export type AiEvent = AiMonitoringEvent;
+export type SystemLogEntry = AiSystemLogEntry;
+
+export interface AiEventFilters {
+  range: AiTimeRange;
+  operation: string;
+  level: AiEventLevel | '';
+  search: string;
+}
+
+export interface SystemLogFilters {
+  level: string;
+  search: string;
+}

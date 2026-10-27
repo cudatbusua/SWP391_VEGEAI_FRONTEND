@@ -5,6 +5,9 @@ export interface RecipeSummary {
   cookTimeMinutes?: number; difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   calories?: number; proteinGrams?: number; isVerified: boolean; tags: RecipeTag[];
 }
+export interface AdminRecipeSummary extends Omit<RecipeSummary, 'isVerified'> {
+  status: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED';
+}
 export interface RecipeDetail extends RecipeSummary {
   description?: string; prepTimeMinutes?: number; servings?: number;
   carbsGrams?: number; fatGrams?: number; fiberGrams?: number;

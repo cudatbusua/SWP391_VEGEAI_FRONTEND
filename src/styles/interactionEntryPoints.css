@@ -1,0 +1,5 @@
+.recipe-card-engagement{display:flex;align-items:center;gap:6px;width:fit-content;margin:6px 0 10px;padding:7px 10px;border:1px solid #d5e8dc;border-radius:7px;background:#f0f8f3;color:#176b4c;font-size:11px;font-weight:700}
+.recipe-card-engagement svg:first-child{color:#d58b1d}.recipe-card-engagement svg:nth-child(2){margin-left:3px}
+.cm-video-engagement{display:flex;align-items:center;gap:8px;width:fit-content;margin:8px 0 12px;padding:8px 11px;border:1px solid #cfe5d8;border-radius:7px;background:#eff8f2;color:#176b4c;font-size:12px;font-weight:700;text-decoration:none}
+.cm-video-engagement svg:first-child{color:#21845d}.cm-video-engagement svg:last-child{margin-left:5px}.cm-video-engagement:hover,.recipe-card-engagement:hover{background:#e4f2e9}
+@media(max-width:600px){.cm-video-engagement{width:100%;justify-content:center}}

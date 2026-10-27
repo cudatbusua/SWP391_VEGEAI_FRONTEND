@@ -74,8 +74,8 @@ export function BlogPage() {
                 <FileText size={16} /> Bài viết của tôi
               </Link>
             )}
-            <Link className="blog-button" to="/blog/write">
-              <Plus size={17} /> Viết bài
+            <Link className="blog-button" to={isAuthenticated ? '/blog/write' : '/login'}>
+              <Plus size={17} /> {isAuthenticated ? 'Viết bài' : 'Đăng nhập để viết bài'}
             </Link>
           </div>
         </header>
@@ -113,8 +113,8 @@ export function BlogPage() {
             <BookOpen size={36} />
             <h2>Chưa có bài viết phù hợp</h2>
             <p>Hãy là người đầu tiên chia sẻ công thức hoặc trải nghiệm sống xanh của bạn!</p>
-            <Link to="/blog/write" className="blog-button">
-              <Plus size={16} /> Viết bài đầu tiên
+            <Link to={isAuthenticated ? '/blog/write' : '/login'} className="blog-button">
+              <Plus size={16} /> {isAuthenticated ? 'Viết bài đầu tiên' : 'Đăng nhập để viết bài'}
             </Link>
           </div>
         )}
@@ -216,7 +216,7 @@ export function BlogDetailPage() {
 
   // Dynamic AI Video Recipe Extraction
   const handleAiVideoExtract = async () => {
-    if (!post) return;
+    if (!isAuthenticated || !post) return;
     setAiAnalyzing(true);
     setAiError('');
     try {
@@ -338,7 +338,7 @@ export function BlogDetailPage() {
                 </div>
 
                 {/* AI Video Recipe Extraction Trigger */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {isAuthenticated && <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                       <Sparkles size={18} />
@@ -361,7 +361,7 @@ export function BlogDetailPage() {
                     <ChefHat size={15} />
                     {aiAnalyzing ? 'AI đang phân tích video...' : aiRecipe ? 'Làm mới phân tích AI' : '✨ AI Phân tích video ngay'}
                   </button>
-                </div>
+                </div>}
 
                 {aiError && (
                   <p className="text-xs text-red-600 font-semibold px-2">{aiError}</p>

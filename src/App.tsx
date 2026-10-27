@@ -43,7 +43,8 @@ const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').the
 const SmartMarketPage = lazy(() => import('./pages/SmartMarketPage').then(module => ({ default: module.SmartMarketPage })));
 
 const DashboardRoute: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
+  if (!isAuthenticated && !isLoading) return <Navigate to="/explore" replace />;
   if (isAuthenticated && user?.role === 'admin') {
     return <Navigate to="/admin" replace />;
   }
@@ -71,13 +72,13 @@ export const App: React.FC = () => {
             <Route path="/reset-password" element={<GuestOnlyBoundary><ResetPasswordPage /></GuestOnlyBoundary>} />
             <Route path="/change-password" element={<Navigate to="/settings?tab=security" replace />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/ai-chef" element={<AiChatPage />} />
-            <Route path="/fridge-scan" element={<FridgeScanPage />} />
+            <Route path="/ai-chef" element={<PersonalFeatureBoundary><AiChatPage /></PersonalFeatureBoundary>} />
+            <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />
             <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
             <Route path="/nutrition" element={<Navigate to="/meal-plans?tab=nutrition" replace />} />
             <Route path="/meal-plans" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
           <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
-          <Route path="/smart-market" element={<SmartMarketPage />} />
+          <Route path="/smart-market" element={<PersonalFeatureBoundary><SmartMarketPage /></PersonalFeatureBoundary>} />
           <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
           <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
           <Route path="/admin/ai-monitoring" element={<AdminFeatureBoundary><AdminAiMonitoringPage /></AdminFeatureBoundary>} />
@@ -95,9 +96,9 @@ export const App: React.FC = () => {
           <Route path="/questions/mine" element={<PersonalFeatureBoundary><QuestionsPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine/:id" element={<PersonalFeatureBoundary><QuestionDetailPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/:id" element={<QuestionDetailPage />} />
-          <Route path="/videos" element={<VideosPage />} />
+          <Route path="/videos" element={<PersonalFeatureBoundary><VideosPage /></PersonalFeatureBoundary>} />
           <Route path="/videos/saved" element={<PersonalFeatureBoundary><VideosPage saved /></PersonalFeatureBoundary>} />
-          <Route path="/videos/:id" element={<VideoDetailPage />} />
+          <Route path="/videos/:id" element={<PersonalFeatureBoundary><VideoDetailPage /></PersonalFeatureBoundary>} />
           <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos" element={<AdminFeatureBoundary><AdminVideosPage /></AdminFeatureBoundary>} />

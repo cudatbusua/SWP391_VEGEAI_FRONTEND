@@ -149,3 +149,30 @@ html.dark .cm-dialog {
   color: #f1f5f9;
   box-shadow: 0 16px 80px rgba(0, 0, 0, 0.6);
 }
+
+/* Keep video administration actions on one horizontal row, matching Blog. */
+.cm-admin-row {
+  grid-template-columns: minmax(260px, 1fr) auto auto;
+}
+.cm-admin-row > .flex.shrink-0 {
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+.cm-admin-row > .flex.shrink-0 > * {
+  flex: none;
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .cm-admin-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cm-admin-row > .cm-badge,
+  .cm-admin-row > .flex.shrink-0 {
+    grid-column: 1;
+  }
+  .cm-admin-row > .flex.shrink-0 {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}

@@ -1,5 +1,5 @@
 export type QuestionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
-export type VideoStatus = 'DRAFT' | 'PUBLISHED';
+export type VideoStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
 export interface Question {
   id: string; authorName: string; content: string; status: QuestionStatus;
   answer?: string; answeredBy?: string; answeredAt?: string;
@@ -9,6 +9,8 @@ export interface Question {
 export interface CommunityVideo {
   id: string; title: string; description?: string; videoUrl: string; thumbnailUrl?: string;
   category?: string; durationSeconds?: number; status: VideoStatus; createdBy: string;
+  aiModerationStatus?: 'NOT_CHECKED' | 'CHECKING' | 'SAFE' | 'FLAGGED' | 'UNAVAILABLE';
+  aiModerationReason?: string; aiModerationAgreedWithAdmin?: boolean;
   createdAt: string; updatedAt: string; version: number;
 }
 export interface VideoInput {

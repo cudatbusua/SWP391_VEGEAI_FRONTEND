@@ -306,13 +306,6 @@ export function SmartMarketPage() {
   }, [selectedStore, catalogSubcategory]);
 
   const handleAddComboToCart = (combo: MealCombo) => {
-    if (!isAddressConfirmed) {
-      sfx.playNotification();
-      setLocationMessage('Vui lòng cập nhật hoặc chọn địa chỉ giao hàng trước khi mua combo!');
-      const el = document.getElementById('location-section') || document.getElementById('location-bar');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
     sfx.playSuccess();
     const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
     if (!targetStore) return;
@@ -367,13 +360,6 @@ export function SmartMarketPage() {
   };
 
   const handleAddVietgapVeggie = (veg: typeof VIETGAP_5K_VEGGIES[0]) => {
-    if (!isAddressConfirmed) {
-      sfx.playNotification();
-      setLocationMessage('Vui lòng cập nhật hoặc chọn địa chỉ giao hàng trước khi chọn rau củ!');
-      const el = document.getElementById('location-section') || document.getElementById('location-bar');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
     sfx.playSuccess();
     const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
     if (!targetStore) return;
@@ -418,7 +404,6 @@ export function SmartMarketPage() {
     setCartAddToast(`Đã thêm "${veg.name}" (5.000đ) vào giỏ hàng!`);
     setTimeout(() => setCartAddToast(''), 3500);
   };
-  const [paymentMethod, setPaymentMethod] = useState<'VIETQR' | 'MOMO' | 'COD'>('VIETQR');
   const [deliveryNote, setDeliveryNote] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<'VEGE15' | 'FREESHIP' | null>('VEGE15');
   const [autoSyncFridge, setAutoSyncFridge] = useState(true);
@@ -865,13 +850,13 @@ const handleToggle = (id: string) => {
               <span>Đi chợ & Mua sắm thông minh</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-              <span>Đi Chợ Thông Minh & Quán Chay Lân Cận</span>
+              <span>Khám phá nguyên liệu chay</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 font-bold">
-                ShopeeFood Style 🛵
+                Không thanh toán trực tuyến
               </span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-              Tự động tìm kiếm quán chay và tiệm thực phẩm thực tế gần bạn nhất (Google Maps / OpenStreetMap), cho phép đặt hàng từ nhiều quán cùng lúc và giao tận nơi trong một lần thanh toán duy nhất.
+              Tham khảo nguyên liệu và cửa hàng chay, rồi lưu món cần mua vào danh sách cá nhân. VEGEAI không nhận đặt hàng, giao hàng hoặc thanh toán.
             </p>
           </div>
 
@@ -904,7 +889,7 @@ const handleToggle = (id: string) => {
         </div>
 
         {/* Real GPS Location Bar (Session-Persistent) */}
-        <div id="location-bar" className="bg-emerald-50/80 dark:bg-slate-900/90 rounded-2xl border border-emerald-200/70 dark:border-slate-800 p-4 mb-6 shadow-2xs">
+        <div id="location-bar" className="hidden bg-emerald-50/80 dark:bg-slate-900/90 rounded-2xl border border-emerald-200/70 dark:border-slate-800 p-4 mb-6 shadow-2xs">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
@@ -1171,7 +1156,7 @@ const handleToggle = (id: string) => {
               </div>
             </div>
 
-            {isAddressConfirmed ? (
+            {true ? (
               <>
 <div className="grid lg:grid-cols-12 gap-6 items-start">
 
@@ -1540,7 +1525,7 @@ const handleToggle = (id: string) => {
             )}
 
             {/* STICKY BOTTOM FLOATING CART BAR (MULTI-STORE SHOPPING CART) */}
-            {totalCartCount > 0 && (
+            {false && totalCartCount > 0 && (
               <div className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-8 sm:w-auto z-40 animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div className="bg-slate-900/95 text-white backdrop-blur-md rounded-2xl border border-emerald-500/40 p-3.5 sm:px-6 sm:py-4 shadow-2xl flex items-center justify-between gap-6 ring-2 ring-emerald-500/30">
                   <div className="flex items-center gap-3">
@@ -1579,7 +1564,7 @@ const handleToggle = (id: string) => {
         )}
 
         {/* CHECKOUT MODAL: MULTI-STORE SPLIT ORDERS WITH SINGLE UNIFIED PAYMENT */}
-        {showCheckoutModal && (
+        {false && showCheckoutModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 w-full max-w-xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
 
@@ -1747,33 +1732,6 @@ const handleToggle = (id: string) => {
                       </div>
                     </div>
 
-                    {/* Payment Method Selector */}
-                    <div>
-                      <div className="font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Hình thức thanh toán một lần (Tất cả kiện hàng):
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { id: 'VIETQR', label: 'VietQR tức thì' },
-                          { id: 'MOMO', label: 'Ví MoMo' },
-                          { id: 'COD', label: 'Tiền mặt khi nhận' }
-                        ].map(pm => (
-                          <button
-                            key={pm.id}
-                            type="button"
-                            onClick={() => setPaymentMethod(pm.id as any)}
-                            className={`p-2 rounded-xl text-center border font-bold text-[11px] transition cursor-pointer ${
-                              paymentMethod === pm.id
-                                ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-500 text-emerald-800 dark:text-emerald-300'
-                                : 'border-slate-200 dark:border-slate-700 text-slate-600'
-                            }`}
-                          >
-                            {pm.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
                     {/* Auto-sync to Smart Fridge Toggle */}
                     <label className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 cursor-pointer transition hover:bg-emerald-100/60 dark:hover:bg-emerald-900/30">
                       <input
@@ -1810,7 +1768,7 @@ const handleToggle = (id: string) => {
                         </div>
                       )}
                       <div className="flex justify-between text-base font-extrabold text-slate-900 dark:text-white pt-1">
-                        <span>Tổng thanh toán 1 lần:</span>
+                        <span>Tổng chi phí dự kiến:</span>
                         <span className="text-emerald-700 dark:text-emerald-400">
                           {grandTotal.toLocaleString('vi-VN')} đ
                         </span>
@@ -1831,7 +1789,7 @@ const handleToggle = (id: string) => {
                       onClick={handleCheckoutConfirm}
                       className="px-6 py-2.5 rounded-xl text-xs font-extrabold text-white bg-emerald-700 hover:bg-emerald-800 transition shadow-xs cursor-pointer"
                     >
-                      Xác nhận thanh toán ({paymentMethod})
+                      Xác nhận danh sách mua
                     </button>
                   </div>
                 </>

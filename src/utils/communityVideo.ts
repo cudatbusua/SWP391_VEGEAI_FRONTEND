@@ -1,5 +1,6 @@
 export function safeMediaUrl(value?: string): string | undefined {
   if (!value) return undefined;
+  if (/^\/api\/public\/community-media\/[a-f0-9-]{36}\.(?:jpg|png|webp|mp4|webm)$/i.test(value)) return value;
   try {
     const url = new URL(value);
     return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url.href : undefined;
@@ -8,7 +9,7 @@ export function safeMediaUrl(value?: string): string | undefined {
 export function videoSource(value: string): { kind: 'embed' | 'file' | 'external'; src: string } | null {
   const safe = safeMediaUrl(value);
   if (!safe) return null;
-  const url = new URL(safe);
+  const url = new URL(safe, window.location.origin);
   const host = url.hostname.toLowerCase();
   if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com', 'youtu.be', 'www.youtu.be'].includes(host)) {
     const videoId = host.endsWith('youtu.be') ? url.pathname.split('/')[1] : url.searchParams.get('v') || url.pathname.match(/^\/(?:embed|shorts)\/([^/]+)/)?.[1];

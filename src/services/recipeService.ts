@@ -55,7 +55,9 @@ export const recipeService = {
     return response.data;
   },
   async detail(id: string, signal?: AbortSignal): Promise<RecipeDetail> {
-    const response = await apiRequest<RecipeDetail>(`/recipes/${encodeURIComponent(id)}`, { auth: 'none', signal });
+    // Send the token when a session exists so members also receive linked cooking videos.
+    // Guests still use the same public endpoint without being forced to sign in.
+    const response = await apiRequest<RecipeDetail>(`/recipes/${encodeURIComponent(id)}`, { auth: 'optional', signal });
     if (!response.data) throw new Error('Không tìm thấy công thức.');
     return response.data;
   },

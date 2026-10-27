@@ -131,6 +131,7 @@ export const AccountSettingsPage: React.FC = () => {
   };
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [avatar, setAvatar] = useState('');
   const [, setNutrition] = useState<NutritionProfile | null>(null);
   const [, setActivePlan] = useState<MealPlan | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -241,6 +242,11 @@ export const AccountSettingsPage: React.FC = () => {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
 
   // In-Settings Forgot Password / OTP Reset state
   const [isOtpResetMode, setIsOtpResetMode] = useState(false);
@@ -267,6 +273,7 @@ export const AccountSettingsPage: React.FC = () => {
       if (userRes.status === 'fulfilled') {
         const data = userRes.value;
         setProfile(data);
+        setAvatar(data.avatarUrl || '');
         setFullName(data.fullName || '');
         setPhoneNumber(data.phoneNumber || '');
         setDateOfBirth(data.dateOfBirth || '');
@@ -378,6 +385,29 @@ export const AccountSettingsPage: React.FC = () => {
       setPasswordError(errorMessage(err));
     } finally {
       setIsChangingPassword(false);
+    }
+  };
+
+  const handleChangeEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailMessage('');
+    setEmailError('');
+    if (!newEmail.trim() || !emailPassword) {
+      setEmailError('Vui lòng nhập email mới và mật khẩu hiện tại.');
+      return;
+    }
+    setIsChangingEmail(true);
+    try {
+      const updated = await userService.changeEmail(newEmail.trim(), emailPassword);
+      setProfile(updated);
+      setNewEmail('');
+      setEmailPassword('');
+      setEmailMessage('Đã cập nhật địa chỉ email đăng nhập.');
+      sfx.playSuccess();
+    } catch (err) {
+      setEmailError(errorMessage(err));
+    } finally {
+      setIsChangingEmail(false);
     }
   };
 
@@ -548,17 +578,28 @@ export const AccountSettingsPage: React.FC = () => {
           </div>
         )}
 
-        {/* 1. USER IDENTITY HEADER BANNER */}
+        {/* 1. USER IDENTITY HEADER BANNER: only belongs to the profile view */}
+        {currentTab === 'profile' && (
         <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-6 sm:p-8">
           <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
             
             {/* Avatar & Identifiers */}
             <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-linear-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white flex items-center justify-center font-extrabold text-3xl shadow-lg ring-4 ring-emerald-100 dark:ring-emerald-950/60">
-                  {fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V'}
+                <div className="w-24 h-24 overflow-hidden rounded-full bg-linear-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white flex items-center justify-center font-extrabold text-3xl shadow-lg ring-4 ring-emerald-100 dark:ring-emerald-950/60">
+                  {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
                 </div>
                 <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" title="Đang trực tuyến" />
+                <label className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap cursor-pointer text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                  Đổi avatar
+                  <input type="file" accept="image/png,image/jpeg" className="sr-only" onChange={async event => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) { setProfileError('Avatar không được vượt quá 2 MB.'); return; }
+                    try { const updated = await userService.updateAvatar(file); setProfile(updated); setAvatar(updated.avatarUrl || ''); setProfileSuccess('Đã cập nhật avatar.'); }
+                    catch (reason) { setProfileError(errorMessage(reason)); }
+                  }} />
+                </label>
               </div>
 
               <div>
@@ -593,7 +634,7 @@ export const AccountSettingsPage: React.FC = () => {
             </div>
 
             {/* Quick Links / Tabs */}
-            <div className="flex flex-wrap items-center justify-center gap-2">
+            {false && <div className="flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
                 onClick={() => handleSelectTab('profile')}
@@ -609,67 +650,18 @@ export const AccountSettingsPage: React.FC = () => {
                 type="button"
                 onClick={() => handleSelectTab('calendar')}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'calendar'
+                  false
                     ? 'bg-emerald-700 text-white shadow-xs'
                     : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
                 }`}
               >
                 Lịch biểu &amp; Thực đơn
               </button>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('security')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'security'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Bảo mật &amp; OTP
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectTab('preferences')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                  currentTab === 'preferences'
-                    ? 'bg-emerald-700 text-white shadow-xs'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                Giao diện Sáng/Tối
-              </button>
-            </div>
+            </div>}
 
           </div>
         </section>
-
-        {/* 2. TAB NAVIGATION SWITCHER BAR */}
-        <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 overflow-x-auto shadow-2xs">
-          {[
-            { id: 'profile', label: 'Hồ sơ & Chỉ số sức khỏe', icon: Activity, desc: 'BMI, Thể trạng, Calo, Vòng vận động' },
-            { id: 'calendar', label: 'Lịch biểu & Thực đơn', icon: CalendarDays, desc: 'Lịch ăn 30 ngày, 3 bữa chính' },
-            { id: 'security', label: 'Bảo mật & Đăng nhập', icon: ShieldCheck, desc: 'Đổi mật khẩu, OTP' },
-            { id: 'preferences', label: 'Giao diện & Hệ thống', icon: Palette, desc: 'Chế độ Sáng/Tối, Riêng tư' },
-          ].map(tabItem => {
-            const Icon = tabItem.icon;
-            const isActive = currentTab === tabItem.id;
-            return (
-              <button
-                key={tabItem.id}
-                type="button"
-                onClick={() => handleSelectTab(tabItem.id)}
-                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition cursor-pointer flex-1 justify-center ${
-                  isActive
-                    ? 'bg-emerald-800 dark:bg-emerald-600 text-white shadow-md'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-slate-700/50'
-                }`}
-              >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
-                <span>{tabItem.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        )}
 
         {/* TAB 1: PROFILE & HEALTH METRICS */}
         {currentTab === 'profile' && (
@@ -1361,7 +1353,7 @@ export const AccountSettingsPage: React.FC = () => {
         )}
 
         {/* TAB 3: ACCOUNT SECURITY */}
-        {currentTab === 'security' && (
+        {['security', 'settings'].includes(currentTab) && (
           <div className="space-y-6 animate-in fade-in duration-200">
             <div className="grid lg:grid-cols-12 gap-8 items-start">
               
@@ -1380,6 +1372,38 @@ export const AccountSettingsPage: React.FC = () => {
                     {isOtpResetMode ? 'Đổi bằng mật khẩu cũ' : 'Quên mật khẩu? (Dùng OTP)'}
                   </button>
                 </div>
+
+                <form onSubmit={handleChangeEmail} className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 bg-slate-50/70 dark:bg-slate-800/40">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Đổi địa chỉ Gmail / email</h3>
+                    <p className="mt-1 text-xs text-slate-500">Email hiện tại: <strong>{profile?.email || user?.emailOrPhone}</strong></p>
+                  </div>
+                  {emailMessage && <p className="text-xs font-semibold text-emerald-700">{emailMessage}</p>}
+                  {emailError && <p className="text-xs font-semibold text-rose-700">{emailError}</p>}
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <input
+                      type="email"
+                      required
+                      value={newEmail}
+                      onChange={e => setNewEmail(e.target.value)}
+                      placeholder="Email mới"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
+                    />
+                    <input
+                      type="password"
+                      required
+                      value={emailPassword}
+                      onChange={e => setEmailPassword(e.target.value)}
+                      placeholder="Mật khẩu hiện tại"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <button type="submit" disabled={isChangingEmail} className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs disabled:opacity-50">
+                      {isChangingEmail ? 'Đang cập nhật...' : 'Cập nhật email'}
+                    </button>
+                  </div>
+                </form>
 
                 {passwordSuccess && (
                   <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
@@ -1551,7 +1575,7 @@ export const AccountSettingsPage: React.FC = () => {
         )}
 
         {/* TAB 4: PREFERENCES & DISPLAY THEME */}
-        {currentTab === 'preferences' && (
+        {['preferences', 'settings'].includes(currentTab) && (
           <div className="space-y-6 animate-in fade-in duration-200 max-w-3xl">
             {/* Box 2: Appearance & Preferences */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">

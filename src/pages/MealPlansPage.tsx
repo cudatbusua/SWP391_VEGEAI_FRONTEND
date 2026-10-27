@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Activity,
   ArrowDown,
@@ -900,10 +900,11 @@ function PlannerHub() {
 }
 
 export function MealPlansPage() {
+  const location = useLocation();
   return (
     <MainLayout>
       <CommunityGuard>
-        <PlannerHub />
+        {location.search.includes('tab=saved') ? <div className="mx-auto max-w-5xl px-4 py-10"><SavedMealPlans revision={0} /></div> : <PlannerHub />}
       </CommunityGuard>
     </MainLayout>
   );

@@ -55,10 +55,16 @@ function formatTime(timestamp: number | string): string {
 }
 
 export function AiChatPage() {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const location = useLocation();
 
-  const storageKey = `vegeai:ai-chef:sessions:${user?.id || 'guest'}`;
+  // Keep account history isolated from guest history. The v2 guest key also
+  // discards legacy guest data polluted while authentication was hydrating.
+  const storageKey = user?.id
+    ? `vegeai:ai-chef:sessions:${user.id}`
+    : 'vegeai:ai-chef:sessions:guest:v2';
+  const loadedStorageKeyRef = useRef('');
+  const skipNextPersistRef = useRef(false);
 
   // Session state
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -102,6 +108,39 @@ export function AiChatPage() {
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (isAuthLoading) return;
+    let nextSessions: ChatSession[] | null = null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) nextSessions = parsed;
+      }
+    } catch {
+      // Fall back to a clean welcome session.
+    }
+    if (!nextSessions) {
+      nextSessions = [{
+        id: 'default-welcome',
+        title: 'Chào mừng bạn đến với Bếp trưởng',
+        category: 'ai-chef',
+        messages: [{
+          sender: 'ai',
+          text: 'Xin chào! Tôi là Bếp trưởng VEGEAI. Tôi có thể giúp bạn lên thực đơn chay, phân tích nguyên liệu từ tủ lạnh, hoặc hướng dẫn nấu các món chay bổ dưỡng và ngon miệng. Hôm nay bạn muốn nấu gì?',
+          time: formatTime(Date.now())
+        }],
+        updatedAt: Date.now()
+      }];
+    }
+    skipNextPersistRef.current = true;
+    loadedStorageKeyRef.current = storageKey;
+    setSessions(nextSessions);
+    setActiveSessionId(nextSessions[0].id);
+    setActiveTabCategory('all');
+    setError('');
+  }, [isAuthLoading, storageKey]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -130,12 +169,17 @@ export function AiChatPage() {
 
   // Persist sessions
   useEffect(() => {
+    if (isAuthLoading || loadedStorageKeyRef.current !== storageKey) return;
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
     try {
       localStorage.setItem(storageKey, JSON.stringify(sessions));
     } catch {
       // Ignore storage errors
     }
-  }, [sessions, storageKey]);
+  }, [isAuthLoading, sessions, storageKey]);
 
   // Current session
   const currentSession = sessions.find(s => s.id === activeSessionId) || sessions[0];

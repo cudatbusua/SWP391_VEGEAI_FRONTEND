@@ -308,36 +308,25 @@ export function SmartMarketPage() {
   const handleAddComboToCart = (combo: MealCombo) => {
     sfx.playSuccess();
     const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
-    if (!targetStore) return;
-
-    setMultiCart(prev => {
-      let next = [...prev];
-      combo.ingredients.forEach(ing => {
-        const cartItemId = `${targetStore.id}___combo_${ing.name.toLowerCase().replace(/\s+/g, '_')}`;
-        const existing = next.find(i => i.id === cartItemId);
-        if (existing) {
-          next = next.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
-        } else {
-          next.push({
-            id: cartItemId,
-            catalogItemId: `combo_${ing.name}`,
-            name: ing.name,
-            price: ing.price,
-            priceFormatted: `${ing.price.toLocaleString('vi-VN')} đ`,
-            unit: ing.unit,
-            imageEmoji: ing.emoji,
-            storeId: targetStore.id,
-            storeName: targetStore.name,
-            storeAddress: targetStore.address,
-            storeCategory: targetStore.category,
-            count: 1
+    if (targetStore) {
+      setMultiCart(prev => {
+        let next = [...prev];
+        combo.ingredients.forEach(ing => {
+          const cartItemId = `${targetStore.id}___combo_${ing.name.toLowerCase().replace(/\s+/g, '_')}`;
+          const existing = next.find(i => i.id === cartItemId);
+          if (existing) next = next.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
+          else next.push({
+            id: cartItemId, catalogItemId: `combo_${ing.name}`, name: ing.name,
+            price: ing.price, priceFormatted: `${ing.price.toLocaleString('vi-VN')} đ`, unit: ing.unit,
+            imageEmoji: ing.emoji, storeId: targetStore.id, storeName: targetStore.name,
+            storeAddress: targetStore.address, storeCategory: targetStore.category, count: 1
           });
-        }
+        });
+        return next;
       });
-      return next;
-    });
+    }
 
-    setItems(prev => {
+    updateItems(prev => {
       const next = [...prev];
       combo.ingredients.forEach(ing => {
         if (!next.some(it => it.name.toLowerCase() === ing.name.toLowerCase())) {
@@ -355,38 +344,39 @@ export function SmartMarketPage() {
       return next;
     });
 
-    setCartAddToast(`Đã thêm trọn combo "${combo.name}" (${combo.ingredients.length} nguyên liệu) vào giỏ hàng và danh sách mua sắm!`);
+    setMainView('checklist');
+    setCartAddToast(`Đã thêm trọn combo "${combo.name}" (${combo.ingredients.length} nguyên liệu) vào danh sách cần mua!`);
     setTimeout(() => setCartAddToast(''), 4500);
   };
 
   const handleAddVietgapVeggie = (veg: typeof VIETGAP_5K_VEGGIES[0]) => {
     sfx.playSuccess();
     const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
-    if (!targetStore) return;
+    if (targetStore) {
+      const cartItemId = `${targetStore.id}___vg_${veg.name.toLowerCase().replace(/\s+/g, '_')}`;
+      setMultiCart(prev => {
+        const existing = prev.find(i => i.id === cartItemId);
+        if (existing) {
+          return prev.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
+        }
+        return [...prev, {
+          id: cartItemId,
+          catalogItemId: `vg_${veg.name}`,
+          name: veg.name,
+          price: veg.price,
+          priceFormatted: '5.000 đ',
+          unit: 'gói 500g',
+          imageEmoji: veg.emoji,
+          storeId: targetStore.id,
+          storeName: targetStore.name,
+          storeAddress: targetStore.address,
+          storeCategory: targetStore.category,
+          count: 1
+        }];
+      });
+    }
 
-    const cartItemId = `${targetStore.id}___vg_${veg.name.toLowerCase().replace(/\s+/g, '_')}`;
-    setMultiCart(prev => {
-      const existing = prev.find(i => i.id === cartItemId);
-      if (existing) {
-        return prev.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
-      }
-      return [...prev, {
-        id: cartItemId,
-        catalogItemId: `vg_${veg.name}`,
-        name: veg.name,
-        price: veg.price,
-        priceFormatted: '5.000 đ',
-        unit: 'gói 500g',
-        imageEmoji: veg.emoji,
-        storeId: targetStore.id,
-        storeName: targetStore.name,
-        storeAddress: targetStore.address,
-        storeCategory: targetStore.category,
-        count: 1
-      }];
-    });
-
-    setItems(prev => {
+    updateItems(prev => {
       if (!prev.some(it => it.name.toLowerCase() === veg.name.toLowerCase())) {
         return [{
           id: `sm-vg-${Date.now()}`,
@@ -401,7 +391,8 @@ export function SmartMarketPage() {
       return prev;
     });
 
-    setCartAddToast(`Đã thêm "${veg.name}" (5.000đ) vào giỏ hàng!`);
+    setMainView('checklist');
+    setCartAddToast(`Đã thêm "${veg.name}" (5.000đ) vào danh sách cần mua!`);
     setTimeout(() => setCartAddToast(''), 3500);
   };
   const [deliveryNote, setDeliveryNote] = useState('');
@@ -409,7 +400,7 @@ export function SmartMarketPage() {
   const [autoSyncFridge, setAutoSyncFridge] = useState(true);
   const [syncedCount, setSyncedCount] = useState(0);
 
-  const updateItems = (updater: (prev: SmartMarketItem[]) => SmartMarketItem[]) => {
+  function updateItems(updater: (prev: SmartMarketItem[]) => SmartMarketItem[]) {
     setItems(prev => {
       const next = updater(prev);
       try {
@@ -419,7 +410,7 @@ export function SmartMarketPage() {
       }
       return next;
     });
-  };
+  }
 
   const location = useLocation();
   const [importNotice, setImportNotice] = useState<string | null>(null);
@@ -685,6 +676,11 @@ const handleToggle = (id: string) => {
   // Calculations for checklist
   const totalCount = items.length;
   const boughtCount = items.filter(i => i.checked).length;
+  const selectedPurchaseItems = useMemo(() => items.filter(item => item.checked), [items]);
+  const selectedPurchaseTotal = useMemo(() => selectedPurchaseItems.reduce((total, item) => {
+    const cartItem = multiCart.find(candidate => candidate.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+    return total + (cartItem ? cartItem.price * cartItem.count : 0);
+  }, 0), [selectedPurchaseItems, multiCart]);
   const unboughtCount = totalCount - boughtCount;
   const progressPercent = totalCount > 0 ? Math.round((boughtCount / totalCount) * 100) : 0;
 
@@ -889,7 +885,7 @@ const handleToggle = (id: string) => {
         </div>
 
         {/* Real GPS Location Bar (Session-Persistent) */}
-        <div id="location-bar" className="hidden bg-emerald-50/80 dark:bg-slate-900/90 rounded-2xl border border-emerald-200/70 dark:border-slate-800 p-4 mb-6 shadow-2xs">
+        <div id="location-bar" className="bg-emerald-50/80 dark:bg-slate-900/90 rounded-2xl border border-emerald-200/70 dark:border-slate-800 p-4 mb-6 shadow-2xs">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
@@ -900,7 +896,7 @@ const handleToggle = (id: string) => {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-900 dark:text-white">
-                    {isAddressConfirmed ? 'Vị trí giao hàng hiện tại:' : 'Chưa có địa chỉ giao hàng:'}
+                    {isAddressConfirmed ? 'Vị trí hiện tại:' : 'Chưa chọn vị trí:'}
                   </span>
                   {isAddressConfirmed ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
@@ -913,7 +909,7 @@ const handleToggle = (id: string) => {
                   )}
                 </div>
                 <p className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-white truncate max-w-xl mt-0.5">
-                  {isAddressConfirmed ? userAddress : 'Vui lòng chọn hoặc cập nhật địa chỉ để tìm quán chay & đi chợ gần bạn'}
+                  {isAddressConfirmed ? userAddress : 'Chọn vị trí để tìm quán chay và cửa hàng nguyên liệu gần bạn'}
                 </p>
               </div>
             </div>
@@ -948,7 +944,7 @@ const handleToggle = (id: string) => {
                   type="button"
                   onClick={() => setIsAddressConfirmed(false)}
                   className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                  title="Thay đổi địa chỉ giao hàng"
+                  title="Thay đổi vị trí hiện tại"
                 >
                   Đổi địa chỉ
                 </button>
@@ -981,18 +977,11 @@ const handleToggle = (id: string) => {
                     </span>
                   </div>
                   <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                    Bách Hóa Xanh Chay — Rau Củ Tươi Mới Giao Nhanh 25–35 Phút
+                    Bách Hóa Xanh Chay — Rau Củ Tươi Mỗi Ngày
                   </h3>
                   <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed max-w-2xl">
                     Đồng giá 5.000đ/gói 500g rau lá quốc dân VietGAP. Giảm thêm 20% khi mua trọn combo nấu ăn theo món!
                   </p>
-                </div>
-
-                <div className="shrink-0 flex items-center">
-                  <span className="px-3.5 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-emerald-200 flex items-center gap-1.5 shadow-2xs">
-                    <Truck className="w-4 h-4 text-amber-300" />
-                    <span>Giao tận nơi 25–35 phút</span>
-                  </span>
                 </div>
               </div>
 
@@ -1525,7 +1514,7 @@ const handleToggle = (id: string) => {
             )}
 
             {/* STICKY BOTTOM FLOATING CART BAR (MULTI-STORE SHOPPING CART) */}
-            {false && totalCartCount > 0 && (
+            {boughtCount > 0 && (
               <div className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-8 sm:w-auto z-40 animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div className="bg-slate-900/95 text-white backdrop-blur-md rounded-2xl border border-emerald-500/40 p-3.5 sm:px-6 sm:py-4 shadow-2xl flex items-center justify-between gap-6 ring-2 ring-emerald-500/30">
                   <div className="flex items-center gap-3">
@@ -1534,16 +1523,16 @@ const handleToggle = (id: string) => {
                         <ShoppingCart className="w-5 h-5" />
                       </div>
                       <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-[11px] font-extrabold flex items-center justify-center text-white">
-                        {totalCartCount}
+                        {boughtCount}
                       </span>
                     </div>
                     <div>
                       <div className="text-xs font-medium text-slate-300">
-                        Giỏ hàng đa cửa hàng: <strong className="text-emerald-400">{groupedOrders.length} quán/tiệm</strong>
+                        Giỏ nguyên liệu đã chọn
                       </div>
                       <div className="text-sm sm:text-base font-extrabold text-emerald-400">
-                        {grandTotal.toLocaleString('vi-VN')} đ
-                        <span className="text-[11px] font-normal text-slate-400 ml-1.5">(Đã gồm ship & ưu đãi)</span>
+                        {boughtCount} món đã tick
+                        {selectedPurchaseTotal > 0 && <span className="text-[11px] font-normal text-slate-400 ml-1.5">· khoảng {selectedPurchaseTotal.toLocaleString('vi-VN')} đ</span>}
                       </div>
                     </div>
                   </div>
@@ -1553,13 +1542,69 @@ const handleToggle = (id: string) => {
                     onClick={() => { sfx.playTap(); setShowCheckoutModal(true); }}
                     className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs sm:text-sm transition shadow-lg flex items-center gap-2 cursor-pointer"
                   >
-                    <span>Xem giỏ & Thanh toán</span>
+                    <span>Xem giỏ đã chọn</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             )}
 
+          </div>
+        )}
+
+        {/* Selected shopping-list summary. This is intentionally not a checkout flow. */}
+        {showCheckoutModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" onMouseDown={() => setShowCheckoutModal(false)}>
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 w-full max-w-xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto" onMouseDown={event => event.stopPropagation()}>
+              <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div>
+                  <h3 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5 text-emerald-600" /> Giỏ nguyên liệu đã chọn
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">Chỉ hiển thị những món bạn đã tick trong Danh Sách Cần Mua.</p>
+                </div>
+                <button type="button" onClick={() => setShowCheckoutModal(false)} aria-label="Đóng giỏ nguyên liệu" className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {selectedPurchaseItems.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-500">Chưa có nguyên liệu nào được tick.</div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedPurchaseItems.map(item => {
+                    const cartItem = multiCart.find(candidate => candidate.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+                    return (
+                      <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-3.5 bg-slate-50 dark:bg-slate-800/70">
+                        <div className="min-w-0">
+                          <div className="font-bold text-sm text-slate-900 dark:text-white truncate">{item.name}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{item.amount}{item.categoryLabel ? ` · ${item.categoryLabel}` : ''}</div>
+                          {cartItem && <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1 truncate">Tham khảo tại {cartItem.storeName}</div>}
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {cartItem && <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">{(cartItem.price * cartItem.count).toLocaleString('vi-VN')} đ</span>}
+                          <button type="button" onClick={() => handleToggle(item.id)} title="Bỏ chọn món này" className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-4">
+                <div className="flex justify-between font-extrabold text-slate-900 dark:text-white">
+                  <span>{selectedPurchaseItems.length} món đã chọn</span>
+                  {selectedPurchaseTotal > 0 && <span className="text-emerald-700 dark:text-emerald-400">Dự kiến {selectedPurchaseTotal.toLocaleString('vi-VN')} đ</span>}
+                </div>
+                <p className="text-xs text-emerald-800/80 dark:text-emerald-300 mt-1">VEGEAI chỉ hỗ trợ lập danh sách và tham khảo giá; không đặt hàng, giao hàng hoặc thanh toán.</p>
+              </div>
+
+              <div className="flex justify-end">
+                <button type="button" onClick={() => setShowCheckoutModal(false)} className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold cursor-pointer">Đóng</button>
+              </div>
+            </div>
           </div>
         )}
 

@@ -66,7 +66,7 @@ export function BlogPostStatusPage({ adminMode = false }: { adminMode?: boolean 
     try { await navigator.clipboard.writeText(publicUrl); setMessage('Đã sao chép liên kết.'); }
     catch { setError('Không thể sao chép tự động. Bạn có thể chọn đường dẫn bên dưới.'); }
   };
-  const headline = post ? { DRAFT: 'Câu chuyện của bạn đang thành hình', PENDING_REVIEW: 'Bài viết đang chờ admin duyệt', PUBLISHED: 'Bài viết đã được xuất bản', REJECTED: 'Bài viết cần được chỉnh sửa' }[post.status] : '';
+  const headline = post ? { DRAFT: 'Câu chuyện của bạn đang thành hình', PENDING_REVIEW: 'Bài viết đang chờ admin duyệt', PUBLISHED: 'Bài viết đã được xuất bản', REJECTED: 'Bài viết cần được chỉnh sửa', ARCHIVED: 'Bài viết đang ở trong kho đã ẩn' }[post.status] : '';
   const StatusIcon = post?.status === 'PUBLISHED' ? BadgeCheck : post?.status === 'REJECTED' ? XCircle : post?.status === 'PENDING_REVIEW' ? Clock : FilePenLine;
   return <MainLayout><div className="blog-shell"><BlogAccess admin={adminMode}><Link to={adminMode ? '/admin/blog' : '/blog/my-posts'} className="blog-back"><ArrowLeft size={15} />{adminMode ? 'Hàng chờ duyệt Blog' : 'Bài viết của tôi'}</Link>
     {error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}{message && <p role="status" className="blog-message">{message}</p>}

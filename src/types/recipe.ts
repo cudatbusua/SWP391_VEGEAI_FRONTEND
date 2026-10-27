@@ -4,6 +4,7 @@ export interface RecipeSummary {
   recipeId: string; title: string; slug: string; imageUrl?: string;
   cookTimeMinutes?: number; difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   calories?: number; proteinGrams?: number; isVerified: boolean; tags: RecipeTag[];
+  status?: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED';
 }
 export interface AdminRecipeSummary extends Omit<RecipeSummary, 'isVerified'> {
   status: 'PUBLISHED' | 'DRAFT' | 'ARCHIVED';
@@ -12,7 +13,7 @@ export interface RecipeDetail extends RecipeSummary {
   description?: string; prepTimeMinutes?: number; servings?: number;
   carbsGrams?: number; fatGrams?: number; fiberGrams?: number;
   ingredients: { ingredientId?: string; name: string; amount?: number; unit?: string; allergenType?: string; }[];
-  instructions: string[]; status: string; videos?: CommunityVideo[];
+  instructions: string[]; status: NonNullable<RecipeSummary['status']>; videos?: CommunityVideo[];
 }
 export interface RecipeFilter {
   keyword?: string; includeTagCodes?: string[]; excludeTagCodes?: string[];

@@ -269,7 +269,7 @@ export const LoginForm: React.FC = () => {
                 isLoading={isSubmitting}
                 rightIcon={<ArrowRight className="w-4 h-4" />}
               >
-                Tiếp tục & Xác thực OTP
+                Đăng nhập
               </Button>
             </div>
           </form>

@@ -78,7 +78,20 @@ export const communityService = {
   async saveVideo(input: VideoInput, videoId?: string) {
     return data(await apiRequest<CommunityVideo>('/admin/videos' + (videoId ? '/' + id(videoId) : ''), { method: videoId ? 'PUT' : 'POST', body: input }));
   },
+  async uploadVideoAsset(file: File, video: boolean) {
+    const body = new FormData(); body.append('file', file);
+    return data(await apiRequest<{ url: string }>('/admin/videos/upload?video=' + video, { method: 'POST', body }));
+  },
   async deleteVideo(videoId: string, version: number) {
     await apiRequest('/admin/videos/' + id(videoId) + query({ version }), { method: 'DELETE' });
+  },
+  async archiveVideo(videoId: string, version: number) {
+    return data(await apiRequest<CommunityVideo>('/admin/videos/' + id(videoId) + '/archive', { method: 'POST', body: { version } }));
+  },
+  async restoreVideo(videoId: string, version: number) {
+    return data(await apiRequest<CommunityVideo>('/admin/videos/' + id(videoId) + '/restore', { method: 'POST', body: { version } }));
+  },
+  async reviewVideoModeration(videoId: string, version: number, decision: 'APPROVE' | 'REJECT') {
+    return data(await apiRequest<CommunityVideo>('/admin/videos/' + id(videoId) + '/moderation', { method: 'POST', body: { version, decision, reason: '' } }));
   },
 };

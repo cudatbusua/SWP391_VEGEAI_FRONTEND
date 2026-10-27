@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { BadgeCheck, Clock, FileText, XCircle, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { Archive, BadgeCheck, Clock, FileText, XCircle, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import type { BlogPost, BlogStatus } from '../types/blog';
 import { blogStatuses } from '../types/blog';
@@ -16,7 +16,7 @@ export function BlogAccess({ children, admin = false }: { children: ReactNode; a
   return children;
 }
 export function BlogBadge({ status }: { status: BlogStatus }) {
-  const Icon = { DRAFT: FileText, PENDING_REVIEW: Clock, PUBLISHED: BadgeCheck, REJECTED: XCircle }[status];
+  const Icon = { DRAFT: FileText, PENDING_REVIEW: Clock, PUBLISHED: BadgeCheck, REJECTED: XCircle, ARCHIVED: Archive }[status];
   return <span className={'blog-badge ' + status.toLowerCase()}><Icon size={14} />{blogStatuses[status]}</span>;
 }
 // Pin a distinct, topic-matched image to each published post so reused or stale API covers cannot create duplicate cards.

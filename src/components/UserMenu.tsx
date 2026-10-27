@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, LogOut, Palette, ShieldCheck, Activity, CalendarDays } from 'lucide-react';
+import { Activity, CalendarDays, ChevronDown, LogOut, Settings } from 'lucide-react';
 import type { User as AuthUser } from '../types/auth';
 
 interface UserMenuProps {
@@ -73,52 +73,21 @@ export function UserMenu({ user, loggingOut, onLogout }: UserMenuProps) {
             )}
           </div>
 
-          {/* Links to Settings & Health Tabs */}
-          <Link
-            to="/settings?tab=profile"
-            role="menuitem"
-            className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition"
-          >
-            <Activity className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <span className="block font-semibold">Hồ sơ & Chỉ số sức khỏe</span>
-              <span className="block text-[11px] text-slate-400">Thông tin cá nhân, thể trạng, BMI, Calo, Vòng vận động</span>
-            </div>
+          <Link to="/settings?tab=profile" role="menuitem" className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition">
+            <Activity className="w-4 h-4 text-emerald-600 shrink-0" /><div><span className="block font-semibold">Hồ sơ & Chỉ số sức khỏe</span><span className="block text-[11px] text-slate-400">Thông tin cá nhân, thể trạng và BMI</span></div>
           </Link>
-
-          <Link
-            to="/settings?tab=calendar"
-            role="menuitem"
-            className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition"
-          >
-            <CalendarDays className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <span className="block font-semibold">Lịch biểu & Thực đơn</span>
-              <span className="block text-[11px] text-slate-400">Lịch ăn 30 ngày, phân bổ bữa sáng - trưa - tối, calo tuần</span>
-            </div>
+          <Link to="/settings?tab=calendar" role="menuitem" className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition">
+            <CalendarDays className="w-4 h-4 text-emerald-600 shrink-0" /><div><span className="block font-semibold">Lịch biểu & Thực đơn</span><span className="block text-[11px] text-slate-400">Lịch ăn và kế hoạch bữa ăn</span></div>
           </Link>
-
           <Link
-            to="/settings?tab=security"
+            to="/settings?tab=settings"
             role="menuitem"
             className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition"
           >
-            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <Settings className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <div>
-              <span className="block font-semibold">Bảo mật & Đăng nhập</span>
-              <span className="block text-[11px] text-slate-400">Đổi mật khẩu, mã OTP, quản lý tài khoản</span>
-            </div>
-          </Link>
-
-          <Link
-            to="/settings?tab=preferences"
-            role="menuitem"
-            className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition"
-          >
-            <Palette className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <div>
-              <span className="block font-semibold">Giao diện & Hệ thống</span>
-              <span className="block text-[11px] text-slate-400">Chế độ Sáng / Tối, bản đồ định vị</span>
+              <span className="block font-semibold">Cài đặt</span>
+              <span className="block text-[11px] text-slate-400">Bảo mật, mật khẩu và giao diện</span>
             </div>
           </Link>
 

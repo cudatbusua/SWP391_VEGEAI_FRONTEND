@@ -1,4 +1,4 @@
-export type BlogStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED';
+export type BlogStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'REJECTED' | 'ARCHIVED';
 export type BlogCategory = 'KITCHEN' | 'GREEN_LIVING' | 'EXPLORATION' | 'NUTRITION';
 
 export interface BlogPost {
@@ -55,6 +55,7 @@ export const blogCategories: Record<BlogCategory, string> = {
 };
 
 export const blogStatuses: Record<BlogStatus, string> = {
+  ARCHIVED: 'Kho đã ẩn',
   DRAFT: 'Bản nháp',
   PENDING_REVIEW: 'Chờ duyệt',
   PUBLISHED: 'Đã xuất bản',

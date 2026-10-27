@@ -34,6 +34,7 @@ export interface UserProfile {
   dateOfBirth?: string;
   gender?: string;
   address?: string;
+  avatarUrl?: string;
   dietaryPreferences?: string;
   allergies?: string;
   heightCm?: number;

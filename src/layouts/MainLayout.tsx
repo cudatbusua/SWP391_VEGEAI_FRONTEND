@@ -51,6 +51,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     { key: 'ai-chef', label: 'AI Bếp trưởng', path: '/ai-chef', isActive: isAiChefActive },
     { key: 'pantry', label: 'Kho nguyên liệu & Đi chợ', path: '/fridge', isActive: isPantryActive },
     { key: 'calendar', label: 'Lịch biểu & Thực đơn', path: '/settings?tab=calendar', isActive: isNutritionActive },
+    { key: 'profile', label: 'Hồ sơ & Thể trạng', path: '/settings?tab=profile', isActive: pathname === '/settings' && location.search.includes('tab=profile') },
   ];
 
   const guestNavItems: { label: string; path: string; isActive: boolean }[] = [
@@ -280,16 +281,6 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                     }`}
                   >
                     Kế hoạch thực đơn tuần
-                  </Link>
-                  <Link
-                    to="/settings?tab=profile"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      (pathname === '/settings' && location.search.includes('tab=profile')) || (pathname === '/meal-plans' && location.search.includes('tab=nutrition'))
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
-                  >
-                    Hồ sơ BMI & Vòng sức khỏe
                   </Link>
                   <Link
                     to="/meal-plans?tab=saved"

@@ -6,7 +6,7 @@ import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
 
 export const LoginForm: React.FC = () => {
-  const { initLogin, verifyLoginOtp, resendLoginOtp, loginWithGoogle } = useAuth();
+  const { login, verifyLoginOtp, resendLoginOtp, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const requestedPath: unknown = location.state?.from;
@@ -36,7 +36,7 @@ export const LoginForm: React.FC = () => {
   });
 
   const [otp, setOtp] = useState('');
-  const [maskedEmail, setMaskedEmail] = useState('');
+  const [maskedEmail] = useState('');
   const [cooldown, setCooldown] = useState(0);
   const [isResending, setIsResending] = useState(false);
 
@@ -127,12 +127,9 @@ export const LoginForm: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const res = await initLogin(formData);
+      const res = await login(formData);
       if (res.success && res.data) {
-        setMaskedEmail(res.data.maskedEmail);
-        setStep('OTP');
-        setCooldown(60);
-        setSuccessMessage('Mã OTP đã được gửi đến email của bạn.');
+        navigate(resolveDestination(res.data.role), { replace: true });
       } else {
         setGeneralError(res.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
       }

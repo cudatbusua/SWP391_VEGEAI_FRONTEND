@@ -1,6 +1,6 @@
 import { apiRequest } from './apiClient';
 import type { PageResponse } from '../types/api';
-import type { AdminRecipeSummary, FridgeRecipeMatches, RecipeDetail, RecipeFilter, RecipeInput, RecipeSummary, RecipeTag } from '../types/recipe';
+import type { AdminRecipeSummary, FridgeRecipeMatchDto, FridgeRecipeMatches, RecipeDetail, RecipeFilter, RecipeInput, RecipeSummary, RecipeTag } from '../types/recipe';
 
 export const recipeService = {
   async adminList(params: { keyword?: string; status?: string; page: number; size?: number }, signal?: AbortSignal): Promise<PageResponse<AdminRecipeSummary>> {
@@ -30,6 +30,11 @@ export const recipeService = {
   async matchFridge(): Promise<FridgeRecipeMatches> {
     const response = await apiRequest<FridgeRecipeMatches>('/recipes/fridge-match?minMatchPercentage=50&limit=20');
     if (!response.data) throw new Error('Không thể gợi ý món từ tủ lạnh.');
+    return response.data;
+  },
+  async matchSingle(id: string): Promise<FridgeRecipeMatchDto> {
+    const response = await apiRequest<FridgeRecipeMatchDto>(`/recipes/${encodeURIComponent(id)}/fridge-match`);
+    if (!response.data) throw new Error('Không thể kiểm tra độ khả thi.');
     return response.data;
   },
   async save(input: RecipeInput, id?: string): Promise<RecipeDetail> {

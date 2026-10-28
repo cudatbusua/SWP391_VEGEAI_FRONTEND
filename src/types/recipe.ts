@@ -21,10 +21,19 @@ export interface RecipeFilter {
   minProtein?: number; difficulty?: string; sortBy?: string; sortDirection?: string;
   page: number; size: number;
 }
+export interface FridgeRecipeMatchDto {
+  recipe: RecipeSummary;
+  matchPercentage: number;
+  matchGroup: string;
+  totalMandatoryIngredients?: number;
+  matchedIngredientsCount?: number;
+  availableInFridge: string[];
+  missingIngredients: string[];
+  recommendation: string;
+}
 export interface FridgeRecipeMatches {
   totalRecipesEvaluated: number; canCookNowCount: number; missingFewCount: number;
-  matchedRecipes: { recipe: RecipeSummary; matchPercentage: number; matchGroup: string;
-    availableInFridge: string[]; missingIngredients: string[]; recommendation: string; }[];
+  matchedRecipes: FridgeRecipeMatchDto[];
 }
 export interface RecipeInput {
   title: string; description: string; imageUrl: string; difficulty: RecipeSummary['difficulty'];

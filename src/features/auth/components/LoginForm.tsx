@@ -34,6 +34,26 @@ export const LoginForm: React.FC = () => {
     password: '',
     rememberMe: false
   });
+  const [rememberedAccount, setRememberedAccount] = useState<{ username?: string; fullName?: string; email?: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('vegeai_remembered_account');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.username || parsed?.email) {
+          setRememberedAccount(parsed);
+          setFormData(prev => ({
+            ...prev,
+            emailOrPhone: prev.emailOrPhone || parsed.username || parsed.email || '',
+            rememberMe: false
+          }));
+        }
+      }
+    } catch {
+      // ignore JSON parse error
+    }
+  }, []);
 
   const [otp, setOtp] = useState('');
   const [maskedEmail] = useState('');
@@ -128,7 +148,16 @@ export const LoginForm: React.FC = () => {
     setIsSubmitting(true);
     try {
       const res = await login(formData);
-      if (res.success && res.data) {
+            if (res.success && res.data) {
+        if (formData.rememberMe) {
+          localStorage.setItem('vegeai_remembered_account', JSON.stringify({
+            username: res.data.username,
+            fullName: res.data.name || res.data.username,
+            email: res.data.emailOrPhone,
+          }));
+        } else {
+          localStorage.removeItem('vegeai_remembered_account');
+        }
         navigate(resolveDestination(res.data.role), { replace: true });
       } else {
         setGeneralError(res.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
@@ -154,7 +183,16 @@ export const LoginForm: React.FC = () => {
     setIsSubmitting(true);
     try {
       const res = await verifyLoginOtp(formData.emailOrPhone, cleanOtp, formData.rememberMe);
-      if (res.success && res.data) {
+            if (res.success && res.data) {
+        if (formData.rememberMe) {
+          localStorage.setItem('vegeai_remembered_account', JSON.stringify({
+            username: res.data.username,
+            fullName: res.data.name || res.data.username,
+            email: res.data.emailOrPhone,
+          }));
+        } else {
+          localStorage.removeItem('vegeai_remembered_account');
+        }
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
           navigate(resolveDestination(res.data?.role), { replace: true });
@@ -213,6 +251,31 @@ export const LoginForm: React.FC = () => {
             <div className="mb-5 p-3.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-900 rounded-xl text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
               <span>{successMessage}</span>
+            </div>
+          )}
+
+          {rememberedAccount && (
+            <div className="mb-4 p-3 bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+                  {rememberedAccount.fullName?.[0]?.toUpperCase() || rememberedAccount.username?.[0]?.toUpperCase() || 'U'}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
+                    {rememberedAccount.fullName || rememberedAccount.username}
+                  </p>
+                  <p className="text-[10px] text-emerald-700 dark:text-emerald-400 truncate">
+                    Tài khoản đã ghi nhớ trên máy này
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormData(p => ({ ...p, emailOrPhone: rememberedAccount.username || rememberedAccount.email || p.emailOrPhone }))}
+                className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline shrink-0 cursor-pointer"
+              >
+                Chọn
+              </button>
             </div>
           )}
 

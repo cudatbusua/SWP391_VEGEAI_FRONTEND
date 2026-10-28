@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ArrowUp,
+  CheckCircle2,
   ChefHat,
   Leaf,
   Plus,
@@ -17,20 +18,40 @@ import {
   Search,
   Camera,
   PenLine,
+  Square,
   X
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { aiService } from '../services/aiService';
 import { errorMessage } from '../services/apiClient';
 import { useAuth } from '../hooks/useAuth';
+import { fridgeService } from '../services/fridgeService';
 
 export type SessionCategory = 'fridge-scan' | 'ai-chef';
+
+export interface ChatIngredientItem {
+  name: string;
+  category?: string;
+  isVegetarian?: boolean;
+  freshness?: string;
+  shelfLifeEstimate?: string;
+  storageTip?: string;
+  checked?: boolean;
+}
+
+export interface ChatIngredientsPoll {
+  items: ChatIngredientItem[];
+  status: 'pending' | 'confirmed' | 'dismissed';
+  confirmedCount?: number;
+  confirmedAt?: string;
+}
 
 export interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   time: string;
   image?: string;
+  ingredientsPoll?: ChatIngredientsPoll;
 }
 
 export interface ChatSession {
@@ -104,6 +125,125 @@ export function AiChatPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [pollSavingId, setPollSavingId] = useState<string | null>(null);
+
+  const handleTogglePollItem = (sessionMsgIdx: number, itemIdx: number) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id !== activeSessionId) return s;
+      const newMessages = [...s.messages];
+      const targetMsg = { ...newMessages[sessionMsgIdx] };
+      if (!targetMsg.ingredientsPoll) return s;
+      const newItems = targetMsg.ingredientsPoll.items.map((it, idx) =>
+        idx === itemIdx ? { ...it, checked: !it.checked } : it
+      );
+      targetMsg.ingredientsPoll = { ...targetMsg.ingredientsPoll, items: newItems };
+      newMessages[sessionMsgIdx] = targetMsg;
+      return { ...s, messages: newMessages, updatedAt: Date.now() };
+    }));
+  };
+
+  const handleConfirmPoll = async (sessionMsgIdx: number) => {
+    if (!user) {
+      alert('Vui lòng đăng nhập tài khoản để lưu nguyên liệu vào Tủ Bếp Của Tôi nhé!');
+      return;
+    }
+    const msg = currentSession?.messages[sessionMsgIdx];
+    if (!msg || !msg.ingredientsPoll) return;
+    const selected = msg.ingredientsPoll.items.filter(i => i.checked !== false);
+    if (selected.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 nguyên liệu.');
+      return;
+    }
+
+    setPollSavingId(`${sessionMsgIdx}`);
+    try {
+      for (const item of selected) {
+        await fridgeService.add({
+          name: item.name,
+          category: item.category || 'VEGAN',
+          isVegetarian: item.isVegetarian ?? true,
+          quantity: 1,
+          unit: 'phần',
+          freshnessStatus: (item.freshness || 'FRESH') as any,
+          estimatedShelfLifeDays: item.shelfLifeEstimate ? (Number(item.shelfLifeEstimate.match(/\d+/)?.[0]) || 3) : 3,
+          storageTip: item.storageTip,
+          notes: `Quét từ AI Bếp Trưởng: ${item.shelfLifeEstimate || '3-5 ngày'}`
+        });
+      }
+      fridgeService.expiringSoon(2).then(items => setExpiringItems(Array.from(new Set(items.map(i => i.name).filter(Boolean))))).catch(() => {});
+      setSessions(prev => prev.map(s => {
+        if (s.id !== activeSessionId) return s;
+        const newMessages = [...s.messages];
+        newMessages[sessionMsgIdx] = {
+          ...newMessages[sessionMsgIdx],
+          ingredientsPoll: {
+            ...newMessages[sessionMsgIdx].ingredientsPoll!,
+            status: 'confirmed',
+            confirmedCount: selected.length,
+            confirmedAt: formatTime(Date.now())
+          }
+        };
+        return { ...s, messages: newMessages, updatedAt: Date.now() };
+      }));
+    } catch {
+      alert('Không thể lưu nguyên liệu vào Tủ Bếp. Vui lòng thử lại sau.');
+    } finally {
+      setPollSavingId(null);
+    }
+  };
+
+  const handleDismissPoll = (sessionMsgIdx: number) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id !== activeSessionId) return s;
+      const newMessages = [...s.messages];
+      newMessages[sessionMsgIdx] = {
+        ...newMessages[sessionMsgIdx],
+        ingredientsPoll: {
+          ...newMessages[sessionMsgIdx].ingredientsPoll!,
+          status: 'dismissed'
+        }
+      };
+      return { ...s, messages: newMessages, updatedAt: Date.now() };
+    }));
+  };
+  const [expiringItems, setExpiringItems] = useState<string[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    fridgeService.expiringSoon(2)
+      .then(items => {
+        const names = items.map(i => i.name).filter(Boolean);
+        setExpiringItems(Array.from(new Set(names)));
+      })
+      .catch(() => {});
+  }, [user]);
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setBusy(false);
+    setIsAnalyzingImage(false);
+    if (currentSession) {
+      const stopMsg: ChatMessage = {
+        sender: 'ai',
+        text: '*(Bạn đã dừng phản hồi này)*',
+        time: formatTime(Date.now()),
+      };
+      setSessions(prev => prev.map(s => {
+        if (s.id === currentSession.id) {
+          return {
+            ...s,
+            messages: [...s.messages, stopMsg],
+            updatedAt: Date.now()
+          };
+        }
+        return s;
+      }));
+    }
+  };
   const bottomRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -321,6 +461,8 @@ export function AiChatPage() {
     setImagePreview(null);
     setBusy(true);
     setError('');
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const userMsg: ChatMessage = {
       sender: 'user',
@@ -350,6 +492,7 @@ export function AiChatPage() {
     try {
       let finalPrompt = userText;
       let detectedRecipes: string[] = [];
+      let detectedPoll: ChatIngredientsPoll | undefined = undefined;
 
       if (currentImg) {
         setIsAnalyzingImage(true);
@@ -366,6 +509,18 @@ export function AiChatPage() {
             if (edibleIngredients.length > 0) {
               const ingNames = edibleIngredients.map(i => i.name).join(', ');
               detectedRecipes = scanRes.suggestedRecipes || [];
+              detectedPoll = {
+                items: edibleIngredients.map(i => ({
+                  name: i.name,
+                  category: i.category,
+                  freshness: i.freshness,
+                  shelfLifeEstimate: i.shelfLifeEstimate,
+                  storageTip: i.storageTip,
+                  isVegetarian: i.isVegetarian,
+                  checked: true
+                })),
+                status: 'pending'
+              };
               let promptIntro = userText
                 ? `Tôi vừa gửi ảnh tủ lạnh/món ăn. AI thị giác nhận diện được các nguyên liệu ăn được: ${ingNames}. Yêu cầu của tôi: ${userText}`
                 : `Tôi vừa gửi ảnh tủ lạnh. Qua hình ảnh nhận diện được các nguyên liệu thực phẩm ăn được: ${ingNames}. Hãy phân tích độ tươi, lưu ý bảo quản và gợi ý 3 món chay ngon nhất, kèm hướng dẫn chế biến nhanh.`;
@@ -400,7 +555,8 @@ export function AiChatPage() {
       const aiMsg: ChatMessage = {
         sender: 'ai',
         text: response.reply,
-        time: formatTime(Date.now())
+        time: formatTime(Date.now()),
+        ingredientsPoll: detectedPoll
       };
 
       const combinedRecipes = Array.from(new Set([
@@ -445,6 +601,7 @@ export function AiChatPage() {
         setInput(userText);
       }
     } finally {
+      abortControllerRef.current = null;
       setBusy(false);
     }
   };
@@ -749,7 +906,105 @@ export function AiChatPage() {
                         <img src={msg.image} alt="Ảnh đính kèm" className="w-full h-auto object-cover max-h-56 rounded-lg" />
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap font-sans break-words">{msg.text}</div>
+                                        <div className="whitespace-pre-wrap font-sans break-words">{msg.text}</div>
+
+                    {/* Zalo-style Poll Confirmation Card for Fridge Inventory */}
+                    {msg.ingredientsPoll && (
+                      <div className="mt-3 rounded-2xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-850 p-4 shadow-sm animate-in fade-in duration-300 text-slate-800 dark:text-slate-100">
+                        <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-emerald-200 dark:border-emerald-800/80">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">🧺</span>
+                            <div>
+                              <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                                Xác nhận nguyên liệu cho "Tủ Bếp Của Tôi"
+                              </h4>
+                              <p className="text-[10px] text-emerald-700 dark:text-emerald-400">
+                                AI phát hiện {msg.ingredientsPoll.items.length} nguyên liệu có thể lưu kho
+                              </p>
+                            </div>
+                          </div>
+                          {msg.ingredientsPoll.status === 'confirmed' && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-600 text-white shadow-2xs">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Đã lưu kho
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Items List with Checkboxes */}
+                        <div className="space-y-2 mb-3">
+                          {msg.ingredientsPoll.items.map((item, itemIdx) => (
+                            <label
+                              key={itemIdx}
+                              className={`flex items-start gap-2.5 p-2 rounded-xl border text-xs transition cursor-pointer ${
+                                item.checked !== false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 shadow-2xs'
+                                  : 'bg-slate-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-800 opacity-60'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                disabled={msg.ingredientsPoll?.status !== 'pending'}
+                                checked={item.checked !== false}
+                                onChange={() => handleTogglePollItem(idx, itemIdx)}
+                                className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-slate-900 dark:text-white truncate">
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-300 shrink-0">
+                                    {item.freshness === 'FRESH' ? 'Tươi xanh' : 'Cần dùng sớm'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                                  <span>⏳ Hạn dùng: ~{item.shelfLifeEstimate || '3-5 ngày'}</span>
+                                  {item.storageTip && <span>• 💡 {item.storageTip}</span>}
+                                </div>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+
+                        {/* Poll Actions */}
+                        {msg.ingredientsPoll.status === 'pending' ? (
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={pollSavingId === `${idx}`}
+                              onClick={() => handleConfirmPoll(idx)}
+                              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition cursor-pointer disabled:opacity-50"
+                            >
+                              {pollSavingId === `${idx}` ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              )}
+                              <span>Thêm vào Tủ Bếp Của Tôi</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDismissPoll(idx)}
+                              className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-xs transition cursor-pointer"
+                            >
+                              Bỏ qua
+                            </button>
+                          </div>
+                        ) : msg.ingredientsPoll.status === 'confirmed' ? (
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 bg-white/70 dark:bg-slate-900/60 p-2.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                            <span>✓ Đã lưu {msg.ingredientsPoll.confirmedCount} nguyên liệu vào Tủ Bếp lúc {msg.ingredientsPoll.confirmedAt}.</span>
+                            <Link to="/fridge" className="underline font-bold hover:text-emerald-950 dark:hover:text-emerald-200">
+                              Mở Tủ Bếp →
+                            </Link>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-slate-400 italic">
+                            (Đã bỏ qua lưu vào Tủ Bếp - Bếp trưởng chỉ tư vấn công thức nấu)
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -841,6 +1096,23 @@ export function AiChatPage() {
                 </div>
               )}
               
+              {expiringItems.length > 0 && (
+                <div className="mb-2.5 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center justify-between text-xs gap-2">
+                  <span className="text-amber-800 dark:text-amber-200 truncate">
+                    ⚠️ <strong>Tủ Bếp Của Tôi:</strong> Có {expiringItems.length} nguyên liệu sắp hết hạn ({expiringItems.slice(0, 3).join(', ')}{expiringItems.length > 3 ? '...' : ''})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInput(`Tủ bếp của tôi có nguyên liệu sắp hết hạn: ${expiringItems.join(', ')}. Hãy gợi ý món chay thơm ngon để nấu hết hôm nay nhé!`);
+                    }}
+                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold shrink-0 text-[11px] cursor-pointer shadow-2xs"
+                  >
+                    Gợi ý nấu ngay
+                  </button>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 sm:p-2.5 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent transition">
                 <input
                   ref={fileInputRef}
@@ -877,13 +1149,25 @@ export function AiChatPage() {
                   className="w-full resize-none bg-transparent text-xs sm:text-sm p-1.5 outline-hidden text-slate-800 dark:text-white placeholder:text-slate-400"
                 />
 
-                <button
-                  type="submit"
-                  disabled={busy || (!input.trim() && !selectedImage)}
-                  className="shrink-0 w-10 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
-                >
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowUp className="w-5 h-5" />}
-                </button>
+                {busy ? (
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    className="shrink-0 px-3 h-10 rounded-xl bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-1.5 text-xs font-bold transition cursor-pointer shadow-xs"
+                    title="Dừng phản hồi AI"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <span>Dừng</span>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={!input.trim() && !selectedImage}
+                    className="shrink-0 w-10 h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-40 text-white flex items-center justify-center transition cursor-pointer shadow-xs"
+                  >
+                    <ArrowUp className="w-5 h-5" />
+                  </button>
+                )}
               </form>
 
               <div className="flex items-center justify-between mt-2 text-[11px] text-slate-400">

@@ -637,8 +637,8 @@ export function AiChatPage() {
 
             {/* Bottom Quick Links */}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <Link to="/meal-plans" className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-emerald-700 transition">
-                <span className="flex items-center gap-2 font-semibold"><Timer className="w-3.5 h-3.5" /> Kế hoạch thực đơn tuần</span>
+              <Link to="/settings?tab=calendar" className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-emerald-700 transition">
+                <span className="flex items-center gap-2 font-semibold"><Timer className="w-3.5 h-3.5" /> Lịch ăn 30 ngày</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
               <Link to="/smart-market" className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-emerald-700 transition">

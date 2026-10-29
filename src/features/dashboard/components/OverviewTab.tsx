@@ -307,8 +307,8 @@ export function OverviewTab() {
                 </span>
                 <h2 className="text-lg font-bold text-slate-900">Dinh dưỡng hôm nay</h2>
               </div>
-              <Link to="/meal-plans" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
-                Xem kế hoạch tuần <ArrowUpRight size={14} />
+              <Link to="/settings?tab=calendar" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
+                Xem lịch ăn 30 ngày <ArrowUpRight size={14} />
               </Link>
             </div>
 
@@ -450,7 +450,7 @@ export function OverviewTab() {
 
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <span className="text-slate-500">Thực đơn được thiết kế tự động bởi AI Bếp Trưởng</span>
-              <Link to="/meal-plans" className="font-bold text-emerald-700 hover:underline flex items-center gap-1">
+              <Link to="/settings?tab=calendar" className="font-bold text-emerald-700 hover:underline flex items-center gap-1">
                 Chi tiết tuần này <ArrowRight size={13} />
               </Link>
             </div>

@@ -573,8 +573,8 @@ function ScanReview(props: ScanReviewProps) {
                   <span>Nấu</span>
                 </Link>
                 <Link
-                  to="/meal-plans"
-                  title="Lên thực đơn tuần với món này"
+                  to="/settings?tab=calendar"
+                  title="Lên lịch ăn với món này"
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 text-[11px] font-bold transition shadow-2xs"
                 >
                   <CalendarDays size={12} />

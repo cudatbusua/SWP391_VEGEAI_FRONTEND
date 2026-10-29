@@ -493,7 +493,7 @@ export function SmartMarketPage() {
         const uniqueIncoming = incoming.filter(i => !existingNames.has(i.name.toLowerCase().trim()));
         return [...uniqueIncoming, ...prev];
       });
-      setImportNotice(`Đã tự động bổ sung ${incoming.length} nguyên liệu từ ${state.planTitle || 'thực đơn tuần'} vào danh sách đi chợ!`);
+      setImportNotice(`Đã tự động bổ sung ${incoming.length} nguyên liệu từ ${state.planTitle || 'lịch ăn'} vào danh sách đi chợ!`);
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
@@ -2057,7 +2057,7 @@ const handleToggle = (id: string) => {
                   </div>
                   <h4 className="text-sm font-bold text-slate-800 dark:text-white">Danh sách cần mua đang trống</h4>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                    Bạn có thể tự thêm nguyên liệu cần sắm hoặc đồng bộ tự động từ các công thức trong thực đơn tuần!
+                    Bạn có thể tự thêm nguyên liệu cần sắm hoặc đồng bộ tự động từ các công thức trong lịch ăn 30 ngày!
                   </p>
                   <button
                     type="button"

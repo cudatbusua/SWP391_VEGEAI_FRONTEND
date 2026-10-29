@@ -39,8 +39,6 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     pathname.startsWith('/questions') ||
     pathname === '/restaurants';
   const isNutritionActive =
-    pathname.startsWith('/meal-plans') ||
-    pathname === '/nutrition' ||
     (pathname === '/settings' && (location.search.includes('tab=calendar') || location.search.includes('tab=profile')));
   const isAiChefActive = pathname === '/ai-chef' || pathname === '/fridge-scan';
   const isPantryActive = pathname === '/fridge' || pathname === '/smart-market';
@@ -272,24 +270,14 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                     Lịch ăn 30 ngày & Bữa ăn
                   </Link>
                   <Link
-                    to="/meal-plans?tab=planner"
+                    to="/settings?tab=profile"
                     className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname === '/meal-plans' && (location.search.includes('tab=planner') || !location.search.includes('tab='))
+                      pathname === '/settings' && location.search.includes('tab=profile')
                         ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
                         : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                     }`}
                   >
-                    Kế hoạch thực đơn tuần
-                  </Link>
-                  <Link
-                    to="/meal-plans?tab=saved"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname === '/meal-plans' && location.search.includes('tab=saved')
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
-                  >
-                    Thực đơn đã lưu
+                    Hồ sơ BMI & Vòng sức khỏe
                   </Link>
                 </div>
               </div>
@@ -395,7 +383,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           </div>
           <div className="flex items-center gap-5 text-xs font-medium">
             {isAuthenticated ? <>
-            <Link to="/meal-plans" className="hover:text-emerald-700 dark:hover:text-emerald-400">
+            <Link to="/settings?tab=calendar" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               Dinh dưỡng & Thực đơn
             </Link>
             <Link to="/fridge" className="hover:text-emerald-700 dark:hover:text-emerald-400">

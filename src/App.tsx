@@ -18,7 +18,6 @@ const AiChatPage = lazy(() => import('./pages/AiChatPage').then(module => ({ def
 const FridgeScanPage = lazy(() => import('./pages/FridgeScanPage').then(module => ({ default: module.FridgeScanPage })));
 const FridgeInventoryPage = lazy(() => import('./pages/FridgeInventoryPage').then(module => ({ default: module.FridgeInventoryPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then(module => ({ default: module.AdminPage })));
-const MealPlansPage = lazy(() => import('./pages/MealPlansPage').then(module => ({ default: module.MealPlansPage })));
 const AdminRecipesPage = lazy(() => import('./pages/AdminRecipesRedesignedPage').then(module => ({ default: module.AdminRecipesPage })));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(module => ({ default: module.ResetPasswordPage })));
 const BlogPage = lazy(() => import('./pages/BlogPage').then(module => ({ default: module.BlogPage })));
@@ -75,9 +74,10 @@ export const App: React.FC = () => {
             <Route path="/ai-chef" element={<PersonalFeatureBoundary><AiChatPage /></PersonalFeatureBoundary>} />
             <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />
             <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
-            <Route path="/nutrition" element={<Navigate to="/meal-plans?tab=nutrition" replace />} />
-            <Route path="/meal-plans" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
-          <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
+            <Route path="/nutrition" element={<Navigate to="/settings?tab=profile" replace />} />
+            {/* Meal planning now lives on the 30-day calendar; old links keep working. */}
+            <Route path="/meal-plans" element={<Navigate to="/settings?tab=calendar" replace />} />
+          <Route path="/meal-plans/:id" element={<Navigate to="/settings?tab=calendar" replace />} />
           <Route path="/smart-market" element={<PersonalFeatureBoundary><SmartMarketPage /></PersonalFeatureBoundary>} />
           <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
           <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />

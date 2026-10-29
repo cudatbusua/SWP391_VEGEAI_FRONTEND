@@ -194,11 +194,11 @@ function VideoAiRecipeCopilot({
                 <ChefHat size={14} /> Chuyển sang AI Bếp Trưởng
               </Link>
               <Link
-                to="/meal-plans"
+                to="/settings?tab=calendar"
                 state={{ recommendedDish: recipe.title }}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition shadow-xs"
               >
-                <CalendarDays size={14} /> Lên thực đơn tuần
+                <CalendarDays size={14} /> Lên lịch ăn
               </Link>
               <Link
                 to="/smart-market"

@@ -29,6 +29,7 @@ import { MealPlanCalendarPlanner } from '../components/MealPlanCalendarPlanner';
 import { SeasonalRegionalMealsView } from '../components/SeasonalRegionalMealsView';
 import { sfx } from '../utils/soundEffects';
 import { HealthActivityRings } from '../components/HealthActivityRings';
+import { WearableGoogleFitTracker } from '../components/WearableGoogleFitTracker';
 import { dietLabels, calculateBmr, calculateTdee } from '../utils/nutritionProfile';
 import type { UserProfile, UpdateUserProfile, NutritionProfile } from '../types/api';
 import { errorMessage } from '../services/apiClient';
@@ -378,7 +379,11 @@ export const AccountSettingsPage: React.FC = () => {
 
   // Calorie Input vs Output
   const calorieInput = dailyCalorieTarget === '' ? 1450 : Number(dailyCalorieTarget);
-  const calorieOutput = tdee;
+  const [wearableKcal, setWearableKcal] = useState<number>(() => {
+    const k = localStorage.getItem('wearable_kcal');
+    return k ? Number(k) : 0;
+  });
+  const calorieOutput = tdee + wearableKcal;
   const calorieBalance = calorieInput - calorieOutput;
 
   if (isLoadingProfile) {
@@ -876,6 +881,13 @@ export const AccountSettingsPage: React.FC = () => {
 
           </div>
         </section>
+
+        {/* 3. OMNI-WEARABLE HEALTH HUB & GOOGLE FIT SYNC */}
+        <WearableGoogleFitTracker
+          plannedCalorieIntake={calorieInput}
+          userBmr={bmr}
+          onSyncMetrics={(m) => setWearableKcal(m.calories)}
+        />
 
                   </div>
         )}

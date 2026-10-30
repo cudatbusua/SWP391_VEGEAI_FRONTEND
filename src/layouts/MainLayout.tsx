@@ -38,8 +38,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     pathname.startsWith('/videos') ||
     pathname.startsWith('/questions') ||
     pathname === '/restaurants';
-  const isNutritionActive =
-    (pathname === '/settings' && (location.search.includes('tab=calendar') || location.search.includes('tab=profile')));
+  const isNutritionActive = pathname === '/settings' && location.search.includes('tab=calendar');
   const isAiChefActive = pathname === '/ai-chef' || pathname === '/fridge-scan';
   const isPantryActive = pathname === '/fridge' || pathname === '/smart-market';
 
@@ -257,12 +256,12 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
                 <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
                   <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
-                    Lịch biểu & Dinh dưỡng:
+                    Lịch biểu & Thực đơn:
                   </span>
                   <Link
                     to="/settings?tab=calendar"
                     className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname === '/settings' && location.search.includes('tab=calendar')
+                      pathname === '/settings' && location.search.includes('tab=calendar') && location.hash !== '#saved-meal-plans'
                         ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
                         : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                     }`}
@@ -270,14 +269,19 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                     Lịch ăn 30 ngày & Bữa ăn
                   </Link>
                   <Link
-                    to="/settings?tab=profile"
+                    to="/settings?tab=calendar#saved-meal-plans"
+                    onClick={() => {
+                      window.requestAnimationFrame(() => {
+                        document.getElementById('saved-meal-plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      });
+                    }}
                     className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname === '/settings' && location.search.includes('tab=profile')
+                      location.hash === '#saved-meal-plans'
                         ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
                         : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                     }`}
                   >
-                    Hồ sơ BMI & Vòng sức khỏe
+                    Thực đơn đã lưu
                   </Link>
                 </div>
               </div>

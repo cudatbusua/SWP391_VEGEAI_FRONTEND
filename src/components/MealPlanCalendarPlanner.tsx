@@ -180,14 +180,14 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
         />
 
         {/* KẾ HOẠCH ĐÃ LƯU - bấm để nhảy tới ngày bắt đầu trên lịch */}
-        <div className="mt-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
+        <div id="saved-meal-plans" tabIndex={-1} className="scroll-mt-36 mt-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4 focus:outline-none focus:ring-2 focus:ring-emerald-500/40">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shadow-2xs">
                 <History className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Kế hoạch đã lưu</h3>
+                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Thực đơn đã lưu</h3>
                 <p className="text-[11px] text-slate-400">Bấm vào một kế hoạch để xem trên lịch · kế hoạch bị thay hết sẽ tự ẩn</p>
               </div>
             </div>

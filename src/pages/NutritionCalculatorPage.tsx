@@ -99,6 +99,8 @@ export function NutritionCalculatorPage() {
   const saveProfile = async () => {
     if (!form.dateOfBirth) { setError('Vui lòng nhập ngày sinh để lưu hồ sơ.'); return; }
     if (!form.dietaryPreferences) { setError('Vui lòng chọn chế độ ăn.'); return; }
+    if (Number(form.heightCm) < 100 || Number(form.heightCm) > 280) { setError('Chiều cao phải nằm trong khoảng 100–280 cm.'); return; }
+    if (Number(form.weightKg) < 20 || Number(form.weightKg) > 350) { setError('Cân nặng phải nằm trong khoảng 20–350 kg.'); return; }
     setSaving(true); setError(''); setMessage('');
     try {
       const profile = await nutritionService.saveProfile({
@@ -135,7 +137,7 @@ export function NutritionCalculatorPage() {
         </div>
         {isAuthenticated && <Input label="Ngày sinh" type="date" max={new Date().toISOString().slice(0, 10)} value={form.dateOfBirth} onChange={e => { const birth = new Date(e.target.value); const today = new Date(); let age = today.getFullYear() - birth.getFullYear(); if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--; setForm({ ...form, dateOfBirth: e.target.value, age: Number.isFinite(age) ? String(age) : form.age }); }} />}
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Chiều cao (cm)" type="number" min="50" max="280" step="0.1" required value={form.heightCm} onChange={e => setForm({ ...form, heightCm: e.target.value })} />
+          <Input label="Chiều cao (cm)" type="number" min="100" max="280" step="0.1" required value={form.heightCm} onChange={e => setForm({ ...form, heightCm: e.target.value })} />
           <Input label="Cân nặng (kg)" type="number" min="20" max="350" step="0.1" required value={form.weightKg} onChange={e => setForm({ ...form, weightKg: e.target.value })} />
         </div>
         <div><label className="block text-xs font-semibold mb-1.5 text-slate-700 dark:text-slate-300">Mức vận động</label><select className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white p-3 text-sm" value={form.activityLevel} onChange={e => setForm({ ...form, activityLevel: e.target.value as ActivityLevel })}>{Object.entries(activityLabels).map(([value, label]) => <option key={value} value={value} className="dark:bg-slate-800">{label}</option>)}</select></div>

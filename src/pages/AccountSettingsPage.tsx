@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   User,
   ShieldCheck,
@@ -29,6 +29,7 @@ import { MealPlanCalendarPlanner } from '../components/MealPlanCalendarPlanner';
 import { SeasonalRegionalMealsView } from '../components/SeasonalRegionalMealsView';
 import { sfx } from '../utils/soundEffects';
 import { HealthActivityRings } from '../components/HealthActivityRings';
+import { WearableGoogleFitTracker } from '../components/WearableGoogleFitTracker';
 import { dietLabels, calculateBmr, calculateTdee } from '../utils/nutritionProfile';
 import type { UserProfile, UpdateUserProfile, NutritionProfile } from '../types/api';
 import { errorMessage } from '../services/apiClient';
@@ -48,6 +49,7 @@ const ALLERGIES_LIST = [
 export const AccountSettingsPage: React.FC = () => {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'profile';
 
@@ -63,6 +65,21 @@ export const AccountSettingsPage: React.FC = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
+
+  useEffect(() => {
+    if (isLoadingProfile || currentTab !== 'calendar' || location.hash !== '#saved-meal-plans') return;
+
+    const scrollToSavedPlans = () => {
+      document.getElementById('saved-meal-plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    const frame = window.requestAnimationFrame(scrollToSavedPlans);
+    const timer = window.setTimeout(scrollToSavedPlans, 150);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [currentTab, isLoadingProfile, location.hash]);
 
   // Profile Form state
   const [fullName, setFullName] = useState('');
@@ -155,6 +172,14 @@ export const AccountSettingsPage: React.FC = () => {
 
     if (!fullName.trim()) {
       setProfileError('Vui lòng nhập họ và tên.');
+      return;
+    }
+    if (heightCm !== '' && (Number(heightCm) < 100 || Number(heightCm) > 280)) {
+      setProfileError('Chiều cao phải nằm trong khoảng 100–280 cm.');
+      return;
+    }
+    if (weightKg !== '' && (Number(weightKg) < 20 || Number(weightKg) > 350)) {
+      setProfileError('Cân nặng phải nằm trong khoảng 20–350 kg.');
       return;
     }
 
@@ -593,7 +618,8 @@ export const AccountSettingsPage: React.FC = () => {
                 <input
                   type="number"
                   min="100"
-                  max="250"
+                  max="280"
+                  step="0.1"
                   placeholder="Ví dụ: 168"
                   value={heightCm}
                   onChange={e => setHeightCm(e.target.value === '' ? '' : Number(e.target.value))}
@@ -608,8 +634,9 @@ export const AccountSettingsPage: React.FC = () => {
                 </label>
                 <input
                   type="number"
-                  min="30"
-                  max="200"
+                  min="20"
+                  max="350"
+                  step="0.1"
                   placeholder="Ví dụ: 58"
                   value={weightKg}
                   onChange={e => setWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
@@ -876,6 +903,11 @@ export const AccountSettingsPage: React.FC = () => {
 
           </div>
         </section>
+
+        <WearableGoogleFitTracker
+          plannedCalorieIntake={dailyCalorieTarget === '' ? undefined : Number(dailyCalorieTarget)}
+          userBmr={bmr || undefined}
+        />
 
                   </div>
         )}

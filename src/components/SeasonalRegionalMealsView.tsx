@@ -18,7 +18,6 @@ const REGIONS: { id: Region; label: string; tag: string }[] = [
   { id: 'MIEN_BAC', label: 'Miền Bắc', tag: 'Thanh tao · Giữ ấm' },
   { id: 'MIEN_TRUNG', label: 'Miền Trung', tag: 'Đậm đà · Nồng ấm' },
   { id: 'MIEN_NAM', label: 'Miền Nam', tag: 'Thanh mát · Tươi ngọt' },
-  { id: 'MIEN_TAY', label: 'Miền Tây', tag: 'Mùa nước nổi · Hoa đồng' },
 ];
 
 // 3–6 dishes: pick columns so no card is left alone on the last row (4 → 2×2 or one row of 4).
@@ -118,7 +117,7 @@ export function SeasonalRegionalMealsView() {
 
         <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2">
           <p className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-emerald-600" /><span>Vùng miền ẩm thực</span></p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5" role="group" aria-label="Vùng miền ẩm thực">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5" role="group" aria-label="Vùng miền ẩm thực">
             {REGIONS.map(r => (
               <button
                 key={r.id}

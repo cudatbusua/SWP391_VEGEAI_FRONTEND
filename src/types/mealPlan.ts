@@ -9,6 +9,6 @@ export interface MealPlanSummary { id: string; period: 'WEEK' | 'MONTH'; startDa
 export interface MealCalendarDay { date: string; planId: string; period: 'WEEK' | 'MONTH'; targets: NutritionTargets; meals: PlannedMeal[]; totals: PlanNutrients; }
 export interface GenerateMealPlan { period: 'WEEK' | 'MONTH'; startDate: string; mealsPerDay: number; }
 export type Season = 'XUAN' | 'HA' | 'THU' | 'DONG';
-export type Region = 'MIEN_BAC' | 'MIEN_TRUNG' | 'MIEN_NAM' | 'MIEN_TAY';
+export type Region = 'MIEN_BAC' | 'MIEN_TRUNG' | 'MIEN_NAM';
 export interface SeasonalMealSuggestion { mealType: string; dishName: string; seasonalIngredients: string; healthBenefits: string; regionalHighlights: string; estimatedCalories: number; cookingTip: string; recipeId?: string | null; }
 export interface SeasonalRegionalResponse { season: Season; seasonNameVi: string; region: Region; regionNameVi: string; climateSummary: string; highlightedProduce: string[]; nutritionAdvice: string; suggestions: SeasonalMealSuggestion[]; source: 'AI' | 'CURATED'; notice?: string | null; }

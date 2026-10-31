@@ -28,7 +28,8 @@ const STORAGE_KEYS = {
   HEART_RATE: 'wearable_heart_rate',
   SOURCE: 'wearable_source',
   SYNC_TIME: 'wearable_last_synced',
-  PRESET: 'wearable_preset'
+  PRESET: 'wearable_preset',
+  DEVICE: 'wearable_device'
 };
 
 export const WEARABLE_PRESETS = {
@@ -74,14 +75,44 @@ export const wearableService = {
     const storedSteps = localStorage.getItem(STORAGE_KEYS.STEPS);
     const storedKcal = localStorage.getItem(STORAGE_KEYS.KCAL);
     const storedHeartRate = localStorage.getItem(STORAGE_KEYS.HEART_RATE);
-    const storedSource = (localStorage.getItem(STORAGE_KEYS.SOURCE) || (token ? 'google-fit' : 'simulator')) as any;
-    const storedSync = localStorage.getItem(STORAGE_KEYS.SYNC_TIME) || (token ? 'Vừa đồng bộ hôm nay' : 'Mô phỏng thử nghiệm');
-    const presetKey = (localStorage.getItem(STORAGE_KEYS.PRESET) || 'moderate') as keyof typeof WEARABLE_PRESETS;
-    const preset = WEARABLE_PRESETS[presetKey] || WEARABLE_PRESETS.moderate;
+    const storedSource = localStorage.getItem(STORAGE_KEYS.SOURCE);
+    const storedSync = localStorage.getItem(STORAGE_KEYS.SYNC_TIME);
+    const storedDevice = localStorage.getItem(STORAGE_KEYS.DEVICE);
+    const presetKey = localStorage.getItem(STORAGE_KEYS.PRESET) as keyof typeof WEARABLE_PRESETS | null;
 
-    const steps = storedSteps ? Number(storedSteps) : preset.steps;
-    const activeCalories = storedKcal ? Number(storedKcal) : preset.activeCalories;
-    const avgHeartRate = storedHeartRate ? Number(storedHeartRate) : preset.avgHeartRate;
+    // Clean empty state if not linked to Google Fit and no simulator preset chosen
+    if (!token && !storedSteps && !presetKey) {
+      return {
+        steps: 0,
+        stepTarget: 10000,
+        activeCalories: 0,
+        activeMinutes: 0,
+        avgHeartRate: 0,
+        sleepHours: '—',
+        source: 'none',
+        lastSyncedAt: 'Chưa liên kết thiết bị',
+        isConnected: false,
+        deviceModel: 'Chưa kết nối',
+        aiAdvice: 'Bạn chưa liên kết Google Fit hoặc thiết bị đeo. Hãy kết nối Google Fit hoặc chọn một kịch bản mô phỏng bên dưới để VEGEAI đồng bộ chỉ số và tự động cân đối năng lượng.',
+        recommendedSnack: 'Chưa có dữ liệu vận động'
+      };
+    }
+
+    const preset = presetKey && WEARABLE_PRESETS[presetKey] ? WEARABLE_PRESETS[presetKey] : null;
+    const steps = storedSteps !== null ? Number(storedSteps) : (preset?.steps || 0);
+    const activeCalories = storedKcal !== null ? Number(storedKcal) : (preset?.activeCalories || 0);
+    const avgHeartRate = storedHeartRate !== null ? Number(storedHeartRate) : (preset?.avgHeartRate || 0);
+
+    let adviceText = '';
+    if (steps > 0) {
+      adviceText = `Đã đồng bộ thực tế từ ${storedDevice || 'Google Fit'}: ${steps.toLocaleString('vi-VN')} bước chân, tiêu hao ${activeCalories.toLocaleString('vi-VN')} kcal.`;
+    } else if (preset) {
+      adviceText = preset.aiAdvice;
+    } else if (token) {
+      adviceText = `Đã liên kết Google Fit (${storedDevice || 'Thiết bị đeo'}). Hôm nay chưa ghi nhận dữ liệu bước chân mới. Bạn có thể nhấn "Đồng bộ Google Fit" để làm mới dữ liệu.`;
+    } else {
+      adviceText = 'Bạn chưa liên kết Google Fit hoặc thiết bị đeo. Hãy bấm "Đồng bộ Google Fit" ở trên hoặc vào mục "Hồ sơ & Thể trạng" để kết nối theo dõi sức khỏe.';
+    }
 
     return {
       steps,
@@ -89,13 +120,15 @@ export const wearableService = {
       activeCalories,
       activeMinutes: Math.round(steps / 160),
       avgHeartRate,
-      sleepHours: preset.sleepHours,
-      source: storedSource,
-      lastSyncedAt: storedSync,
+      sleepHours: preset?.sleepHours || (token ? '7h 15m' : '—'),
+      source: (storedSource as any) || (token ? 'google-fit' : (preset ? 'simulator' : 'none')),
+      lastSyncedAt: storedSync || (token ? 'Đã liên kết tài khoản' : 'Chưa đồng bộ'),
       isConnected: Boolean(token),
-      deviceModel: 'Xiaomi Smart Band 8 (Mi Fitness / Health Connect)',
-      aiAdvice: preset.aiAdvice,
-      recommendedSnack: preset.recommendedSnack
+      deviceModel: token ? (storedDevice || 'Google Fit / Health Connect') : (preset ? 'Mô phỏng thiết bị đeo (Xiaomi / Apple Watch)' : 'Chưa kết nối thiết bị'),
+      aiAdvice: adviceText,
+      recommendedSnack: steps > 8000
+        ? 'Sinh tố bơ chuối sữa hạt sen (195 kcal · 7g protein)'
+        : (steps > 0 ? 'Nước ép cần tây dưa leo hạt chia (85 kcal)' : 'Rau củ quả tươi giàu vitamin & khoáng chất')
     };
   },
 
@@ -107,25 +140,32 @@ export const wearableService = {
     localStorage.setItem(STORAGE_KEYS.HEART_RATE, String(p.avgHeartRate));
     localStorage.setItem(STORAGE_KEYS.SYNC_TIME, `Mô phỏng (${key === 'light' ? 'Nhẹ' : key === 'moderate' ? 'Tiêu chuẩn' : 'Cường độ cao'})`);
     localStorage.setItem(STORAGE_KEYS.SOURCE, 'simulator');
+    localStorage.removeItem(STORAGE_KEYS.DEVICE);
     window.dispatchEvent(new Event('wearable_sync_updated'));
     return this.getMetrics();
   },
 
   disconnect() {
     localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    localStorage.setItem(STORAGE_KEYS.SOURCE, 'simulator');
-    localStorage.setItem(STORAGE_KEYS.SYNC_TIME, 'Đã ngắt kết nối');
+    localStorage.removeItem(STORAGE_KEYS.STEPS);
+    localStorage.removeItem(STORAGE_KEYS.KCAL);
+    localStorage.removeItem(STORAGE_KEYS.HEART_RATE);
+    localStorage.removeItem(STORAGE_KEYS.PRESET);
+    localStorage.removeItem(STORAGE_KEYS.SOURCE);
+    localStorage.removeItem(STORAGE_KEYS.SYNC_TIME);
+    localStorage.removeItem(STORAGE_KEYS.DEVICE);
     window.dispatchEvent(new Event('wearable_sync_updated'));
   },
 
   async fetchGoogleFitLive(token: string): Promise<{ steps: number; calories: number; heartRate: number }> {
     const now = Date.now();
     const startTime = now - 24 * 60 * 60 * 1000;
-    const requestBody = {
+
+    // 1. Query Activity metrics (Step count & Calorie expended) - requires fitness.activity.read
+    const activityRequestBody = {
       aggregateBy: [
         { dataTypeName: 'com.google.step_count.delta' },
-        { dataTypeName: 'com.google.calories.expended' },
-        { dataTypeName: 'com.google.heart_rate.bpm' }
+        { dataTypeName: 'com.google.calories.expended' }
       ],
       bucketByTime: { durationMillis: 86400000 },
       startTimeMillis: startTime,
@@ -138,21 +178,22 @@ export const wearableService = {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(activityRequestBody)
     });
 
     if (!res.ok) {
       if (res.status === 401) {
         this.disconnect();
-        throw new Error('Phiên ủy quyền Google Fit đã hết hạn. Vui lòng bấm liên kết lại.');
+        throw new Error('Phiên ủy quyền Google Fit đã hết hạn. Vui lòng lấy Token mới hoặc bấm liên kết lại.');
       }
-      throw new Error(`Google Fit API lỗi (${res.status}). Vui lòng kiểm tra lại quyền truy cập.`);
+      const errJson = await res.json().catch(() => null);
+      throw new Error(`Google Fit API lỗi (${res.status}): ${errJson?.error?.message || 'Vui lòng kiểm tra lại quyền truy cập.'}`);
     }
 
     const data = await res.json();
     let steps = 0;
     let calories = 0;
-    let heartRate = 74;
+    let detectedDevice = '';
 
     if (data.bucket && data.bucket.length > 0) {
       for (const bucket of data.bucket) {
@@ -162,24 +203,66 @@ export const wearableService = {
           for (const point of ds.point) {
             if (point.dataTypeName === 'com.google.step_count.delta') {
               steps += point.value?.[0]?.intVal || 0;
+              if (point.originDataSourceId && !detectedDevice) {
+                const parts = point.originDataSourceId.split(':');
+                if (parts.length >= 4) {
+                  detectedDevice = `${parts[2]} ${parts[3]}`;
+                }
+              }
             } else if (point.dataTypeName === 'com.google.calories.expended') {
               calories += point.value?.[0]?.fpVal || 0;
-            } else if (point.dataTypeName === 'com.google.heart_rate.bpm') {
-              heartRate = Math.round(point.value?.[0]?.fpVal || 74);
             }
           }
         }
       }
     }
 
-    // Fallback sensible values if user just authorized with 0 data
-    const finalSteps = steps > 0 ? steps : 8420;
-    const finalKcal = calories > 0 ? Math.round(calories) : 485;
+    // 2. Optionally query Heart Rate (requires fitness.body.read). Gracefully fallback to 0 if not granted.
+    let heartRate = 0;
+    try {
+      const hrRequestBody = {
+        aggregateBy: [{ dataTypeName: 'com.google.heart_rate.bpm' }],
+        bucketByTime: { durationMillis: 86400000 },
+        startTimeMillis: startTime,
+        endTimeMillis: now
+      };
+      const hrRes = await fetch('https://fitness.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(hrRequestBody)
+      });
+      if (hrRes.ok) {
+        const hrData = await hrRes.json();
+        if (hrData.bucket) {
+          for (const b of hrData.bucket) {
+            if (!b.dataset) continue;
+            for (const ds of b.dataset) {
+              if (!ds.point) continue;
+              for (const pt of ds.point) {
+                if (pt.dataTypeName === 'com.google.heart_rate.bpm') {
+                  heartRate = Math.round(pt.value?.[0]?.fpVal || 0);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // Ignored if body scope not granted
+    }
+
+    const finalSteps = steps;
+    const finalKcal = Math.round(calories);
+    const deviceName = detectedDevice ? `Google Fit (${detectedDevice})` : 'Google Fit (Đồng bộ trực tiếp)';
 
     localStorage.setItem(STORAGE_KEYS.TOKEN, token);
     localStorage.setItem(STORAGE_KEYS.STEPS, String(finalSteps));
     localStorage.setItem(STORAGE_KEYS.KCAL, String(finalKcal));
     localStorage.setItem(STORAGE_KEYS.HEART_RATE, String(heartRate));
+    localStorage.setItem(STORAGE_KEYS.DEVICE, deviceName);
     localStorage.setItem(STORAGE_KEYS.SOURCE, 'google-fit');
     localStorage.setItem(STORAGE_KEYS.SYNC_TIME, new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
@@ -189,8 +272,43 @@ export const wearableService = {
 
   openGoogleFitAuthPopup(): Promise<string> {
     return new Promise((resolve, reject) => {
-      const redirectUri = window.location.origin + '/03_UI_UX_and_Prototypes/wearable_sync_studio.html';
-      const scope = 'https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.body.read';
+      const gOauth2 = (window as any)?.google?.accounts?.oauth2;
+
+      // 1. Primary: Use Google Identity Services OAuth2 Token Client (in-place popup flow)
+      // This official GIS flow operates via postMessage and does not require an explicit redirect_uri,
+      // eliminating the "redirect_uri_mismatch" error.
+      if (gOauth2 && typeof gOauth2.initTokenClient === 'function') {
+        try {
+          const client = gOauth2.initTokenClient({
+            client_id: GOOGLE_FIT_CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/fitness.activity.read',
+            callback: (tokenResponse: any) => {
+              if (tokenResponse?.error) {
+                reject(new Error(tokenResponse.error_description || tokenResponse.error || 'Ủy quyền Google Fit không thành công.'));
+                return;
+              }
+              if (tokenResponse?.access_token) {
+                localStorage.setItem(STORAGE_KEYS.TOKEN, tokenResponse.access_token);
+                resolve(tokenResponse.access_token);
+              } else {
+                reject(new Error('Không nhận được Access Token từ Google.'));
+              }
+            },
+            error_callback: (err: any) => {
+              reject(new Error(err?.message || 'Lỗi cửa sổ ủy quyền Google Identity.'));
+            }
+          });
+
+          client.requestAccessToken({ prompt: 'consent' });
+          return;
+        } catch (err: any) {
+          console.warn('Google Identity Services initTokenClient error, trying fallback:', err);
+        }
+      }
+
+      // 2. Fallback: window.open with current origin as redirect_uri
+      const redirectUri = window.location.origin;
+      const scope = 'https://www.googleapis.com/auth/fitness.activity.read';
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_FIT_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=consent`;
 
       const authWindow = window.open(authUrl, 'GoogleFitOAuth', 'width=560,height=680');
@@ -203,7 +321,6 @@ export const wearableService = {
         try {
           if (!authWindow || authWindow.closed) {
             clearInterval(timer);
-            // Check if token was saved to localStorage by redirect page
             const saved = localStorage.getItem(STORAGE_KEYS.TOKEN);
             if (saved) {
               resolve(saved);
@@ -224,7 +341,7 @@ export const wearableService = {
               resolve(token);
             }
           }
-        } catch (e) {
+        } catch {
           // Cross-origin restriction while on Google accounts domain is normal
         }
       }, 600);

@@ -19,12 +19,12 @@ export interface HealthActivityRingsProps {
 }
 
 export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
-  calories = 1420,
-  calorieTarget = 1950,
-  proteinGrams = 56,
-  proteinTarget = 70,
-  fiberGrams = 28,
-  fiberTarget = 35,
+  calories = 0,
+  calorieTarget = 0,
+  proteinGrams = 0,
+  proteinTarget = 0,
+  fiberGrams = 0,
+  fiberTarget = 0,
   heightCm,
   weightKg,
   age = 26,
@@ -42,31 +42,42 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
   const bmr = numericHeight && numericWeight ? calculateBmr(numericWeight, numericHeight, age, gender) : 0;
   const tdee = bmr ? calculateTdee(bmr) : 0;
 
-  // Actual target can fall back to TDEE if calorieTarget is not set
-  const effectiveCalorieTarget = calorieTarget || tdee || 2000;
-  const effectiveProteinTarget = proteinTarget || Math.round((numericWeight || 60) * 1.1) || 65;
-  const effectiveFiberTarget = fiberTarget || 35;
+  // Actual targets - do not fall back to arbitrary numbers if user has not set them
+  const effectiveCalorieTarget = calorieTarget > 0 ? calorieTarget : (tdee > 0 ? tdee : 0);
+  const effectiveProteinTarget = proteinTarget > 0 ? proteinTarget : (numericWeight > 0 ? Math.round(numericWeight * 1.1) : 0);
+  const effectiveFiberTarget = fiberTarget > 0 ? fiberTarget : (effectiveCalorieTarget > 0 ? 35 : 0);
+
+  const hasHealthData = Boolean(
+    effectiveCalorieTarget > 0 ||
+    effectiveProteinTarget > 0 ||
+    effectiveFiberTarget > 0 ||
+    calories > 0 ||
+    proteinGrams > 0 ||
+    fiberGrams > 0 ||
+    (numericHeight > 0 && numericWeight > 0)
+  );
 
   // Calculate percentages (clamped 0 to 100 for stroke dash offset, but display full %)
-  const calPercent = Math.min(Math.round((calories / effectiveCalorieTarget) * 100), 100);
-  const protPercent = Math.min(Math.round((proteinGrams / effectiveProteinTarget) * 100), 100);
-  const fibPercent = Math.min(Math.round((fiberGrams / effectiveFiberTarget) * 100), 100);
+  const calPercent = effectiveCalorieTarget > 0 ? Math.min(Math.round((calories / effectiveCalorieTarget) * 100), 100) : 0;
+  const protPercent = effectiveProteinTarget > 0 ? Math.min(Math.round((proteinGrams / effectiveProteinTarget) * 100), 100) : 0;
+  const fibPercent = effectiveFiberTarget > 0 ? Math.min(Math.round((fiberGrams / effectiveFiberTarget) * 100), 100) : 0;
 
   // SVG Geometry for concentric rings
   // Outer (Calo): r = 62, middle (Protein): r = 48, inner (Fiber): r = 34
   const r1 = 62;
   const circ1 = 2 * Math.PI * r1;
-  const offset1 = circ1 - (calPercent / 100) * circ1;
+  const offset1 = hasHealthData && effectiveCalorieTarget > 0 ? circ1 - (calPercent / 100) * circ1 : circ1;
 
   const r2 = 48;
   const circ2 = 2 * Math.PI * r2;
-  const offset2 = circ2 - (protPercent / 100) * circ2;
+  const offset2 = hasHealthData && effectiveProteinTarget > 0 ? circ2 - (protPercent / 100) * circ2 : circ2;
 
   const r3 = 34;
   const circ3 = 2 * Math.PI * r3;
-  const offset3 = circ3 - (fibPercent / 100) * circ3;
+  const offset3 = hasHealthData && effectiveFiberTarget > 0 ? circ3 - (fibPercent / 100) * circ3 : circ3;
 
-  const averageCompletion = Math.round((calPercent + protPercent + fibPercent) / 3);
+  const activeTargetsCount = (effectiveCalorieTarget > 0 ? 1 : 0) + (effectiveProteinTarget > 0 ? 1 : 0) + (effectiveFiberTarget > 0 ? 1 : 0);
+  const averageCompletion = activeTargetsCount > 0 ? Math.round((calPercent + protPercent + fibPercent) / activeTargetsCount) : 0;
 
   return (
     <div className={`health-activity-rings-card bg-white dark:bg-[#121922] rounded-3xl border border-slate-200/90 dark:border-[#212c3b] p-5 sm:p-6 shadow-sm transition-colors ${compact ? 'p-4' : ''}`}>
@@ -177,12 +188,25 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
 
             {/* Center metric indicator */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-              <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                {averageCompletion}%
-              </span>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 -mt-0.5">
-                Hoàn thành
-              </span>
+              {hasHealthData ? (
+                <>
+                  <span className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                    {averageCompletion}%
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 -mt-0.5">
+                    Hoàn thành
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl font-black text-slate-400 dark:text-slate-500 tracking-tight">
+                    —
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 -mt-0.5">
+                    Chưa có dữ liệu
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -203,20 +227,27 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                 <span className="w-3 h-3 rounded-full bg-rose-500 shadow-xs shrink-0" />
                 <div>
                   <span className="block text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
-                    <Flame className="w-3.5 h-3.5 text-rose-500" /> Năng lượng (Calo)
+                    <Flame className="w-3.5 h-3.5 text-rose-500" /> Năng lượng (Calo vận động)
+                    {calories > 0 && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 ml-1">
+                        Đã đồng bộ thiết bị
+                      </span>
+                    )}
                   </span>
                   <span className="block text-[11px] text-slate-400">
-                    Mục tiêu: {effectiveCalorieTarget.toLocaleString('vi-VN')} kcal/ngày
+                    {effectiveCalorieTarget > 0
+                      ? `Mục tiêu: ${effectiveCalorieTarget.toLocaleString('vi-VN')} kcal/ngày`
+                      : 'Mục tiêu: Chưa thiết lập'}
                   </span>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-sm font-black text-rose-600 dark:text-rose-400">
-                  {calories.toLocaleString('vi-VN')}
+                  {calories > 0 ? calories.toLocaleString('vi-VN') : '—'}
                   <span className="text-[11px] font-semibold text-slate-400 ml-1">kcal</span>
                 </span>
                 <span className="block text-[10px] font-bold text-slate-400">
-                  {Math.round((calories / effectiveCalorieTarget) * 100)}%
+                  {effectiveCalorieTarget > 0 ? `${calPercent}%` : '—'}
                 </span>
               </div>
             </div>
@@ -230,17 +261,19 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                     <Beef className="w-3.5 h-3.5 text-emerald-500" /> Đạm thực vật (Protein)
                   </span>
                   <span className="block text-[11px] text-slate-400">
-                    Mục tiêu: {effectiveProteinTarget}g từ đậu, hạt & ngũ cốc
+                    {effectiveProteinTarget > 0
+                      ? `Mục tiêu: ${effectiveProteinTarget}g từ đậu, hạt & ngũ cốc`
+                      : 'Mục tiêu: Chưa thiết lập'}
                   </span>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
-                  {proteinGrams}
+                  {proteinGrams > 0 ? proteinGrams : '—'}
                   <span className="text-[11px] font-semibold text-slate-400 ml-1">g</span>
                 </span>
                 <span className="block text-[10px] font-bold text-slate-400">
-                  {Math.round((proteinGrams / effectiveProteinTarget) * 100)}%
+                  {effectiveProteinTarget > 0 ? `${protPercent}%` : '—'}
                 </span>
               </div>
             </div>
@@ -254,17 +287,19 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                     <Leaf className="w-3.5 h-3.5 text-cyan-500" /> Chất xơ & Cân bằng rau củ
                   </span>
                   <span className="block text-[11px] text-slate-400">
-                    Mục tiêu: {effectiveFiberTarget}g chất xơ tự nhiên
+                    {effectiveFiberTarget > 0
+                      ? `Mục tiêu: ${effectiveFiberTarget}g chất xơ tự nhiên`
+                      : 'Mục tiêu: Chưa thiết lập'}
                   </span>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-sm font-black text-cyan-600 dark:text-cyan-400">
-                  {fiberGrams}
+                  {fiberGrams > 0 ? fiberGrams : '—'}
                   <span className="text-[11px] font-semibold text-slate-400 ml-1">g</span>
                 </span>
                 <span className="block text-[10px] font-bold text-slate-400">
-                  {Math.round((fiberGrams / effectiveFiberTarget) * 100)}%
+                  {effectiveFiberTarget > 0 ? `${fibPercent}%` : '—'}
                 </span>
               </div>
             </div>
@@ -298,7 +333,7 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                     <strong className="text-lg font-black text-slate-900 dark:text-white">
                       {bmr > 0 ? bmr.toLocaleString('vi-VN') : '—'}
                     </strong>
-                    <span className="text-[10px] text-slate-400">kcal</span>
+                    {bmr > 0 && <span className="text-[10px] text-slate-400">kcal</span>}
                   </div>
                   <span className="text-[9.5px] text-slate-400">Mifflin-St Jeor</span>
                 </div>
@@ -312,9 +347,11 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                     <strong className="text-lg font-black text-slate-900 dark:text-white">
                       {tdee > 0 ? tdee.toLocaleString('vi-VN') : '—'}
                     </strong>
-                    <span className="text-[10px] text-slate-400">kcal</span>
+                    {tdee > 0 && <span className="text-[10px] text-slate-400">kcal</span>}
                   </div>
-                  <span className="text-[9.5px] text-emerald-600 dark:text-emerald-400 font-bold">Mức chuẩn</span>
+                  <span className="text-[9.5px] text-emerald-600 dark:text-emerald-400 font-bold">
+                    {tdee > 0 ? 'Mức chuẩn' : 'Chưa tính'}
+                  </span>
                 </div>
 
                 {/* Thể trạng (Chiều cao / Cân nặng) */}

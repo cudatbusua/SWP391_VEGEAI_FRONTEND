@@ -25,8 +25,8 @@ interface WearableTrackerProps {
 }
 
 export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
-  plannedCalorieIntake = 1650,
-  userBmr = 1420,
+  plannedCalorieIntake = 0,
+  userBmr = 0,
   onSyncMetrics
 }) => {
   const [metrics, setMetrics] = useState<WearableMetrics>(() => wearableService.getMetrics());
@@ -50,8 +50,8 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
     return () => window.removeEventListener('wearable_sync_updated', handleUpdate);
   }, [onSyncMetrics]);
 
-  const totalCaloriesBurned = userBmr + metrics.activeCalories;
-  const netCalorieBalance = plannedCalorieIntake - totalCaloriesBurned;
+  const totalCaloriesBurned = (userBmr > 0 || metrics.activeCalories > 0) ? (userBmr + metrics.activeCalories) : 0;
+  const netCalorieBalance = (plannedCalorieIntake > 0 && totalCaloriesBurned > 0) ? (plannedCalorieIntake - totalCaloriesBurned) : null;
 
   const handleConnectOAuth = async () => {
     sfx.playTap();
@@ -95,7 +95,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
   const handleDisconnect = () => {
     sfx.playTap();
     wearableService.disconnect();
-    setStatusMessage('Đã ngắt liên kết Google Fit. Dữ liệu đã chuyển sang chế độ độc lập.');
+    setStatusMessage('Đã ngắt liên kết và đặt lại dữ liệu thiết bị.');
   };
 
   const handleSelectPreset = (preset: 'light' | 'moderate' | 'intense') => {
@@ -255,9 +255,8 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         <div className="flex flex-wrap items-center gap-1.5">
           {(['light', 'moderate', 'intense'] as const).map(p => {
             const isCurrent =
-              (p === 'light' && metrics.steps === 3850) ||
-              (p === 'moderate' && metrics.steps === 8420) ||
-              (p === 'intense' && metrics.steps === 13600);
+              metrics.source === 'simulator' &&
+              localStorage.getItem('wearable_preset') === p;
             return (
               <button
                 key={p}
@@ -273,6 +272,16 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
               </button>
             );
           })}
+          {metrics.source === 'simulator' && (
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              className="px-2.5 py-1 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-800 transition cursor-pointer"
+              title="Xóa dữ liệu mô phỏng để trở về trạng thái trống"
+            >
+              Xóa mô phỏng
+            </button>
+          )}
         </div>
       </div>
 
@@ -285,7 +294,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
             <Footprints className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-            {metrics.steps.toLocaleString('vi-VN')}
+            {metrics.steps > 0 ? metrics.steps.toLocaleString('vi-VN') : '—'}
           </div>
           <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
             <div
@@ -293,7 +302,11 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
               style={{ width: `${Math.min(100, (metrics.steps / metrics.stepTarget) * 100)}%` }}
             />
           </div>
-          <span className="text-[10px] text-slate-400">Mục tiêu: {metrics.stepTarget.toLocaleString('vi-VN')} bước ({Math.round((metrics.steps / metrics.stepTarget) * 100)}%)</span>
+          <span className="text-[10px] text-slate-400">
+            {metrics.steps > 0
+              ? `Mục tiêu: ${metrics.stepTarget.toLocaleString('vi-VN')} bước (${Math.round((metrics.steps / metrics.stepTarget) * 100)}%)`
+              : 'Chưa có dữ liệu bước chân'}
+          </span>
         </div>
 
         {/* Active Calories */}
@@ -303,12 +316,17 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
             <Flame className="w-4 h-4 text-amber-500" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-amber-500">
-            +{metrics.activeCalories} <span className="text-xs font-bold text-slate-400">kcal</span>
+            {metrics.activeCalories > 0 ? `+${metrics.activeCalories} ` : '— '}
+            <span className="text-xs font-bold text-slate-400">kcal</span>
           </div>
           <div className="text-[11px] text-slate-500">
-            Vận động tích cực: <strong>{metrics.activeMinutes} phút</strong>
+            Vận động tích cực: <strong>{metrics.activeMinutes > 0 ? `${metrics.activeMinutes} phút` : '—'}</strong>
           </div>
-          <span className="text-[10px] text-slate-400">Tổng tiêu hao BMR + Vận động: {totalCaloriesBurned} kcal</span>
+          <span className="text-[10px] text-slate-400">
+            {totalCaloriesBurned > 0
+              ? `Tổng tiêu hao BMR + Vận động: ${totalCaloriesBurned.toLocaleString('vi-VN')} kcal`
+              : 'Chưa có dữ liệu tiêu hao'}
+          </span>
         </div>
 
         {/* Heart Rate */}
@@ -318,9 +336,12 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
             <Heart className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-xl sm:text-2xl font-black text-rose-500">
-            {metrics.avgHeartRate} <span className="text-xs font-bold text-slate-400">bpm</span>
+            {metrics.avgHeartRate > 0 ? metrics.avgHeartRate : '—'}{' '}
+            <span className="text-xs font-bold text-slate-400">bpm</span>
           </div>
-          <span className="text-[11px] text-emerald-600 font-bold">Trạng thái ổn định</span>
+          <span className="text-[11px] text-emerald-600 font-bold">
+            {metrics.avgHeartRate > 0 ? 'Trạng thái ổn định' : 'Chưa đo nhịp tim'}
+          </span>
           <span className="text-[10px] text-slate-400 block">Đo tự động qua cảm biến quang</span>
         </div>
 
@@ -333,7 +354,9 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
           <div className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">
             {metrics.sleepHours}
           </div>
-          <span className="text-[11px] text-indigo-500 font-bold">Chất lượng tốt (88 điểm)</span>
+          <span className="text-[11px] text-indigo-500 font-bold">
+            {metrics.sleepHours !== '—' ? 'Chất lượng tốt (88 điểm)' : 'Chưa có dữ liệu'}
+          </span>
           <span className="text-[10px] text-slate-400 block">Hồi phục cơ bắp tốt</span>
         </div>
       </div>
@@ -349,7 +372,16 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         </p>
         <div className="pt-2 border-t border-emerald-200/50 dark:border-emerald-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
           <span>Gợi ý bữa phụ hồi phục: <strong className="text-emerald-800 dark:text-emerald-300 font-bold">{metrics.recommendedSnack}</strong></span>
-          <span>Cân bằng calo dự kiến: <strong className={netCalorieBalance < 0 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>{netCalorieBalance} kcal</strong></span>
+          <span>
+            Cân bằng calo dự kiến:{' '}
+            {netCalorieBalance !== null ? (
+              <strong className={netCalorieBalance <= 0 ? 'text-emerald-600 font-bold' : 'text-amber-600 font-bold'}>
+                {netCalorieBalance > 0 ? `+${netCalorieBalance}` : netCalorieBalance} kcal
+              </strong>
+            ) : (
+              <span className="text-slate-400 font-normal">Chưa đủ dữ liệu</span>
+            )}
+          </span>
         </div>
       </div>
 

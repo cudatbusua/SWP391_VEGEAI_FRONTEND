@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calendar,
@@ -16,6 +16,9 @@ import {
 import { HealthActivityRings } from './HealthActivityRings';
 import type { ScheduledDayPlan } from '../data/weeklyScheduleData';
 import { sfx } from '../utils/soundEffects';
+import { wearableService } from '../utils/wearableService';
+import type { WearableMetrics } from '../utils/wearableService';
+import { calculateBmr, calculateTdee } from '../utils/nutritionProfile';
 
 export interface ChatMealScheduleCardData {
   weekTitle: string;
@@ -262,6 +265,74 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
   onAskAiAdvice
 }) => {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [liveMetrics, setLiveMetrics] = useState<WearableMetrics>(() => wearableService.getMetrics());
+  const [, setProfileSyncCount] = useState(0);
+
+  useEffect(() => {
+    const handleWearableUpdate = () => {
+      setLiveMetrics(wearableService.getMetrics());
+    };
+    const handleProfileUpdate = () => {
+      setProfileSyncCount(c => c + 1);
+    };
+    window.addEventListener('wearable_sync_updated', handleWearableUpdate);
+    window.addEventListener('user_profile_updated', handleProfileUpdate);
+    return () => {
+      window.removeEventListener('wearable_sync_updated', handleWearableUpdate);
+      window.removeEventListener('user_profile_updated', handleProfileUpdate);
+    };
+  }, []);
+
+  // Determine user's real biometrics and calorie targets matching AccountSettingsPage
+  let height = card.heightCm;
+  let weight = card.weightKg;
+  let age = card.age || 25;
+  let gender = card.gender || 'OTHER';
+  let targetCalorie = card.calorieTarget;
+
+  try {
+    const storedProfRaw = localStorage.getItem('vegeai_user_profile');
+    if (storedProfRaw) {
+      const sp = JSON.parse(storedProfRaw);
+      if (sp.heightCm && (!height || height === 165)) height = sp.heightCm;
+      if (sp.weightKg && (!weight || weight === 58)) weight = sp.weightKg;
+      if (sp.dateOfBirth) age = Math.max(15, new Date().getFullYear() - new Date(sp.dateOfBirth).getFullYear());
+      if (sp.gender) gender = sp.gender;
+      if (sp.dailyCalorieTarget && Number(sp.dailyCalorieTarget) > 0) targetCalorie = Number(sp.dailyCalorieTarget);
+    }
+  } catch {}
+
+  const hNum = typeof height === 'number' && height > 0 ? height : 0;
+  const wNum = typeof weight === 'number' && weight > 0 ? weight : 0;
+
+  const bmr = (hNum > 0 && wNum > 0) ? calculateBmr(wNum, hNum, age, gender) : 0;
+  const tdee = bmr > 0 ? calculateTdee(bmr, 1.375) : 0;
+  const defaultScientificCalorie = tdee > 0 ? Math.round(tdee) : (bmr > 0 ? Math.round(bmr) : 1800);
+
+  const effectiveCalorieTarget = (targetCalorie > 0 && targetCalorie !== 1850)
+    ? targetCalorie
+    : (defaultScientificCalorie > 0 ? defaultScientificCalorie : 2531);
+
+  const effectiveProteinTarget = wNum > 0
+    ? Math.round(wNum * 1.1)
+    : (effectiveCalorieTarget > 0 ? Math.round((effectiveCalorieTarget * 0.20) / 4) : 0);
+
+  const effectiveFiberTarget = effectiveCalorieTarget > 0 ? 35 : 0;
+
+  // Active calories from wearable / live sync
+  const currentActiveKcal = liveMetrics.activeCalories > 0
+    ? liveMetrics.activeCalories
+    : (card.calories === 1420 ? 0 : (card.calories > 0 ? card.calories : card.wearableKcal));
+
+  const currentSteps = liveMetrics.steps > 0 ? liveMetrics.steps : card.steps;
+  const currentHeartRate = liveMetrics.avgHeartRate > 0 ? liveMetrics.avgHeartRate : card.heartRate;
+  const isConnected = liveMetrics.isConnected || card.isConnected;
+  const lastSyncedAt = liveMetrics.lastSyncedAt || card.lastSyncedAt;
+  const currentAdvice = liveMetrics.aiAdvice || card.advice;
+
+  // Clean protein and fiber intake (if 58 or 30 from old hardcoded mock, reset to 0 unless custom tracked)
+  const currentProteinGrams = card.proteinGrams === 58 ? 0 : (card.proteinGrams || 0);
+  const currentFiberGrams = card.fiberGrams === 30 ? 0 : (card.fiberGrams || 0);
 
   const handleSyncClick = async () => {
     sfx.playTap();
@@ -275,7 +346,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 
   const handleAskAdvice = () => {
     sfx.playTap();
-    const prompt = `Dựa vào vòng Ring hoạt động hôm nay của tôi (Bước chân: ${card.steps.toLocaleString('vi-VN')}, Calo tiêu hao: ${card.wearableKcal} kcal, Nhịp tim: ${card.heartRate} bpm), Bếp trưởng hãy tư vấn thực đơn bữa tối chay để bù đắp năng lượng và hồi phục cơ bắp tối ưu nhé!`;
+    const prompt = `Dựa vào vòng Ring hoạt động hôm nay của tôi (Bước chân: ${currentSteps.toLocaleString('vi-VN')}, Calo tiêu hao: ${currentActiveKcal} kcal, Nhịp tim: ${currentHeartRate} bpm), Bếp trưởng hãy tư vấn thực đơn bữa tối chay để bù đắp năng lượng và hồi phục cơ bắp tối ưu nhé!`;
     onAskAiAdvice?.(prompt);
   };
 
@@ -319,16 +390,16 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
       {/* Embedded Concentric Rings Component */}
       <div className="bg-slate-50 dark:bg-slate-900/60 rounded-2xl p-2 border border-slate-200/80 dark:border-slate-800">
         <HealthActivityRings
-          calories={card.calories}
-          calorieTarget={card.calorieTarget}
-          proteinGrams={card.proteinGrams}
-          proteinTarget={card.proteinTarget}
-          fiberGrams={card.fiberGrams}
-          fiberTarget={card.fiberTarget}
-          heightCm={card.heightCm}
-          weightKg={card.weightKg}
-          age={card.age}
-          gender={card.gender}
+          calories={currentActiveKcal > 0 ? currentActiveKcal : 0}
+          calorieTarget={effectiveCalorieTarget}
+          proteinGrams={currentProteinGrams}
+          proteinTarget={effectiveProteinTarget}
+          fiberGrams={currentFiberGrams}
+          fiberTarget={effectiveFiberTarget}
+          heightCm={hNum || ''}
+          weightKg={wNum || ''}
+          age={age}
+          gender={gender}
           compact={true}
           showDetails={true}
         />
@@ -340,11 +411,11 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
           <div className="flex items-center gap-2">
             <Watch className="w-4 h-4 text-emerald-400" />
             <strong className="font-bold text-white text-xs">Dữ liệu thiết bị thông minh (Google Fit / Smartband):</strong>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${card.isConnected ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-300 border border-slate-700'}`}>
-              {card.isConnected ? '🟢 Đã liên kết' : 'Mô phỏng'}
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isConnected ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-300 border border-slate-700'}`}>
+              {isConnected ? '🟢 Đã liên kết' : 'Mô phỏng'}
             </span>
           </div>
-          <span className="text-[10px] text-slate-400">Cập nhật: {card.lastSyncedAt}</span>
+          <span className="text-[10px] text-slate-400">Cập nhật: {lastSyncedAt}</span>
         </div>
 
         <div className="grid grid-cols-3 gap-2 text-center">
@@ -353,7 +424,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
               <Footprints className="w-3 h-3 text-cyan-400" /> Bước chân
             </span>
             <strong className="text-sm sm:text-base font-extrabold text-white block mt-0.5">
-              {card.steps.toLocaleString('vi-VN')}
+              {currentSteps.toLocaleString('vi-VN')}
             </strong>
           </div>
 
@@ -362,7 +433,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
               <Flame className="w-3 h-3 text-amber-400" /> Tiêu hao
             </span>
             <strong className="text-sm sm:text-base font-extrabold text-amber-300 block mt-0.5">
-              +{card.wearableKcal} <span className="text-[10px] text-slate-400">kcal</span>
+              +{currentActiveKcal.toLocaleString('vi-VN')} <span className="text-[10px] text-slate-400">kcal</span>
             </strong>
           </div>
 
@@ -371,7 +442,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
               <Heart className="w-3 h-3 text-rose-400" /> Nhịp tim
             </span>
             <strong className="text-sm sm:text-base font-extrabold text-rose-300 block mt-0.5">
-              {card.heartRate} <span className="text-[10px] text-slate-400">bpm</span>
+              {currentHeartRate > 0 ? `${currentHeartRate} bpm` : '0 bpm'}
             </strong>
           </div>
         </div>
@@ -380,7 +451,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
       {/* AI Advice Callout & Interactive Action */}
       <div className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-2">
         <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-          {card.advice}
+          {currentAdvice}
         </p>
         <div className="pt-2 border-t border-emerald-200/50 dark:border-emerald-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <button

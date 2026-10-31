@@ -31,6 +31,7 @@ import { mealPlanService } from '../services/mealPlanService';
 import { ApiError, errorMessage } from '../services/apiClient';
 import { RecipeCard } from '../components/RecipeCard';
 import { HealthActivityRings } from '../components/HealthActivityRings';
+import { wearableService } from '../utils/wearableService';
 import { dietLabels, displayAllergies } from '../utils/nutritionProfile';
 import { sfx } from '../utils/soundEffects';
 import type { RecipeSummary } from '../types/recipe';
@@ -659,11 +660,11 @@ export const DashboardPage: React.FC = () => {
                 /* Authenticated Profile exists: Apple Watch Concentric Activity Rings Snapshot */
                 <div className="space-y-4">
                   <HealthActivityRings
-                    calories={1420}
+                    calories={wearableService.getMetrics().activeCalories || 0}
                     calorieTarget={Math.round(nutrition.targets.dailyCaloriesTarget)}
-                    proteinGrams={56}
+                    proteinGrams={0}
                     proteinTarget={Math.round(nutrition.targets.proteinTargetG)}
-                    fiberGrams={28}
+                    fiberGrams={0}
                     fiberTarget={35}
                     heightCm={nutrition.heightCm}
                     weightKg={nutrition.weightKg}

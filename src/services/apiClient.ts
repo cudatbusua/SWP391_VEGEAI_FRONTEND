@@ -38,6 +38,16 @@ export function clearSession(): void {
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
   localStorage.removeItem('vegeai_auth_user');
+  localStorage.removeItem('vegeai_user_profile');
+  localStorage.removeItem('google_fit_access_token');
+  localStorage.removeItem('wearable_steps');
+  localStorage.removeItem('wearable_kcal');
+  localStorage.removeItem('wearable_heart_rate');
+  localStorage.removeItem('wearable_source');
+  localStorage.removeItem('wearable_last_synced');
+  localStorage.removeItem('wearable_preset');
+  localStorage.removeItem('wearable_device');
+  window.dispatchEvent(new Event('wearable_sync_updated'));
 }
 function expireSession(): void {
   clearSession();

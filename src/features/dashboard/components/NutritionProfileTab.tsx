@@ -62,7 +62,7 @@ export function NutritionProfileTab() {
           <div><dt className="text-gray-500">Chất xơ mỗi ngày</dt><dd className="mt-1 font-semibold">{profile.targets.fiberTargetG} g</dd></div>
         </dl></section>
       </div>
-      <Link to="/meal-plans" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">Lập kế hoạch ăn uống theo hồ sơ này<ArrowUpRight size={16} /></Link>
+      <Link to="/settings?tab=calendar" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">Lập kế hoạch ăn uống theo hồ sơ này<ArrowUpRight size={16} /></Link>
     </>}
   </section>;
 }

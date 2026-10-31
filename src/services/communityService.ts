@@ -1,6 +1,6 @@
 import { apiRequest } from './apiClient';
 import type { ApiResponse, PageResponse } from '../types/api';
-import type { CommunityVideo, Question, QuestionStatus, VideoComment, VideoInput, VideoStatus } from '../types/community';
+import type { CommunityVideo, ContentRatingSummary, Question, QuestionStatus, VideoComment, VideoInput, VideoStatus } from '../types/community';
 
 function data<T>(response: ApiResponse<T>): T {
   if (response.data === undefined || response.data === null) throw new Error('Máy chủ chưa trả về dữ liệu.');
@@ -44,13 +44,26 @@ export const communityService = {
     await apiRequest('/admin/questions/' + id(questionId) + query({ version }), { method: 'DELETE' });
   },
   async videos(params: { keyword?: string; category?: string; page: number }, signal?: AbortSignal) {
-    return data(await apiRequest<PageResponse<CommunityVideo>>('/videos' + query({ ...params, size: 9 }), { signal }));
+    return data(await apiRequest<PageResponse<CommunityVideo>>('/videos' + query({ ...params, size: 9 }), { auth: 'none', signal }));
   },
   async video(videoId: string, signal?: AbortSignal) {
-    return data(await apiRequest<CommunityVideo>('/videos/' + id(videoId), { signal }));
+    return data(await apiRequest<CommunityVideo>('/videos/' + id(videoId), { auth: 'none', signal }));
   },
   async savedVideos(page: number, signal?: AbortSignal) {
     return data(await apiRequest<PageResponse<CommunityVideo>>('/videos/favorites' + query({ page, size: 9 }), { signal }));
+  },
+  async myVideos(page: number, signal?: AbortSignal) {
+    return data(await apiRequest<PageResponse<CommunityVideo>>('/videos/mine' + query({ page, size: 9 }), { signal }));
+  },
+  async myVideo(videoId: string, signal?: AbortSignal) {
+    return data(await apiRequest<CommunityVideo>('/videos/mine/' + id(videoId), { signal }));
+  },
+  async saveMyVideo(input: VideoInput, videoId?: string) {
+    return data(await apiRequest<CommunityVideo>(videoId ? '/videos/mine/' + id(videoId) : '/videos', { method: videoId ? 'PUT' : 'POST', body: input }));
+  },
+  async uploadMyVideoAsset(file: File, video: boolean) {
+    const body = new FormData(); body.append('file', file);
+    return data(await apiRequest<{ url: string }>('/videos/upload?video=' + video, { method: 'POST', body }));
   },
   async favorite(videoId: string, signal?: AbortSignal) {
     return data(await apiRequest<{ videoId: string; favorite: boolean }>('/videos/' + id(videoId) + '/favorite', { signal }));
@@ -59,7 +72,14 @@ export const communityService = {
     return data(await apiRequest<{ videoId: string; favorite: boolean }>('/videos/' + id(videoId) + '/favorite', { method: saved ? 'PUT' : 'DELETE' }));
   },
   async comments(videoId: string, page: number, signal?: AbortSignal) {
-    return data(await apiRequest<PageResponse<VideoComment>>('/videos/' + id(videoId) + '/comments' + query({ page, size: 10 }), { signal }));
+    return data(await apiRequest<PageResponse<VideoComment>>('/videos/' + id(videoId) + '/comments' + query({ page, size: 10 }), { auth: 'none', signal }));
+  },
+  async videoRating(videoId: string, signal?: AbortSignal) {
+    const content = data(await apiRequest<{ rating: ContentRatingSummary }>(`/public/content-interactions/VIDEO/${id(videoId)}?page=0&size=1`, { auth: 'optional', signal }));
+    return content.rating;
+  },
+  async rateVideo(videoId: string, stars: number) {
+    return data(await apiRequest<ContentRatingSummary>(`/content-interactions/VIDEO/${id(videoId)}/rating`, { method: 'PUT', body: { stars } }));
   },
   async comment(videoId: string, content: string, existing?: { id: string; version: number }) {
     return data(await apiRequest<VideoComment>('/videos/' + id(videoId) + '/comments' + (existing ? '/' + id(existing.id) : ''), {

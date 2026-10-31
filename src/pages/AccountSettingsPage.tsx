@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   User,
   ShieldCheck,
@@ -12,19 +12,13 @@ import {
   Activity,
   RefreshCw,
   ShieldAlert,
-  CalendarDays,
   Flame,
   Sparkles,
-  ChefHat,
-  ShoppingBag,
   Scale,
   Apple,
   Zap,
   Check,
-  ArrowRight,
-  Calendar,
-  ChevronLeft,
-  ChevronRight
+  RotateCcw
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
@@ -32,12 +26,13 @@ import { useTheme } from '../store/ThemeContext';
 import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { nutritionService } from '../services/nutritionService';
-import { mealPlanService } from '../services/mealPlanService';
+import { MealPlanCalendarPlanner } from '../components/MealPlanCalendarPlanner';
+import { SeasonalRegionalMealsView } from '../components/SeasonalRegionalMealsView';
 import { sfx } from '../utils/soundEffects';
 import { HealthActivityRings } from '../components/HealthActivityRings';
+import { WearableGoogleFitTracker } from '../components/WearableGoogleFitTracker';
 import { dietLabels, calculateBmr, calculateTdee } from '../utils/nutritionProfile';
 import type { UserProfile, UpdateUserProfile, NutritionProfile } from '../types/api';
-import type { MealPlan } from '../types/mealPlan';
 import { errorMessage } from '../services/apiClient';
 
 const ALLERGIES_LIST = [
@@ -52,76 +47,9 @@ const ALLERGIES_LIST = [
   'Nấm hương'
 ];
 
-interface DefaultWeekMeal {
-  name: string;
-  calories: number;
-  protein: number;
-  category: string;
-}
-
-const DEFAULT_WEEKLY_SCHEDULE: { dayName: string; dayIndex: number; targetCal: number; breakfast: DefaultWeekMeal; lunch: DefaultWeekMeal; dinner: DefaultWeekMeal }[] = [
-  {
-    dayName: 'Thứ Hai',
-    dayIndex: 1,
-    targetCal: 1450,
-    breakfast: { name: 'Bánh mì ngũ cốc bơ dầm & hạt chia', calories: 340, protein: 9, category: 'Năng lượng sáng' },
-    lunch: { name: 'Cơm gạo lứt đậu hũ áp chảo sốt cà chua', calories: 540, protein: 22, category: 'Bữa chính' },
-    dinner: { name: 'Canh nấm rong biển hạt sen thanh nhiệt', calories: 380, protein: 14, category: 'Thanh nhẹ tối' }
-  },
-  {
-    dayName: 'Thứ Ba',
-    dayIndex: 2,
-    targetCal: 1420,
-    breakfast: { name: 'Yến mạch nấu sữa đậu nành & chuối', calories: 320, protein: 11, category: 'Năng lượng sáng' },
-    lunch: { name: 'Bún riêu chay nấm rơm & chả đậu hũ', calories: 510, protein: 20, category: 'Bữa chính' },
-    dinner: { name: 'Rau củ ngũ sắc luộc kho quẹt chay', calories: 360, protein: 12, category: 'Thanh nhẹ tối' }
-  },
-  {
-    dayName: 'Thứ Tư',
-    dayIndex: 3,
-    targetCal: 1480,
-    breakfast: { name: 'Phở nấm thực dưỡng thanh ngọt', calories: 360, protein: 13, category: 'Năng lượng sáng' },
-    lunch: { name: 'Cơm gạo lứt sườn non lúa mì kho tiêu', calories: 560, protein: 24, category: 'Bữa chính' },
-    dinner: { name: 'Salad bơ đậu gà sốt mè rang', calories: 390, protein: 16, category: 'Thanh nhẹ tối' }
-  },
-  {
-    dayName: 'Thứ Năm',
-    dayIndex: 4,
-    targetCal: 1400,
-    breakfast: { name: 'Súp ngô non đậu hạt sen bùi ngậy', calories: 310, protein: 8, category: 'Năng lượng sáng' },
-    lunch: { name: 'Bún lứt xào nấm đùi gà rau cải thìa', calories: 490, protein: 19, category: 'Bữa chính' },
-    dinner: { name: 'Canh chua dọc mùng đậu hũ non', calories: 370, protein: 13, category: 'Thanh nhẹ tối' }
-  },
-  {
-    dayName: 'Thứ Sáu',
-    dayIndex: 5,
-    targetCal: 1460,
-    breakfast: { name: 'Bánh bao chay nhân nấm tươi', calories: 330, protein: 10, category: 'Năng lượng sáng' },
-    lunch: { name: 'Cơm tấm sườn nấm bào ngư chiên giòn', calories: 550, protein: 21, category: 'Bữa chính' },
-    dinner: { name: 'Cháo yến mạch củ sen hầm thảo mộc', calories: 360, protein: 12, category: 'Thanh nhẹ tối' }
-  },
-  {
-    dayName: 'Thứ Bảy',
-    dayIndex: 6,
-    targetCal: 1520,
-    breakfast: { name: 'Smoothie bowl xoài cải kale hạt lanh', calories: 340, protein: 10, category: 'Năng lượng sáng' },
-    lunch: { name: 'Cà ri đậu gà khoai lang cốt dừa & bánh mì', calories: 580, protein: 23, category: 'Bữa chính' },
-    dinner: { name: 'Gỏi cuốn ngũ sắc tương bơ đậu phộng', calories: 390, protein: 15, category: 'Thanh nhẹ tối' }
-  },
-  {
-    dayName: 'Chủ Nhật',
-    dayIndex: 0,
-    targetCal: 1550,
-    breakfast: { name: 'Miến xào rau củ nấm đông cô', calories: 350, protein: 11, category: 'Năng lượng sáng' },
-    lunch: { name: 'Lẩu nấm dưỡng sinh sum họp gia đình', calories: 610, protein: 26, category: 'Bữa tiệc xanh' },
-    dinner: { name: 'Canh bí đỏ đậu phụ hầm hạt sen ngọt lành', calories: 370, protein: 14, category: 'Thanh nhẹ tối' }
-  }
-];
-
 export const AccountSettingsPage: React.FC = () => {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'profile';
 
@@ -133,95 +61,10 @@ export const AccountSettingsPage: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [avatar, setAvatar] = useState('');
   const [, setNutrition] = useState<NutritionProfile | null>(null);
-  const [, setActivePlan] = useState<MealPlan | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
-
-  // Selected day index for weekly schedule preview (0 = CN, 1 = T2, ...)
-  const [selectedDayIdx, setSelectedDayIdx] = useState<number>(() => {
-    const today = new Date().getDay();
-    return today === 0 ? 0 : today;
-  });
-
-  // Google Calendar 30-31 Day State
-  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(() => new Date());
-
-  // 42-cell Google Calendar month grid
-  const calendarGrid = useMemo(() => {
-    const year = calendarMonth.getFullYear();
-    const month = calendarMonth.getMonth();
-
-    const firstDayOfMonth = new Date(year, month, 1);
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const startCol = (firstDayOfMonth.getDay() + 6) % 7;
-    const daysInPrevMonth = new Date(year, month, 0).getDate();
-
-    const cells: {
-      date: Date;
-      dayNumber: number;
-      isCurrentMonth: boolean;
-      isToday: boolean;
-      isSelected: boolean;
-      dayOfWeek: number;
-    }[] = [];
-
-    const today = new Date();
-    const isSameDay = (d1: Date, d2: Date) =>
-      d1.getFullYear() === d2.getFullYear() &&
-      d1.getMonth() === d2.getMonth() &&
-      d1.getDate() === d2.getDate();
-
-    for (let i = startCol - 1; i >= 0; i--) {
-      const prevDate = new Date(year, month - 1, daysInPrevMonth - i);
-      cells.push({
-        date: prevDate,
-        dayNumber: daysInPrevMonth - i,
-        isCurrentMonth: false,
-        isToday: isSameDay(prevDate, today),
-        isSelected: isSameDay(prevDate, selectedCalendarDate),
-        dayOfWeek: prevDate.getDay(),
-      });
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const curDate = new Date(year, month, day);
-      cells.push({
-        date: curDate,
-        dayNumber: day,
-        isCurrentMonth: true,
-        isToday: isSameDay(curDate, today),
-        isSelected: isSameDay(curDate, selectedCalendarDate),
-        dayOfWeek: curDate.getDay(),
-      });
-    }
-
-    const remaining = 42 - cells.length;
-    for (let day = 1; day <= remaining; day++) {
-      const nextDate = new Date(year, month + 1, day);
-      cells.push({
-        date: nextDate,
-        dayNumber: day,
-        isCurrentMonth: false,
-        isToday: isSameDay(nextDate, today),
-        isSelected: isSameDay(nextDate, selectedCalendarDate),
-        dayOfWeek: nextDate.getDay(),
-      });
-    }
-
-    return cells;
-  }, [calendarMonth, selectedCalendarDate]);
-
-  const handleSelectCalendarCell = (cellDate: Date) => {
-    sfx.playTap();
-    setSelectedCalendarDate(cellDate);
-    if (cellDate.getMonth() !== calendarMonth.getMonth()) {
-      setCalendarMonth(new Date(cellDate.getFullYear(), cellDate.getMonth(), 1));
-    }
-    setSelectedDayIdx(cellDate.getDay());
-  };
 
   // Profile Form state
   const [fullName, setFullName] = useState('');
@@ -266,13 +109,15 @@ export const AccountSettingsPage: React.FC = () => {
     Promise.allSettled([
       userService.getProfile(),
       nutritionService.getProfile().catch(() => null),
-      mealPlanService.list(0).catch(() => ({ items: [] })),
-    ]).then(async ([userRes, nutrRes, plansRes]) => {
+    ]).then(([userRes, nutrRes]) => {
       if (!mounted) return;
 
       if (userRes.status === 'fulfilled') {
         const data = userRes.value;
         setProfile(data);
+        try {
+          localStorage.setItem('vegeai_user_profile', JSON.stringify(data));
+        } catch {}
         setAvatar(data.avatarUrl || '');
         setFullName(data.fullName || '');
         setPhoneNumber(data.phoneNumber || '');
@@ -293,15 +138,6 @@ export const AccountSettingsPage: React.FC = () => {
         setNutrition(nutrRes.value);
       }
 
-      if (plansRes.status === 'fulfilled' && plansRes.value.items.length > 0) {
-        try {
-          const planDetail = await mealPlanService.get(plansRes.value.items[0].id);
-          if (mounted) setActivePlan(planDetail);
-        } catch {
-          // ignore
-        }
-      }
-
       setIsLoadingProfile(false);
     });
 
@@ -309,6 +145,13 @@ export const AccountSettingsPage: React.FC = () => {
       mounted = false;
     };
   }, []);
+
+  const isAllergicToEgg = selectedAllergies.includes('Trứng (Ovo)');
+  const isAllergicToMilk = selectedAllergies.includes('Sữa bò (Lacto)');
+  const hasEggMilkConflict =
+    (dietaryPreferences === 'OVO_LACTO' && (isAllergicToEgg || isAllergicToMilk)) ||
+    (dietaryPreferences === 'OVO' && isAllergicToEgg) ||
+    (dietaryPreferences === 'LACTO' && isAllergicToMilk);
 
   const handleToggleAllergy = (allergy: string) => {
     sfx.playTap();
@@ -326,6 +169,14 @@ export const AccountSettingsPage: React.FC = () => {
       setProfileError('Vui lòng nhập họ và tên.');
       return;
     }
+    if (heightCm !== '' && (Number(heightCm) < 100 || Number(heightCm) > 280)) {
+      setProfileError('Chiều cao phải nằm trong khoảng 100–280 cm.');
+      return;
+    }
+    if (weightKg !== '' && (Number(weightKg) < 20 || Number(weightKg) > 350)) {
+      setProfileError('Cân nặng phải nằm trong khoảng 20–350 kg.');
+      return;
+    }
 
     setIsSavingProfile(true);
     try {
@@ -339,11 +190,15 @@ export const AccountSettingsPage: React.FC = () => {
         allergies: selectedAllergies.join(','),
         heightCm: heightCm === '' ? undefined : Number(heightCm),
         weightKg: weightKg === '' ? undefined : Number(weightKg),
-        dailyCalorieTarget: dailyCalorieTarget === '' ? undefined : Number(dailyCalorieTarget)
+        dailyCalorieTarget: dailyCalorieTarget === '' ? (defaultScientificCalorie > 0 ? defaultScientificCalorie : undefined) : Number(dailyCalorieTarget)
       };
 
       const updated = await userService.updateProfile(payload);
       setProfile(updated);
+      try {
+        localStorage.setItem('vegeai_user_profile', JSON.stringify(updated));
+        window.dispatchEvent(new Event('user_profile_updated'));
+      } catch {}
       sfx.playSuccess();
       setProfileSuccess('Hồ sơ cá nhân và chỉ số dinh dưỡng đã được cập nhật thành công!');
       setTimeout(() => setProfileSuccess(''), 5000);
@@ -532,28 +387,57 @@ export const AccountSettingsPage: React.FC = () => {
       const max = Math.round(24.9 * hM * hM);
       return `${min} - ${max} kg`;
     }
-    return '50 - 65 kg';
+    return 'Chưa có dữ liệu';
   }, [hNum]);
 
   // Deterministic BMR & TDEE Calculations
+  const hasPhysicalStats = Boolean(hNum > 0 && wNum > 0);
   const bmr = useMemo(() => {
-    if (hNum > 0 && wNum > 0) {
+    if (hasPhysicalStats) {
       return calculateBmr(wNum, hNum, age, (gender as any) || 'OTHER');
     }
-    return 1450;
-  }, [hNum, wNum, age, gender]);
+    return 0;
+  }, [hasPhysicalStats, hNum, wNum, age, gender]);
 
-  const tdee = useMemo(() => calculateTdee(bmr, 1.375), [bmr]);
+  const tdee = useMemo(() => (bmr > 0 ? calculateTdee(bmr, 1.375) : 0), [bmr]);
 
-  // Calorie Input vs Output
-  const calorieInput = dailyCalorieTarget === '' ? 1450 : Number(dailyCalorieTarget);
-  const calorieOutput = tdee;
-  const calorieBalance = calorieInput - calorieOutput;
+  // Smart Default Calorie: if user leaves it blank, auto-assign scientific TDEE / BMR
+  const defaultScientificCalorie = useMemo(() => {
+    if (tdee > 0) return Math.round(tdee);
+    if (bmr > 0) return Math.round(bmr);
+    return 1800;
+  }, [tdee, bmr]);
 
-  // Selected Day in weekly schedule
-  const currentScheduledDay = useMemo(() => {
-    return DEFAULT_WEEKLY_SCHEDULE.find(d => d.dayIndex === selectedDayIdx) || DEFAULT_WEEKLY_SCHEDULE[0];
-  }, [selectedDayIdx]);
+  const effectiveCalorieTarget = useMemo(() => {
+    if (dailyCalorieTarget !== '' && Number(dailyCalorieTarget) > 0) {
+      return Number(dailyCalorieTarget);
+    }
+    return defaultScientificCalorie;
+  }, [dailyCalorieTarget, defaultScientificCalorie]);
+
+  const hasCalorieTarget = Boolean(effectiveCalorieTarget > 0);
+  const calorieInput = effectiveCalorieTarget;
+  const isUsingDefaultCalorie = dailyCalorieTarget === '' || Number(dailyCalorieTarget) === defaultScientificCalorie;
+
+  const [wearableKcal, setWearableKcal] = useState<number>(() => {
+    const k = localStorage.getItem('wearable_kcal');
+    return k ? Number(k) : 0;
+  });
+
+  // Reactive listener so wearable sync immediately propagates to Zen Rings & Calculations
+  useEffect(() => {
+    const handleWearableUpdate = () => {
+      const stored = localStorage.getItem('wearable_kcal');
+      if (stored) {
+        setWearableKcal(Number(stored));
+      }
+    };
+    window.addEventListener('wearable_sync_updated', handleWearableUpdate);
+    return () => window.removeEventListener('wearable_sync_updated', handleWearableUpdate);
+  }, []);
+
+  const calorieOutput = (tdee > 0 || wearableKcal > 0) ? (tdee + wearableKcal) : 0;
+  const calorieBalance = (calorieInput > 0 && calorieOutput > 0) ? (calorieInput - calorieOutput) : null;
 
   if (isLoadingProfile) {
     return (
@@ -621,10 +505,6 @@ export const AccountSettingsPage: React.FC = () => {
                 </p>
 
                 <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-900/60">
-                    <Flame className="w-4 h-4 text-amber-500" />
-                    Chuỗi 14 ngày ăn thuần thực vật
-                  </span>
                   <span className="inline-flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800">
                     <Apple className="w-4 h-4 text-emerald-600" />
                     {dietLabels[dietaryPreferences] || 'Ăn chay thông thường'}
@@ -761,72 +641,307 @@ export const AccountSettingsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Grid 2: Physical Biometrics (Height, Weight, Target Calories) */}
-            <div className="grid sm:grid-cols-3 gap-4 p-5 rounded-2xl bg-emerald-50/50 dark:bg-slate-800/50 border border-emerald-100 dark:border-slate-800">
-              <div>
-                <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
-                  <Scale className="w-4 h-4 text-emerald-600" />
-                  Chiều cao (cm)
-                </label>
-                <input
-                  type="number"
-                  min="100"
-                  max="250"
-                  placeholder="Ví dụ: 168"
-                  value={heightCm}
-                  onChange={e => setHeightCm(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
-                />
+            {/* Grid 2: Physical Biometrics (Height, Weight & Smart Protruding Calorie Slider) */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-emerald-50/50 dark:bg-slate-800/50 border border-emerald-100 dark:border-slate-800 space-y-5">
+              
+              {/* Row 1: Height & Weight */}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
+                    <Scale className="w-4 h-4 text-emerald-600" />
+                    Chiều cao (cm)
+                  </label>
+                  <input
+                    type="number"
+                    min="100"
+                    max="250"
+                    placeholder="Ví dụ: 173"
+                    value={heightCm}
+                    onChange={e => setHeightCm(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
+                    <Activity className="w-4 h-4 text-emerald-600" />
+                    Cân nặng hiện tại (kg)
+                  </label>
+                  <input
+                    type="number"
+                    min="30"
+                    max="200"
+                    placeholder="Ví dụ: 88"
+                    value={weightKg}
+                    onChange={e => setWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                {/* Quick Biometrics Summary Chip */}
+                <div className="sm:col-span-2 lg:col-span-1 p-3 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-emerald-200/60 dark:border-slate-700/60 flex items-center justify-around text-center">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">BMI</span>
+                    <span className="text-sm font-black text-slate-900 dark:text-white">
+                      {bmi > 0 ? bmi : '—'}
+                    </span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">BMR cơ bản</span>
+                    <span className="text-sm font-black text-sky-600 dark:text-sky-400">
+                      {bmr > 0 ? `${bmr.toLocaleString('vi-VN')} kcal` : '—'}
+                    </span>
+                  </div>
+                  <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">TDEE tiêu chuẩn</span>
+                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                      {tdee > 0 ? `${tdee.toLocaleString('vi-VN')} kcal` : '—'}
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
-                  <Activity className="w-4 h-4 text-emerald-600" />
-                  Cân nặng hiện tại (kg)
-                </label>
-                <input
-                  type="number"
-                  min="30"
-                  max="200"
-                  placeholder="Ví dụ: 58"
-                  value={weightKg}
-                  onChange={e => setWeightKg(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
-                />
+              {/* Row 2: Custom Protruding Calorie Slider Hub with 3D Thumb & Presets */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200/80 dark:border-slate-700 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
+                      <Flame className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">
+                        Mục tiêu Calo nạp/ngày (kcal)
+                      </h4>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {isUsingDefaultCalorie
+                          ? 'Đang dùng mức Calo mặc định khoa học (Tự động tính từ Chiều cao & Cân nặng)'
+                          : 'Đang dùng mức Calo tùy chỉnh cá nhân'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Mode Badge */}
+                  <div className="flex items-center gap-2">
+                    {isUsingDefaultCalorie ? (
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                        🌿 Mặc định TDEE: {defaultScientificCalorie.toLocaleString('vi-VN')} kcal
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
+                        ✏️ Tùy chỉnh: {effectiveCalorieTarget.toLocaleString('vi-VN')} kcal
+                      </span>
+                    )}
+
+                    {dailyCalorieTarget !== '' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx.playTap();
+                          setDailyCalorieTarget('');
+                        }}
+                        className="px-2 py-1 rounded-lg text-[10px] font-bold text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Khôi phục về mặc định tự động"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Mặc định
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 3D Protruding Slider Control Bar */}
+                <div className="pt-2 pb-1 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playTap();
+                        const next = Math.max(1000, effectiveCalorieTarget - 50);
+                        setDailyCalorieTarget(next);
+                      }}
+                      className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-extrabold text-base flex items-center justify-center transition-transform active:scale-90 cursor-pointer shrink-0 shadow-2xs"
+                      title="Giảm 50 kcal"
+                    >
+                      -
+                    </button>
+
+                    {/* The Track with Protruding Floating Thumb */}
+                    <div className="relative flex-1 py-3 group">
+                      <input
+                        type="range"
+                        min="1000"
+                        max="3500"
+                        step="25"
+                        value={effectiveCalorieTarget}
+                        onChange={e => {
+                          setDailyCalorieTarget(Number(e.target.value));
+                        }}
+                        className="w-full h-3.5 bg-linear-to-r from-emerald-500 via-amber-400 to-rose-500 rounded-full appearance-none cursor-pointer focus:outline-none transition-all
+                        [&::-webkit-slider-thumb]:appearance-none
+                        [&::-webkit-slider-thumb]:w-7
+                        [&::-webkit-slider-thumb]:h-7
+                        [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-white
+                        [&::-webkit-slider-thumb]:border-4
+                        [&::-webkit-slider-thumb]:border-emerald-600
+                        [&::-webkit-slider-thumb]:shadow-[0_4px_14px_rgba(16,185,129,0.55)]
+                        [&::-webkit-slider-thumb]:hover:scale-125
+                        [&::-webkit-slider-thumb]:active:scale-110
+                        [&::-webkit-slider-thumb]:transition-transform
+                        [&::-webkit-slider-thumb]:cursor-grab
+                        [&::-webkit-slider-thumb]:active:cursor-grabbing
+                        [&::-moz-range-thumb]:w-7
+                        [&::-moz-range-thumb]:h-7
+                        [&::-moz-range-thumb]:rounded-full
+                        [&::-moz-range-thumb]:bg-white
+                        [&::-moz-range-thumb]:border-4
+                        [&::-moz-range-thumb]:border-emerald-600
+                        [&::-moz-range-thumb]:shadow-[0_4px_14px_rgba(16,185,129,0.55)]
+                        [&::-moz-range-thumb]:cursor-grab"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playTap();
+                        const next = Math.min(3500, effectiveCalorieTarget + 50);
+                        setDailyCalorieTarget(next);
+                      }}
+                      className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-extrabold text-base flex items-center justify-center transition-transform active:scale-90 cursor-pointer shrink-0 shadow-2xs"
+                      title="Tăng 50 kcal"
+                    >
+                      +
+                    </button>
+
+                    {/* Numeric Input Box to allow typing exact numbers */}
+                    <div className="relative w-24 shrink-0">
+                      <input
+                        type="number"
+                        min="800"
+                        max="4000"
+                        value={dailyCalorieTarget === '' ? '' : effectiveCalorieTarget}
+                        placeholder={String(defaultScientificCalorie)}
+                        onChange={e => setDailyCalorieTarget(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="w-full px-2.5 py-1.5 text-center rounded-xl border border-emerald-300 dark:border-slate-700 bg-emerald-50/50 dark:bg-slate-800 text-sm font-extrabold text-slate-900 dark:text-white focus:outline-emerald-600"
+                      />
+                      <span className="text-[10px] text-slate-400 block text-center font-bold">kcal/ngày</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between text-[10px] font-semibold text-slate-400 px-1">
+                    <span>1.000 kcal (Thấp)</span>
+                    <span>1.800 kcal (Chuẩn vừa)</span>
+                    <span>2.500 kcal (Vận động)</span>
+                    <span>3.500 kcal (VĐV)</span>
+                  </div>
+                </div>
+
+                {/* Preset Chips (Chọn nhanh kịch bản calo chuẩn y khoa) */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1">
+                    Kịch bản đề xuất:
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playTap();
+                      const val = bmr > 0 ? Math.round(bmr) : 1500;
+                      setDailyCalorieTarget(val);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      effectiveCalorieTarget === (bmr > 0 ? Math.round(bmr) : 1500)
+                        ? 'bg-sky-500 text-white border-sky-600 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-sky-400'
+                    }`}
+                  >
+                    🌿 Tối thiểu duy trì (BMR: {bmr > 0 ? Math.round(bmr).toLocaleString('vi-VN') : 1500} kcal)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playTap();
+                      const val = tdee > 500 ? Math.round(tdee - 500) : 1500;
+                      setDailyCalorieTarget(val);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      effectiveCalorieTarget === (tdee > 500 ? Math.round(tdee - 500) : 1500)
+                        ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                    }`}
+                  >
+                    🔥 Giảm mỡ nhẹ (-500 kcal: {tdee > 500 ? Math.round(tdee - 500).toLocaleString('vi-VN') : 1500} kcal)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playTap();
+                      const val = tdee > 0 ? Math.round(tdee) : 2000;
+                      setDailyCalorieTarget(val);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      effectiveCalorieTarget === (tdee > 0 ? Math.round(tdee) : 2000)
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-400'
+                    }`}
+                  >
+                    ⚖️ Cân bằng thể trạng (TDEE: {tdee > 0 ? Math.round(tdee).toLocaleString('vi-VN') : 2000} kcal)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playTap();
+                      const val = tdee > 0 ? Math.round(tdee + 300) : 2300;
+                      setDailyCalorieTarget(val);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                      effectiveCalorieTarget === (tdee > 0 ? Math.round(tdee + 300) : 2300)
+                        ? 'bg-teal-600 text-white border-teal-700 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-teal-400'
+                    }`}
+                  >
+                    💪 Tăng cơ (+300 kcal: {tdee > 0 ? Math.round(tdee + 300).toLocaleString('vi-VN') : 2300} kcal)
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-emerald-950 dark:text-emerald-300 mb-1.5 flex items-center gap-1.5">
-                  <Flame className="w-4 h-4 text-amber-500" />
-                  Mục tiêu Calo nạp/ngày (kcal)
-                </label>
-                <input
-                  type="number"
-                  min="800"
-                  max="4000"
-                  placeholder="Mặc định: 1500"
-                  value={dailyCalorieTarget}
-                  onChange={e => setDailyCalorieTarget(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-bold text-slate-900 dark:text-white"
-                />
-              </div>
             </div>
 
             {/* Grid 3: Dietary Preferences & Allergies */}
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Chế độ ăn chay ưu tiên
-                </label>
+                <div className="flex items-center justify-between max-w-md mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Chế độ ăn chay ưu tiên
+                  </label>
+                  {hasEggMilkConflict && (
+                    <span className="text-[11px] font-extrabold text-rose-600 dark:text-rose-400 flex items-center gap-1 animate-pulse">
+                      <AlertCircle className="w-3.5 h-3.5" /> Xung đột dị ứng!
+                    </span>
+                  )}
+                </div>
                 <select
                   value={dietaryPreferences}
                   onChange={e => setDietaryPreferences(e.target.value)}
-                  className="w-full max-w-md px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
+                  className={`w-full max-w-md px-3.5 py-2.5 rounded-xl border text-sm font-semibold transition-colors focus:outline-emerald-600 ${
+                    hasEggMilkConflict
+                      ? 'border-rose-400 bg-rose-50/30 text-rose-950 dark:border-rose-700 dark:bg-rose-950/30 dark:text-rose-100'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white'
+                  }`}
                 >
-                  <option value="VEGAN">Thuần chay (Vegan - Hoàn toàn từ thực vật)</option>
-                  <option value="VEGETARIAN">Ăn chay thông thường (Vegetarian)</option>
-                  <option value="OVO_LACTO">Chay có trứng & sữa (Ovo-Lacto Vegetarian)</option>
-                  <option value="FLEXITARIAN">Bán chay / Linh hoạt (Flexitarian)</option>
+                  <option value="VEGAN">🌱 Thuần chay (Vegan - 100% thực vật, không trứng/sữa)</option>
+                  <option value="OVO">🍳 Chay có trứng (Ovo-Vegetarian - Có trứng, KHÔNG sữa/bơ)</option>
+                  <option value="LACTO">🥛 Chay có sữa (Lacto-Vegetarian - Có sữa/bơ, KHÔNG trứng)</option>
+                  <option value="OVO_LACTO">🍳🥛 Chay có trứng &amp; sữa (Ovo-Lacto Vegetarian)</option>
+                  <option value="VEGETARIAN">🥗 Ăn chay thông thường (Vegetarian)</option>
+                  <option value="RAW_VEGAN">🥑 Thuần chay thô (Raw Vegan - Tươi sống, không nấu nhiệt)</option>
+                  <option value="PESCATARIAN">🐟 Chay có hải sản (Pescatarian - Thực vật &amp; Cá/Tôm)</option>
+                  <option value="FLEXITARIAN">🌿 Bán chay / Linh hoạt (Flexitarian)</option>
                 </select>
               </div>
 
@@ -838,13 +953,22 @@ export const AccountSettingsPage: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {ALLERGIES_LIST.map(allergy => {
                     const isSelected = selectedAllergies.includes(allergy);
+                    const isConflictItem =
+                      (dietaryPreferences === 'OVO_LACTO' && (
+                        (allergy.includes('Trứng') && isAllergicToEgg) ||
+                        (allergy.includes('Sữa bò') && isAllergicToMilk)
+                      )) ||
+                      (dietaryPreferences === 'OVO' && allergy.includes('Trứng') && isAllergicToEgg) ||
+                      (dietaryPreferences === 'LACTO' && allergy.includes('Sữa bò') && isAllergicToMilk);
                     return (
                       <button
                         key={allergy}
                         type="button"
                         onClick={() => handleToggleAllergy(allergy)}
                         className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                          isSelected
+                          isConflictItem
+                            ? 'bg-rose-600 text-white border border-rose-700 shadow-xs ring-2 ring-rose-400/50 animate-pulse'
+                            : isSelected
                             ? 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
                         }`}
@@ -856,6 +980,97 @@ export const AccountSettingsPage: React.FC = () => {
                   })}
                 </div>
               </div>
+
+              {/* MEDICAL SAFETY ALERT BANNER: Hard Constraint Interlock */}
+              {hasEggMilkConflict && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/40 border-2 border-amber-500/50 text-amber-950 dark:text-amber-200 space-y-3 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 font-black text-lg shadow-xs">
+                      ⚠️
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-black uppercase tracking-tight text-amber-950 dark:text-amber-200">
+                          Xung đột an toàn thực phẩm &amp; Dị ứng
+                        </h4>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-600 text-white shadow-2xs">
+                          CẢNH BÁO Y KHOA
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-sm text-amber-900 dark:text-amber-300 mt-1 leading-relaxed">
+                        Chế độ ăn hiện tại (<strong>{dietaryPreferences === 'OVO_LACTO' ? 'Chay có trứng & sữa' : dietaryPreferences === 'OVO' ? 'Chay có trứng' : 'Chay có sữa'}</strong>) xung đột trực tiếp với dị ứng{' '}
+                        <strong className="text-rose-600 dark:text-rose-400 underline underline-offset-2">
+                          {isAllergicToEgg && isAllergicToMilk
+                            ? 'cả Trứng (Ovo) và Sữa bò (Lacto)'
+                            : isAllergicToMilk
+                            ? 'Sữa bò (Lacto)'
+                            : 'Trứng (Ovo)'}
+                        </strong> của bạn!
+                      </p>
+                      <p className="text-xs text-amber-800 dark:text-amber-300 mt-1.5 flex items-center gap-1.5 font-medium">
+                        🛡️ <span><strong>Nguyên tắc cốt lõi của VEGEAI:</strong> Dị ứng là <em>Ràng Buộc Cứng (Hard Constraint)</em>. Hệ thống AI sẽ <strong>tuyệt đối không bao giờ</strong> gợi ý các món có chứa thành phần bạn bị dị ứng.</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Fix Actions */}
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-300/60 dark:border-amber-800/60 sm:pl-12">
+                    <span className="text-xs font-bold text-amber-950 dark:text-amber-200 mr-1">
+                      💡 Khắc phục an toàn 1-chạm:
+                    </span>
+
+                    {/* If allergic to milk only and currently in OVO_LACTO: suggest OVO */}
+                    {isAllergicToMilk && !isAllergicToEgg && dietaryPreferences === 'OVO_LACTO' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx.playSuccess();
+                          setDietaryPreferences('OVO');
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-transform active:scale-95 cursor-pointer"
+                      >
+                        🍳 Đổi sang "Chay có trứng (Ovo)" (Giữ trứng, bỏ sữa)
+                      </button>
+                    )}
+
+                    {/* If allergic to egg only and currently in OVO_LACTO: suggest LACTO */}
+                    {isAllergicToEgg && !isAllergicToMilk && dietaryPreferences === 'OVO_LACTO' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx.playSuccess();
+                          setDietaryPreferences('LACTO');
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-transform active:scale-95 cursor-pointer"
+                      >
+                        🥛 Đổi sang "Chay có sữa (Lacto)" (Giữ sữa, bỏ trứng)
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playSuccess();
+                        setDietaryPreferences('VEGAN');
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-transform active:scale-95 cursor-pointer"
+                    >
+                      🌱 Chuyển sang "Thuần chay (Vegan)" ngay (An toàn 100%)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playTap();
+                        setSelectedAllergies(prev => prev.filter(a => !a.includes('Trứng') && !a.includes('Sữa bò')));
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-amber-300 dark:border-slate-700 hover:bg-amber-50 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      Bỏ chọn dị ứng Trứng/Sữa
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Save Button */}
@@ -898,10 +1113,12 @@ export const AccountSettingsPage: React.FC = () => {
 
           {/* Activity Concentric Rings */}
           <HealthActivityRings
-            calories={calorieInput}
-            calorieTarget={calorieInput}
-            proteinGrams={56}
-            fiberGrams={28}
+            calories={wearableKcal > 0 ? wearableKcal : 0}
+            calorieTarget={calorieInput > 0 ? calorieInput : (tdee > 0 ? tdee : 0)}
+            proteinGrams={0}
+            proteinTarget={hasPhysicalStats ? Math.round(wNum * 1.1) : (calorieInput > 0 ? Math.round((calorieInput * 0.20) / 4) : 0)}
+            fiberGrams={0}
+            fiberTarget={hasCalorieTarget ? 35 : 0}
             heightCm={heightCm}
             weightKg={weightKg}
             age={age}
@@ -967,7 +1184,7 @@ export const AccountSettingsPage: React.FC = () => {
                     Năng lượng nạp vào (Input):
                   </span>
                   <span className="font-extrabold text-slate-900 dark:text-white">
-                    {calorieInput.toLocaleString('vi-VN')} kcal/ngày
+                    {calorieInput > 0 ? `${calorieInput.toLocaleString('vi-VN')} kcal/ngày` : '— Chưa thiết lập'}
                   </span>
                 </div>
 
@@ -977,7 +1194,7 @@ export const AccountSettingsPage: React.FC = () => {
                     Chuyển hóa cơ bản (BMR):
                   </span>
                   <span className="font-extrabold text-slate-900 dark:text-white">
-                    {bmr.toLocaleString('vi-VN')} kcal/ngày
+                    {bmr > 0 ? `${bmr.toLocaleString('vi-VN')} kcal/ngày` : '— Chưa có dữ liệu'}
                   </span>
                 </div>
 
@@ -987,22 +1204,30 @@ export const AccountSettingsPage: React.FC = () => {
                     Tiêu hao tổng thể (TDEE Output):
                   </span>
                   <span className="font-extrabold text-slate-900 dark:text-white">
-                    {calorieOutput.toLocaleString('vi-VN')} kcal/ngày
+                    {calorieOutput > 0 ? `${calorieOutput.toLocaleString('vi-VN')} kcal/ngày` : '— Chưa có dữ liệu'}
                   </span>
                 </div>
               </div>
 
               <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-300 flex items-center justify-between">
                 <span>Trạng thái calo tịnh:</span>
-                <span className={`font-extrabold ${calorieBalance <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600'}`}>
-                  {calorieBalance <= 0
-                    ? `Thâm hụt nhẹ ${Math.abs(calorieBalance)} kcal (Giữ dáng)`
-                    : `Thặng dư ${calorieBalance} kcal (Tăng cơ)`}
-                </span>
+                {calorieBalance !== null ? (
+                  <span className={`font-extrabold ${calorieBalance <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600'}`}>
+                    {calorieBalance === 0
+                      ? 'Cân bằng hoàn hảo 0 kcal'
+                      : calorieBalance < 0
+                      ? `Thâm hụt nhẹ ${Math.abs(calorieBalance)} kcal (Giữ dáng)`
+                      : `Thặng dư ${calorieBalance} kcal (Tăng cơ)`}
+                  </span>
+                ) : (
+                  <span className="font-semibold text-slate-400">
+                    Chưa đủ dữ liệu tính toán
+                  </span>
+                )}
               </div>
 
               <p className="text-[11px] text-slate-400">
-                Tính toán theo phương trình Harris-Benedict chuẩn khoa học.
+                Tính toán theo phương trình Mifflin-St Jeor &amp; Harris-Benedict chuẩn khoa học.
               </p>
             </div>
 
@@ -1015,45 +1240,63 @@ export const AccountSettingsPage: React.FC = () => {
                 <Sparkles className="w-4 h-4 text-emerald-600" />
               </div>
 
-              <div className="space-y-3 pt-1">
-                <div>
-                  <div className="flex justify-between text-xs font-bold mb-1">
-                    <span className="text-slate-700 dark:text-slate-300">Tinh bột tốt (Carbs - 55%):</span>
-                    <span className="text-emerald-600">~210g</span>
+              {calorieInput > 0 ? (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-slate-700 dark:text-slate-300">Tinh bột tốt (Carbs - 55%):</span>
+                      <span className="text-emerald-600">~{Math.round((calorieInput * 0.55) / 4)}g</span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-emerald-500 h-full w-[55%]" />
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="bg-emerald-500 h-full w-[55%]" />
-                  </div>
-                </div>
 
-                <div>
-                  <div className="flex justify-between text-xs font-bold mb-1">
-                    <span className="text-slate-700 dark:text-slate-300">Đạm thực vật (Protein - 20%):</span>
-                    <span className="text-teal-600">~75g</span>
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-slate-700 dark:text-slate-300">Đạm thực vật (Protein - 20%):</span>
+                      <span className="text-teal-600">~{Math.round((calorieInput * 0.20) / 4)}g</span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-teal-500 h-full w-[20%]" />
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="bg-teal-500 h-full w-[20%]" />
-                  </div>
-                </div>
 
-                <div>
-                  <div className="flex justify-between text-xs font-bold mb-1">
-                    <span className="text-slate-700 dark:text-slate-300">Chất béo lành mạnh (Fats - 25%):</span>
-                    <span className="text-amber-600">~42g</span>
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-slate-700 dark:text-slate-300">Chất béo lành mạnh (Fats - 25%):</span>
+                      <span className="text-amber-600">~{Math.round((calorieInput * 0.25) / 9)}g</span>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-amber-500 h-full w-[25%]" />
+                    </div>
                   </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div className="bg-amber-500 h-full w-[25%]" />
-                  </div>
-                </div>
-              </div>
 
-              <p className="text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
-                Chất xơ tự nhiên: <strong>28-35g/ngày</strong> từ ngũ cốc nguyên cám & nấm.
-              </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+                    Chất xơ tự nhiên: <strong>28-35g/ngày</strong> từ ngũ cốc nguyên cám &amp; nấm.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 pt-4 text-center py-6">
+                  <div className="text-slate-400 dark:text-slate-500 text-3xl font-light">
+                    —
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+                    Chưa thiết lập mục tiêu calo nạp vào hàng ngày. Hãy điền mục tiêu calo ở trên để xem phân bổ Carbs, Protein và Fats.
+                  </p>
+                </div>
+              )}
             </div>
 
           </div>
         </section>
+
+        {/* 3. OMNI-WEARABLE HEALTH HUB & GOOGLE FIT SYNC */}
+        <WearableGoogleFitTracker
+          plannedCalorieIntake={calorieInput}
+          userBmr={bmr}
+          onSyncMetrics={(m) => setWearableKcal(m.calories)}
+        />
 
                   </div>
         )}
@@ -1069,10 +1312,10 @@ export const AccountSettingsPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm text-emerald-950 dark:text-emerald-200">
-                    Kế hoạch năng lượng cá nhân: {dailyCalorieTarget || '1.650'} kcal/ngày
+                    Kế hoạch năng lượng cá nhân: {dailyCalorieTarget ? `${Number(dailyCalorieTarget).toLocaleString('vi-VN')} kcal/ngày` : 'chưa đặt mục tiêu calo'}
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 mt-0.5">
-                    Thực đơn 30 ngày và khẩu phần 3 bữa chính được tính toán đồng bộ theo chiều cao, cân nặng và chỉ số TDEE của bạn.
+                    Chọn một ngày rồi bấm "Lập với AI" để lập thực đơn ngay trên lịch. Chấm xanh: đã lưu · chấm cam: bản nháp AI.
                   </p>
                 </div>
               </div>
@@ -1085,271 +1328,13 @@ export const AccountSettingsPage: React.FC = () => {
               </button>
             </div>
 
-            {/* 4. WEEKLY CALORIE CONSUMPTION & MEAL SCHEDULE */}
-            {/* Grid 2 Columns: Left (Google Calendar 30-31 Days) + Right (Weekly Schedule & Meals) */}
-            <div className="grid lg:grid-cols-12 gap-6 items-start">
-              {/* GOOGLE CALENDAR 30-31 NGÀY - BÊN TRÁI */}
-              <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center font-bold shadow-2xs">
-                      <Calendar className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 dark:text-white text-base">
-                        {calendarMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' }).replace(/^tháng\s+/i, 'Tháng ')}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Lịch dinh dưỡng &amp; kế hoạch ăn chay
-                      </p>
-                    </div>
-                  </div>
+            <MealPlanCalendarPlanner
+              dailyCalorieTarget={dailyCalorieTarget === '' ? undefined : Number(dailyCalorieTarget)}
+              onAddToShoppingList={handleAddMealToShoppingList}
+            />
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sfx.playTap();
-                        const today = new Date();
-                        setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-                        setSelectedCalendarDate(today);
-                        setSelectedDayIdx(today.getDay());
-                      }}
-                      className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 transition cursor-pointer"
-                      title="Quay về hôm nay"
-                    >
-                      Hôm nay
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sfx.playTap();
-                        setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1));
-                      }}
-                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                      aria-label="Tháng trước"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sfx.playTap();
-                        setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1));
-                      }}
-                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                      aria-label="Tháng sau"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Days of Week Header */}
-                <div className="grid grid-cols-7 text-center">
-                  {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d, idx) => (
-                    <div
-                      key={d}
-                      className={`text-[11px] font-bold py-1.5 ${
-                        idx >= 5 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'
-                      }`}
-                    >
-                      {d}
-                    </div>
-                  ))}
-                </div>
-
-                {/* 42-cell Month Grid */}
-                <div className="grid grid-cols-7 gap-1">
-                  {calendarGrid.map((cell, idx) => {
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleSelectCalendarCell(cell.date)}
-                        className={`aspect-square p-1 rounded-xl flex flex-col items-center justify-center relative transition cursor-pointer text-xs ${
-                          cell.isSelected
-                            ? 'bg-emerald-700 dark:bg-emerald-600 text-white font-extrabold shadow-sm ring-2 ring-emerald-300 dark:ring-emerald-900'
-                            : cell.isToday
-                            ? 'border-2 border-emerald-600 text-emerald-700 dark:text-emerald-400 font-extrabold bg-emerald-50/50 dark:bg-emerald-950/30'
-                            : cell.isCurrentMonth
-                            ? 'text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 font-semibold'
-                            : 'text-slate-300 dark:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-850'
-                        }`}
-                      >
-                        <span>{cell.dayNumber}</span>
-                        {/* Status dot indicator */}
-                        {cell.isCurrentMonth && (
-                          <span
-                            className={`w-1 h-1 rounded-full mt-0.5 ${
-                              cell.isSelected
-                                ? 'bg-emerald-200'
-                                : cell.isToday
-                                ? 'bg-emerald-600 dark:bg-emerald-400'
-                                : 'bg-emerald-400/60 dark:bg-emerald-600/60'
-                            }`}
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Selected Date Summary & Streak Card */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>
-                        {selectedCalendarDate.toLocaleDateString('vi-VN', {
-                          weekday: 'long',
-                          day: 'numeric',
-                          month: 'numeric',
-                          year: 'numeric'
-                        })}
-                      </span>
-                    </span>
-                    <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                      Đang chọn
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <Flame className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Chuỗi ăn chay: <strong className="text-slate-700 dark:text-slate-200">14 ngày</strong> liên tục</span>
-                    </span>
-                    <span className="font-bold text-emerald-800 dark:text-emerald-300">
-                      {dailyCalorieTarget || '1.650'} kcal
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. WEEKLY CALORIE CONSUMPTION & MEAL SCHEDULE - BÊN PHẢI */}
-              <section id="weekly-schedule" className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <div>
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
-                <CalendarDays className="w-5 h-5 text-emerald-600" />
-                Lịch biểu tiêu thụ Calo & Thực đơn 7 ngày trong tuần
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Phân bổ lượng calo theo từng ngày, định lượng bữa ăn và dễ dàng đổi món thông qua AI Bếp Trưởng.
-              </p>
-            </div>
-
-            <Link
-              to="/meal-planner"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 transition shadow-2xs self-start sm:self-auto"
-            >
-              <span>Mở Thực Đơn Tuần Chi Tiết</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
+            <SeasonalRegionalMealsView />
           </div>
-
-          {/* 7-Day Day Selector Bar */}
-          <div className="grid grid-cols-7 gap-2">
-            {DEFAULT_WEEKLY_SCHEDULE.map(day => {
-              const isSelected = day.dayIndex === selectedDayIdx;
-              const totalDayCal = day.breakfast.calories + day.lunch.calories + day.dinner.calories;
-              return (
-                <button
-                  key={day.dayName}
-                  type="button"
-                  onClick={() => { sfx.playTap(); setSelectedDayIdx(day.dayIndex); }}
-                  className={`p-3 rounded-2xl border text-center transition cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-800 dark:bg-emerald-600 text-white border-emerald-900 dark:border-emerald-500 shadow-md ring-2 ring-emerald-300 dark:ring-emerald-900'
-                      : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="text-xs font-bold">{day.dayName}</div>
-                  <div className={`text-xs font-extrabold mt-1 ${isSelected ? 'text-emerald-200' : 'text-emerald-700 dark:text-emerald-400'}`}>
-                    {totalDayCal}
-                  </div>
-                  <div className={`text-[10px] ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
-                    kcal
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Detailed 3 Meals for Selected Day */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                <span>Khẩu phần {currentScheduledDay.dayName}</span>
-                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
-                  Tổng: {currentScheduledDay.breakfast.calories + currentScheduledDay.lunch.calories + currentScheduledDay.dinner.calories} kcal · Mục tiêu: {currentScheduledDay.targetCal} kcal
-                </span>
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3 gap-4">
-              {[
-                { title: 'Bữa Sáng (07:00)', meal: currentScheduledDay.breakfast, icon: '🌅' },
-                { title: 'Bữa Trưa (12:00)', meal: currentScheduledDay.lunch, icon: '☀️' },
-                { title: 'Bữa Tối (18:30)', meal: currentScheduledDay.dinner, icon: '🌙' },
-              ].map(({ title, meal, icon }) => (
-                <div
-                  key={title}
-                  className="p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-850 shadow-2xs space-y-3 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
-                      <span className="font-bold flex items-center gap-1.5">
-                        <span>{icon}</span> {title}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold">
-                        {meal.category}
-                      </span>
-                    </div>
-
-                    <h4 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-2">
-                      {meal.name}
-                    </h4>
-
-                    <div className="flex items-center gap-3 mt-2 text-xs">
-                      <span className="font-extrabold text-emerald-700 dark:text-emerald-400">
-                        {meal.calories} kcal
-                      </span>
-                      <span className="text-slate-300">·</span>
-                      <span className="font-semibold text-slate-600 dark:text-slate-300">
-                        {meal.protein}g đạm thực vật
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => navigate('/ai-chef?prompt=' + encodeURIComponent(`Hãy gợi ý cho tôi 2 món chay thay thế cho món "${meal.name}" (${meal.calories} kcal) cho ${title}.`))}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
-                    >
-                      <ChefHat className="w-3.5 h-3.5" />
-                      <span>Đổi món với AI</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAddMealToShoppingList(meal.name)}
-                      className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 transition cursor-pointer"
-                      title="Thêm nguyên liệu vào danh sách đi chợ"
-                    >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-            </div>
-
-                  </div>
         )}
 
         {/* TAB 3: ACCOUNT SECURITY */}

@@ -15,11 +15,11 @@ import {
   Sparkles,
   ChefHat,
   Utensils,
-  CalendarDays,
   ShoppingBag,
   CheckCircle2,
   Flame,
-  AlertCircle
+  AlertCircle,
+  Star
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
@@ -187,18 +187,11 @@ function VideoAiRecipeCopilot({
                 state={{
                   source: 'video-recipe',
                   title: `Nấu: ${recipe.title}`,
-                  initialPrompt: `Tôi đang xem video "${title}" và muốn nấu món "${recipe.title}". Hãy hướng dẫn tôi từng bước chi tiết và tư vấn dinh dưỡng.`
+                  initialPrompt: `Tôi muốn hỏi thêm về món "${recipe.title}" từ video "${title}". Nguyên liệu chính: ${recipe.ingredients.slice(0, 8).join(', ')}. Thời gian khoảng ${recipe.cookTimeMinutes} phút, ước tính ${recipe.estimatedCalories} kcal. Hãy tư vấn ngắn gọn và trả lời câu hỏi tiếp theo của tôi dựa trên thông tin món này.`
                 }}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs"
               >
                 <ChefHat size={14} /> Chuyển sang AI Bếp Trưởng
-              </Link>
-              <Link
-                to="/meal-plans"
-                state={{ recommendedDish: recipe.title }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold transition shadow-xs"
-              >
-                <CalendarDays size={14} /> Lên thực đơn tuần
               </Link>
               <Link
                 to="/smart-market"
@@ -230,7 +223,10 @@ function VideoComments({ videoId }: { videoId: string }) {
   const { user, isAuthenticated } = useAuth();
   const [page, setPage] = useState(0);
   const query = useCommunityQuery(JSON.stringify(['comments', videoId, page]), signal => communityService.comments(videoId, page, signal));
+  const ratingQuery = useCommunityQuery(JSON.stringify(['video-rating', videoId, user?.id]), signal => communityService.videoRating(videoId, signal));
   const [draft, setDraft] = useState('');
+  const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState(0);
   const [editing, setEditing] = useState<VideoComment | null>(null);
   const [deleting, setDeleting] = useState<VideoComment | null>(null);
   const [busy, setBusy] = useState(false);
@@ -241,10 +237,15 @@ function VideoComments({ videoId }: { videoId: string }) {
     event.preventDefault(); if (busy || !draft.trim()) return;
     setBusy(true); setError(''); setMessage('');
     try {
+      if (!editing) {
+        const summary = await communityService.rateVideo(videoId, rating);
+        setRating(summary.myRating || rating);
+      }
       await communityService.comment(videoId, draft, editing || undefined);
-      setMessage(editing ? 'Đã cập nhật bình luận.' : 'Đã gửi bình luận.');
+      setMessage(editing ? 'Đã cập nhật bình luận.' : 'Cảm ơn bạn đã gửi đánh giá và bình luận!');
       const nextPage = editing ? page : Math.floor((query.data?.totalElements ?? 0) / 10);
       setEditing(null); setDraft('');
+      ratingQuery.refresh();
       if (nextPage !== page) setPage(nextPage); else query.refresh();
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusy(false); }
@@ -262,10 +263,28 @@ function VideoComments({ videoId }: { videoId: string }) {
     finally { setBusy(false); }
   };
 
-  return <section className="cm-comments" id="video-comments"><h2><MessageCircle size={20} style={{ display: 'inline', marginRight: 9 }} />Bình luận {query.data ? '(' + query.data.totalElements + ')' : ''}</h2>
+  const average = ratingQuery.data?.averageStars || 0;
+  const ratingCount = ratingQuery.data?.ratingCount || 0;
+  const currentRating = hoverRating || rating;
+  const starLabels = ['', 'Rất tệ', 'Chưa đạt', 'Tương đối ổn', 'Rất hay & hữu ích', 'Tuyệt vời, 5 sao!'];
+
+  return <section className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 space-y-8" id="video-comments">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div><div className="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-400"><MessageCircle size={16} /> ĐÁNH GIÁ & BÌNH LUẬN CỘNG ĐỒNG</div><h2 className="text-xl font-black text-slate-900 dark:text-white mt-1">Cảm nhận từ người xem ({query.data?.totalElements || 0})</h2></div>
+      <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-amber-50/80 dark:bg-slate-900 border border-amber-200 dark:border-slate-800 shadow-xs">
+        <div className="text-2xl font-black text-amber-600 dark:text-amber-400">{ratingCount ? average.toFixed(1) : '—'}</div>
+        <div><div className="flex text-amber-500">{[1, 2, 3, 4, 5].map(value => <Star key={value} size={14} fill={value <= Math.round(average) ? '#f59e0b' : 'none'} className={value <= Math.round(average) ? 'text-amber-500' : 'text-slate-300 dark:text-slate-600'} />)}</div><span className="text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">{ratingCount} lượt đánh giá</span></div>
+      </div>
+    </div>
     {error && <CommunityError message={error} />}{message && <p role="status" className="cm-alert">{message}</p>}
-    {isAuthenticated ? <form className="cm-form" onSubmit={submit} style={{ marginTop: 15, marginBottom: 10 }}><label className="cm-field">{editing ? 'Chỉnh sửa bình luận' : 'Chia sẻ cảm nhận của bạn'}<textarea aria-label="Nội dung bình luận" rows={3} value={draft} maxLength={2000} required disabled={busy} onChange={event => setDraft(event.target.value)} placeholder="Bạn đã thử nấu món này chưa?" /><small>{draft.length}/2000</small></label><div className="cm-actions"><button className="cm-button" disabled={busy || !draft.trim()}>{busy ? <Loader2 size={16} className="cm-spin" /> : <Send size={16} />}{editing ? 'Lưu chỉnh sửa' : 'Gửi bình luận'}</button>{editing && <button type="button" className="cm-button secondary" disabled={busy} onClick={() => { setEditing(null); setDraft(''); }}>Hủy chỉnh sửa</button>}</div></form>
-      : <Link className="cm-button secondary" to="/login" state={{ from: '/videos/' + videoId }}><UserRound size={16} /> Đăng nhập để bình luận</Link>}
+    <div className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 shadow-xs">
+      {isAuthenticated ? <form onSubmit={submit} className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-slate-900 dark:text-white">{editing ? 'Chỉnh sửa bình luận của bạn:' : 'Gửi đánh giá và bình luận của bạn:'}</h3><span className="text-[11px] text-slate-500">Đang đánh giá với tên: <strong>{user?.name || user?.username || 'Thành viên'}</strong></span></div>
+        {!editing && <div className="flex flex-wrap items-center gap-3"><span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Đánh giá của bạn:</span><div className="flex items-center gap-1">{[1, 2, 3, 4, 5].map(value => <button key={value} type="button" onClick={() => setRating(value)} onMouseEnter={() => setHoverRating(value)} onMouseLeave={() => setHoverRating(0)} className="p-1 hover:scale-110 transition cursor-pointer focus:outline-none" aria-label={`Đánh giá ${value} sao`}><Star size={22} fill={value <= currentRating ? '#f59e0b' : 'none'} className={value <= currentRating ? 'text-amber-500' : 'text-slate-300 dark:text-slate-600'} /></button>)}</div><span className="text-xs font-bold text-amber-600 dark:text-amber-400">{starLabels[currentRating]} ({currentRating}/5)</span></div>}
+        <textarea aria-label="Nội dung bình luận" rows={3} value={draft} maxLength={2000} required disabled={busy} onChange={event => setDraft(event.target.value)} placeholder="Chia sẻ trải nghiệm nấu ăn hoặc cảm nhận của bạn về video này..." className="w-full p-3.5 text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition resize-y" />
+        <div className="flex items-center justify-between gap-3"><small className="text-slate-400">{draft.length}/2000</small><div className="cm-actions"><button className="cm-button" disabled={busy || !draft.trim()}>{busy ? <Loader2 size={16} className="cm-spin" /> : <Send size={16} />}{editing ? 'Lưu chỉnh sửa' : 'Gửi đánh giá & bình luận'}</button>{editing && <button type="button" className="cm-button secondary" disabled={busy} onClick={() => { setEditing(null); setDraft(''); }}>Hủy chỉnh sửa</button>}</div></div>
+      </form> : <div className="text-center py-4 space-y-3"><p className="text-xs text-slate-600 dark:text-slate-400">Bạn cần đăng nhập để gửi đánh giá 5 sao và bình luận về video.</p><Link className="cm-button" to="/login" state={{ from: '/videos/' + videoId }}><UserRound size={16} /> Đăng nhập ngay</Link></div>}
+    </div>
     {query.busy && <CommunityLoading />}{query.error && <CommunityError message={query.error} retry={query.refresh} />}
     {!query.busy && !query.error && query.data?.items.length === 0 && <p className="cm-empty">Chưa có bình luận. Hãy để lại cảm nhận đầu tiên.</p>}
     {query.data?.items.map(comment => <article className="cm-comment" key={comment.id}><div className="cm-comment-heading"><span className="cm-avatar">{comment.authorName.charAt(0).toUpperCase()}</span><div><strong>{comment.authorName}</strong><small>{communityDate(comment.createdAt)}</small></div><div className="cm-actions">{user?.id === comment.authorId && <button className="cm-icon" disabled={busy} title="Sửa bình luận" aria-label="Sửa bình luận" onClick={() => { setEditing(comment); setDraft(comment.content); setError(''); document.getElementById('video-comments')?.scrollIntoView({ block: 'start' }); }}><Pencil size={15} /></button>}{(user?.id === comment.authorId || user?.role === 'admin') && <button className="cm-icon danger" disabled={busy} title="Xóa bình luận" aria-label="Xóa bình luận" onClick={() => setDeleting(comment)}><Trash2 size={15} /></button>}</div></div><p>{comment.content}</p></article>)}

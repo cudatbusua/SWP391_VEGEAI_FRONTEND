@@ -307,8 +307,8 @@ export function OverviewTab() {
                 </span>
                 <h2 className="text-lg font-bold text-slate-900">Dinh dưỡng hôm nay</h2>
               </div>
-              <Link to="/meal-plans" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
-                Xem kế hoạch tuần <ArrowUpRight size={14} />
+              <Link to="/settings?tab=calendar" className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
+                Xem lịch ăn 30 ngày <ArrowUpRight size={14} />
               </Link>
             </div>
 
@@ -349,10 +349,10 @@ export function OverviewTab() {
               </div>
 
               {/* Macro Bars */}
-              <div className="sm:col-span-7 flex flex-col gap-4">
+              <div className="sm:col-span-7 min-w-0 flex flex-col gap-4">
                 {/* Đạm thực vật */}
                 <div>
-                  <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-xs font-semibold mb-1">
                     <span className="flex items-center gap-1.5 text-slate-700">
                       <Activity size={14} className="text-emerald-600" /> Đạm thực vật
                     </span>
@@ -367,7 +367,7 @@ export function OverviewTab() {
 
                 {/* Tinh bột */}
                 <div>
-                  <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-xs font-semibold mb-1">
                     <span className="flex items-center gap-1.5 text-slate-700">
                       <Wheat size={14} className="text-amber-600" /> Tinh bột
                     </span>
@@ -382,7 +382,7 @@ export function OverviewTab() {
 
                 {/* Chất béo lành tính */}
                 <div>
-                  <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-xs font-semibold mb-1">
                     <span className="flex items-center gap-1.5 text-slate-700">
                       <Flame size={14} className="text-rose-600" /> Chất béo thực vật
                     </span>
@@ -450,7 +450,7 @@ export function OverviewTab() {
 
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
               <span className="text-slate-500">Thực đơn được thiết kế tự động bởi AI Bếp Trưởng</span>
-              <Link to="/meal-plans" className="font-bold text-emerald-700 hover:underline flex items-center gap-1">
+              <Link to="/settings?tab=calendar" className="font-bold text-emerald-700 hover:underline flex items-center gap-1">
                 Chi tiết tuần này <ArrowRight size={13} />
               </Link>
             </div>

@@ -31,6 +31,7 @@ import { mealPlanService } from '../services/mealPlanService';
 import { ApiError, errorMessage } from '../services/apiClient';
 import { RecipeCard } from '../components/RecipeCard';
 import { HealthActivityRings } from '../components/HealthActivityRings';
+import { wearableService } from '../utils/wearableService';
 import { dietLabels, displayAllergies } from '../utils/nutritionProfile';
 import { sfx } from '../utils/soundEffects';
 import type { RecipeSummary } from '../types/recipe';
@@ -423,12 +424,12 @@ export const DashboardPage: React.FC = () => {
 
                 {/* Action 2: Calendar (Weekly Meal Planner) */}
                 <Link
-                  to="/meal-plans"
+                  to="/settings?tab=calendar"
                   title="Quản lý thực đơn theo tuần"
                   className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-stone-100 dark:bg-slate-800 hover:bg-stone-200 dark:hover:bg-slate-700 text-stone-700 dark:text-slate-200 text-xs font-bold transition shrink-0 border border-stone-200/80 dark:border-slate-700"
                 >
                   <CalendarDays className="w-4 h-4 text-stone-600 dark:text-slate-400" />
-                  <span className="hidden md:inline">Thực đơn tuần</span>
+                  <span className="hidden md:inline">Lịch ăn 30 ngày</span>
                 </Link>
 
                 {/* Text Input Pill body */}
@@ -499,7 +500,7 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 </div>
                 <Link
-                  to={isAuthenticated ? "/meal-plans" : "/explore"}
+                  to={isAuthenticated ? "/settings?tab=calendar" : "/explore"}
                   className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 flex items-center gap-1 transition"
                 >
                   {isAuthenticated ? "Xem cả tuần" : "Khám phá thêm"} <ArrowRight size={13} />
@@ -543,7 +544,7 @@ export const DashboardPage: React.FC = () => {
                         Xem hướng dẫn nấu
                       </Link>
                       <Link
-                        to="/meal-plans?tab=planner"
+                        to="/settings?tab=calendar"
                         className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#1a2938] hover:bg-stone-50 dark:hover:bg-slate-700 text-stone-700 dark:text-slate-200 border border-stone-200 dark:border-slate-700 text-xs font-bold transition"
                       >
                         Đổi món khác
@@ -607,15 +608,15 @@ export const DashboardPage: React.FC = () => {
                       Hôm nay bạn chưa có kế hoạch bữa ăn
                     </h3>
                     <p className="text-xs text-stone-500 dark:text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-                      AI Bếp Trưởng có thể giúp bạn tạo ngay thực đơn tuần cân bằng đủ chất đạm thực vật và vi chất dựa trên chỉ số cơ thể.
+                      AI Bếp Trưởng có thể giúp bạn lập ngay thực đơn cân bằng trên lịch ăn 30 ngày, đủ chất đạm thực vật và vi chất dựa trên chỉ số cơ thể.
                     </p>
                   </div>
                   <div className="pt-2">
                     <Link
-                      to="/meal-plans"
+                      to="/settings?tab=calendar"
                       className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs hover:shadow-md cursor-pointer"
                     >
-                      <Sparkles size={14} /> Tạo thực đơn tuần với AI
+                      <Sparkles size={14} /> Lập thực đơn AI trên lịch
                     </Link>
                   </div>
                 </div>
@@ -624,7 +625,7 @@ export const DashboardPage: React.FC = () => {
 
             <div className="mt-5 pt-3 border-t border-stone-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-stone-500 dark:text-slate-400">
               <span>Được tính toán tự động dựa trên chỉ số TDEE</span>
-              <Link to="/meal-plans" className="text-emerald-700 dark:text-emerald-400 font-bold hover:underline">
+              <Link to="/settings?tab=calendar" className="text-emerald-700 dark:text-emerald-400 font-bold hover:underline">
                 Tùy chỉnh lịch ăn uống →
               </Link>
             </div>
@@ -659,11 +660,11 @@ export const DashboardPage: React.FC = () => {
                 /* Authenticated Profile exists: Apple Watch Concentric Activity Rings Snapshot */
                 <div className="space-y-4">
                   <HealthActivityRings
-                    calories={1420}
+                    calories={wearableService.getMetrics().activeCalories || 0}
                     calorieTarget={Math.round(nutrition.targets.dailyCaloriesTarget)}
-                    proteinGrams={56}
+                    proteinGrams={0}
                     proteinTarget={Math.round(nutrition.targets.proteinTargetG)}
-                    fiberGrams={28}
+                    fiberGrams={0}
                     fiberTarget={35}
                     heightCm={nutrition.heightCm}
                     weightKg={nutrition.weightKg}
@@ -764,7 +765,7 @@ export const DashboardPage: React.FC = () => {
                   </div>
                   <div className="pt-1">
                     <Link
-                      to="/meal-plans?tab=nutrition"
+                      to="/settings?tab=profile"
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs"
                     >
                       Khai báo chỉ số BMI & TDEE <ArrowUpRight size={13} />

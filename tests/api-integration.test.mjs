@@ -49,7 +49,7 @@ const reply = (data, status = 200, message = 'OK', code = status) => ({ ok: stat
   json: async () => ({ success: status < 400, code, message, data }) });
 const hash = value => createHash('sha256').update(value).digest('hex');
 
-test('nutrition saves contact, diet and exclusions and authenticates calculation', async () => {
+test('nutrition saves contact privately while calculation remains public', async () => {
   const fixture = setup(() => reply({ targets: { dailyCaloriesTarget: 1800 } }));
   fixture.api.setSession(auth(), true);
   const input = { gender: 'FEMALE', dateOfBirth: '2000-01-01', heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN', phoneNumber: '0912345678', dietaryPreferences: 'VEGAN', allergies: 'Đậu phộng', customDailyCalories: null };
@@ -58,7 +58,7 @@ test('nutrition saves contact, diet and exclusions and authenticates calculation
   assert.deepEqual(JSON.parse(fixture.calls[0].body), input);
   assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
   await fixture.nutrition.calculate({ gender: 'FEMALE', age: 26, heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN' });
-  assert.equal(fixture.calls[1].headers.get('Authorization'), 'Bearer token-1');
+  assert.equal(fixture.calls[1].headers.get('Authorization'), null);
   assert.equal(JSON.parse(fixture.calls[1].body).phoneNumber, undefined);
 });
 
@@ -354,7 +354,7 @@ test('failed logout preserves local auth so it can be retried', async () => {
   assert.equal((await fixture.auth.logout()).success, false); assert.equal(fixture.api.hasSession(), true);
 });
 
-test('public questions stay anonymous while videos require a member token', async () => {
+test('public questions, published videos and comments stay anonymous', async () => {
   const fixture = setup(() => reply({ items: [], page: 1, size: 8, totalElements: 0, totalPages: 0, first: false, last: true }));
   fixture.api.setSession(auth(), true);
   await fixture.community.questions({ keyword: 'đậu & nấm?', answered: false, page: 1 });
@@ -364,10 +364,10 @@ test('public questions stay anonymous while videos require a member token', asyn
   assert.equal(fixture.calls[0].headers.has('Authorization'), false);
   await fixture.community.videos({ keyword: 'nấu chay', category: 'MON_CHAY', page: 0 });
   assert.equal(new URL(fixture.calls[1].url, 'http://localhost').searchParams.get('category'), 'MON_CHAY');
-  assert.equal(fixture.calls[1].headers.get('Authorization'), 'Bearer token-1');
+  assert.equal(fixture.calls[1].headers.has('Authorization'), false);
   await fixture.community.comments('video/one', 0);
   assert.ok(fixture.calls[2].url.startsWith('/api/videos/video%2Fone/comments?'));
-  assert.equal(fixture.calls[2].headers.get('Authorization'), 'Bearer token-1');
+  assert.equal(fixture.calls[2].headers.has('Authorization'), false);
 });
 
 test('community private resources and mutations never fall back to unauthenticated writes', async () => {
@@ -436,17 +436,12 @@ test('video embeds use exact provider allowlists and reject unsafe or credential
   assert.equal(videoMedia.videoDuration(3661), '1:01:01');
 });
 
-test('guest cannot call AI, nutrition or video services before logging in', async () => {
+test('guest cannot call account-bound AI services before logging in', async () => {
   const fixture = setup(() => reply({}));
   for (const action of [
     () => fixture.ai.chat('Gợi ý món chay'),
     () => fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })),
     () => fixture.ai.extractRecipeFromVideo('Món chay'),
-    () => fixture.nutrition.calculate({ gender: 'FEMALE', age: 26, heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN' }),
-    () => fixture.nutrition.options(),
-    () => fixture.community.videos({ page: 0 }),
-    () => fixture.community.video('video-1'),
-    () => fixture.community.comments('video-1', 0),
   ]) await assert.rejects(action(), /đăng nhập/);
   assert.equal(fixture.calls.length, 0);
 });

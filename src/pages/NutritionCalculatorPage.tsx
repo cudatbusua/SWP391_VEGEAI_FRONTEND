@@ -99,6 +99,8 @@ export function NutritionCalculatorPage() {
   const saveProfile = async () => {
     if (!form.dateOfBirth) { setError('Vui lòng nhập ngày sinh để lưu hồ sơ.'); return; }
     if (!form.dietaryPreferences) { setError('Vui lòng chọn chế độ ăn.'); return; }
+    if (Number(form.heightCm) < 100 || Number(form.heightCm) > 280) { setError('Chiều cao phải nằm trong khoảng 100–280 cm.'); return; }
+    if (Number(form.weightKg) < 20 || Number(form.weightKg) > 350) { setError('Cân nặng phải nằm trong khoảng 20–350 kg.'); return; }
     setSaving(true); setError(''); setMessage('');
     try {
       const profile = await nutritionService.saveProfile({
@@ -135,7 +137,7 @@ export function NutritionCalculatorPage() {
         </div>
         {isAuthenticated && <Input label="Ngày sinh" type="date" max={new Date().toISOString().slice(0, 10)} value={form.dateOfBirth} onChange={e => { const birth = new Date(e.target.value); const today = new Date(); let age = today.getFullYear() - birth.getFullYear(); if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--; setForm({ ...form, dateOfBirth: e.target.value, age: Number.isFinite(age) ? String(age) : form.age }); }} />}
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Chiều cao (cm)" type="number" min="50" max="280" step="0.1" required value={form.heightCm} onChange={e => setForm({ ...form, heightCm: e.target.value })} />
+          <Input label="Chiều cao (cm)" type="number" min="100" max="280" step="0.1" required value={form.heightCm} onChange={e => setForm({ ...form, heightCm: e.target.value })} />
           <Input label="Cân nặng (kg)" type="number" min="20" max="350" step="0.1" required value={form.weightKg} onChange={e => setForm({ ...form, weightKg: e.target.value })} />
         </div>
         <div><label className="block text-xs font-semibold mb-1.5 text-slate-700 dark:text-slate-300">Mức vận động</label><select className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white p-3 text-sm" value={form.activityLevel} onChange={e => setForm({ ...form, activityLevel: e.target.value as ActivityLevel })}>{Object.entries(activityLabels).map(([value, label]) => <option key={value} value={value} className="dark:bg-slate-800">{label}</option>)}</select></div>
@@ -146,7 +148,7 @@ export function NutritionCalculatorPage() {
         </fieldset>
       </form>
       <section className="min-w-0">
-        {isAuthenticated && targets && <Link to="/meal-plans" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400 mb-5"><Target size={17} />Lập kế hoạch ăn uống</Link>}
+        {isAuthenticated && targets && <Link to="/settings?tab=calendar" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400 mb-5"><Target size={17} />Lập kế hoạch ăn uống</Link>}
         {!targets ? <><img src="https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?auto=format&fit=crop&w=1000&q=85" alt="Bữa ăn từ rau củ" className="w-full aspect-[16/9] object-cover rounded-lg" /><div className="py-7"><Target size={26} className="text-emerald-700 dark:text-emerald-400 mb-4" /><h2 className="text-2xl font-bold text-slate-900 dark:text-white">Mỗi cơ thể, một mục tiêu riêng.</h2><p className="text-sm text-gray-500 dark:text-slate-400 mt-3 leading-6">Khám phá mức năng lượng và các chỉ số dinh dưỡng phù hợp với thông tin của bạn.</p><div className="flex flex-wrap gap-6 mt-6 text-xs text-gray-500 dark:text-slate-400"><span className="flex items-center gap-2"><Activity size={16} /> Chỉ số cơ thể</span><span className="flex items-center gap-2"><Flame size={16} /> Năng lượng</span><span className="flex items-center gap-2"><Leaf size={16} /> Dưỡng chất</span></div></div></> :
           <div className="space-y-6">
             <div className="border-b border-gray-200 dark:border-slate-800 pb-6"><p className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400 font-semibold"><Flame size={18} /> Năng lượng mục tiêu mỗi ngày</p><p className="text-5xl font-bold mt-3 text-slate-900 dark:text-white">{Math.round(targets.dailyCaloriesTarget).toLocaleString('vi-VN')} <span className="text-lg text-gray-400 dark:text-slate-500 font-normal">kcal</span></p><p className="text-sm text-gray-500 dark:text-slate-400 mt-3">Mục tiêu: {goalLabels[resultGoal]}</p></div>

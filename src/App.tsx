@@ -18,7 +18,6 @@ const AiChatPage = lazy(() => import('./pages/AiChatPage').then(module => ({ def
 const FridgeScanPage = lazy(() => import('./pages/FridgeScanPage').then(module => ({ default: module.FridgeScanPage })));
 const FridgeInventoryPage = lazy(() => import('./pages/FridgeInventoryPage').then(module => ({ default: module.FridgeInventoryPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then(module => ({ default: module.AdminPage })));
-const MealPlansPage = lazy(() => import('./pages/MealPlansPage').then(module => ({ default: module.MealPlansPage })));
 const AdminRecipesPage = lazy(() => import('./pages/AdminRecipesRedesignedPage').then(module => ({ default: module.AdminRecipesPage })));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage').then(module => ({ default: module.ResetPasswordPage })));
 const BlogPage = lazy(() => import('./pages/BlogPage').then(module => ({ default: module.BlogPage })));
@@ -36,6 +35,8 @@ const AdminQuestionsPage = lazy(() => import('./pages/AdminQuestionsPage').then(
 const AdminQuestionDetailPage = lazy(() => import('./pages/AdminQuestionsPage').then(module => ({ default: module.AdminQuestionDetailPage })));
 const AdminVideosPage = lazy(() => import('./pages/AdminVideosPage').then(module => ({ default: module.AdminVideosPage })));
 const AdminVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.AdminVideoEditorPage })));
+const UserVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.UserVideoEditorPage })));
+const MyVideosPage = lazy(() => import('./pages/MyVideosPage').then(module => ({ default: module.MyVideosPage })));
 const AdminAiMonitoringPage = lazy(() => import('./pages/AdminAiMonitoringPage').then(module => ({ default: module.AdminAiMonitoringPage })));
 import { ThemeProvider } from './store/ThemeContext';
 
@@ -75,10 +76,11 @@ export const App: React.FC = () => {
             <Route path="/ai-chef" element={<PersonalFeatureBoundary><AiChatPage /></PersonalFeatureBoundary>} />
             <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />
             <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
-            <Route path="/nutrition" element={<Navigate to="/meal-plans?tab=nutrition" replace />} />
-            <Route path="/meal-plans" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
-          <Route path="/meal-plans/:id" element={<PersonalFeatureBoundary><MealPlansPage /></PersonalFeatureBoundary>} />
-          <Route path="/smart-market" element={<PersonalFeatureBoundary><SmartMarketPage /></PersonalFeatureBoundary>} />
+            <Route path="/nutrition" element={<Navigate to="/settings?tab=profile" replace />} />
+            {/* Meal planning now lives on the 30-day calendar; old links keep working. */}
+            <Route path="/meal-plans" element={<Navigate to="/settings?tab=calendar" replace />} />
+          <Route path="/meal-plans/:id" element={<Navigate to="/settings?tab=calendar" replace />} />
+          <Route path="/smart-market" element={<SmartMarketPage />} />
           <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
           <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
           <Route path="/admin/ai-monitoring" element={<AdminFeatureBoundary><AdminAiMonitoringPage /></AdminFeatureBoundary>} />
@@ -98,6 +100,9 @@ export const App: React.FC = () => {
           <Route path="/questions/:id" element={<QuestionDetailPage />} />
           <Route path="/videos" element={<PersonalFeatureBoundary><VideosPage /></PersonalFeatureBoundary>} />
           <Route path="/videos/saved" element={<PersonalFeatureBoundary><VideosPage saved /></PersonalFeatureBoundary>} />
+          <Route path="/videos/mine" element={<PersonalFeatureBoundary><MyVideosPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/new" element={<PersonalFeatureBoundary><UserVideoEditorPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/mine/:id/edit" element={<PersonalFeatureBoundary><UserVideoEditorPage /></PersonalFeatureBoundary>} />
           <Route path="/videos/:id" element={<PersonalFeatureBoundary><VideoDetailPage /></PersonalFeatureBoundary>} />
           <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />

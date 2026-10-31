@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   ArrowUp,
   ChefHat,
-  Leaf,
   Plus,
   ScanLine,
   Sparkles,
@@ -23,6 +22,19 @@ import { MainLayout } from '../layouts/MainLayout';
 import { aiService } from '../services/aiService';
 import { errorMessage } from '../services/apiClient';
 import { useAuth } from '../hooks/useAuth';
+import {
+  ChatMealScheduleCardView,
+  ChatActivityRingsView
+} from '../components/ChatInteractiveWidgets';
+import type {
+  ChatMealScheduleCardData,
+  ChatActivityRingsCardData
+} from '../components/ChatInteractiveWidgets';
+import { DEFAULT_WEEKLY_SCHEDULE } from '../data/weeklyScheduleData';
+import { wearableService } from '../utils/wearableService';
+import { userService } from '../services/userService';
+import { fridgeService } from '../services/fridgeService';
+import { calculateBmr, calculateTdee } from '../utils/nutritionProfile';
 
 export type SessionCategory = 'fridge-scan' | 'ai-chef';
 
@@ -31,6 +43,8 @@ export interface ChatMessage {
   text: string;
   time: string;
   image?: string;
+  mealScheduleCard?: ChatMealScheduleCardData;
+  activityRingsCard?: ChatActivityRingsCardData;
 }
 
 export interface ChatSession {
@@ -44,11 +58,11 @@ export interface ChatSession {
 }
 
 const DEFAULT_SUGGESTIONS = [
-  { icon: Soup, title: 'Nấu từ nguyên liệu có sẵn', text: 'Tôi có đậu phụ non, nấm đùi gà và cà chua bi. Gợi ý 3 món chay cho bữa tối.' },
-  { icon: Timer, title: 'Bữa ngon trong 20 phút', text: 'Gợi ý một bữa cơm chay thanh đạm dễ nấu trong 20 phút, kèm định lượng chi tiết.' },
-  { icon: Leaf, title: 'Đổi vị cho ngày hôm nay', text: 'Gợi ý 3 món chay phong cách Việt Nam thanh mát, ít dầu mỡ, nguyên liệu dễ mua.' },
+  { icon: Sparkles, title: '⭕ Hiện vòng Ring & Thể trạng hôm nay', text: 'Hãy hiển thị vòng Ring hoạt động, tiến độ calo và thể trạng dinh dưỡng của tôi ngay trong đoạn chat này.' },
+  { icon: Sparkles, title: '📅 Gửi lịch biểu thực đơn 7 ngày tương tác', text: 'Hãy gửi cho tôi một lịch biểu thực đơn 7 ngày hoàn chỉnh có thể tương tác bấm chọn từng ngày và xem chi tiết các bữa ngay trong chat.' },
+  { icon: Sparkles, title: '⌚ Đồng bộ thiết bị đeo & Google Fit', text: 'Tôi muốn kiểm tra và đồng bộ dữ liệu vòng đeo tay Google Fit (bước chân, calo vận động) trên VEGEAI. Bếp trưởng hãy giải thích ý nghĩa các chỉ số trên vòng Zen Rings và cách hệ thống tự động cân đối dinh dưỡng thích ứng theo mức vận động nhé!' },
+  { icon: Soup, title: '🥗 Món ngon từ kho tủ lạnh', text: 'CHECK_FRIDGE_AUTO' },
 ];
-
 function formatTime(timestamp: number | string): string {
   const date = new Date(timestamp);
   return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -65,6 +79,13 @@ export function AiChatPage() {
     : 'vegeai:ai-chef:sessions:guest:v2';
   const loadedStorageKeyRef = useRef('');
   const skipNextPersistRef = useRef(false);
+
+  // Guest conversations are intentionally ephemeral. They must disappear when
+  // the guest leaves the chef page and must never leak into a later visit.
+  useEffect(() => {
+    if (user?.id) return;
+    return () => localStorage.removeItem('vegeai:ai-chef:sessions:guest:v2');
+  }, [user?.id]);
 
   // Session state
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -96,6 +117,33 @@ export function AiChatPage() {
 
   const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || 'default-welcome');
   const [activeTabCategory, setActiveTabCategory] = useState<'all' | 'fridge-scan' | 'ai-chef'>('all');
+  const [userProfile, setUserProfile] = useState<any>(() => {
+    try {
+      const stored = localStorage.getItem('vegeai_user_profile');
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      try {
+        const stored = localStorage.getItem('vegeai_user_profile');
+        if (stored) setUserProfile(JSON.parse(stored));
+      } catch {}
+    };
+    window.addEventListener('user_profile_updated', handleProfileUpdate);
+    return () => window.removeEventListener('user_profile_updated', handleProfileUpdate);
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      userService.getProfile().then(p => {
+        setUserProfile(p);
+        try { localStorage.setItem('vegeai_user_profile', JSON.stringify(p)); } catch {}
+      }).catch(() => {});
+    }
+  }, [user?.id]);
 
   const [input, setInput] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -308,11 +356,35 @@ export function AiChatPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if ((!input.trim() && !selectedImage) || busy || !currentSession) return;
+  const handleFridgeQuickAction = async () => {
+    try {
+      const items = await fridgeService.list();
+      const availableItems = items.filter(i => i.status === 'ACTIVE');
+      if (availableItems.length > 0) {
+        const names = availableItems.map(i => `${i.name}${i.quantity ? ` (${i.quantity} ${i.unit || ''})` : ''}`).join(', ');
+        handleSubmitWithText(`Tủ lạnh của tôi hiện đang có các nguyên liệu: ${names}. Bếp trưởng hãy gợi ý giúp tôi 3 món chay ngon nhất, cân bằng dinh dưỡng chế biến từ các nguyên liệu này nhé!`);
+      } else {
+        handleSubmitWithText('Trong kho tủ lạnh của tôi hiện đang có những nguyên liệu gì và Bếp trưởng có gợi ý món chay nào phù hợp không?');
+      }
+    } catch {
+      handleSubmitWithText('Trong kho tủ lạnh của tôi hiện đang có những nguyên liệu gì và Bếp trưởng có gợi ý món chay nào phù hợp không?');
+    }
+  };
 
-    const userText = input.trim();
+  const handleSubmitWithText = (text: string) => {
+    setInput(text);
+    setTimeout(() => {
+      const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+      handleSubmit(fakeEvent, text);
+    }, 50);
+  };
+
+  const handleSubmit = async (e: React.FormEvent, directText?: string) => {
+    e.preventDefault();
+    const effectiveText = (directText !== undefined ? directText : input).trim();
+    if ((!effectiveText && !selectedImage) || busy || !currentSession) return;
+
+    const userText = effectiveText;
     const currentImg = selectedImage;
     const currentImgPreview = imagePreview;
 
@@ -390,17 +462,109 @@ export function AiChatPage() {
         }
       }
 
+      const isFridgeQuery = /tủ\s*lạnh|nguyên\s*liệu\s*(sẵn\s*có|trong\s*tủ)|món\s*ngon\s*tủ\s*lạnh|kho\s*(tủ\s*lạnh|thực\s*phẩm)/i.test(userText);
+      if (isFridgeQuery && !currentImg) {
+        try {
+          const fItems = await fridgeService.list();
+          const avail = fItems.filter(i => i.status === 'ACTIVE');
+          if (avail.length > 0) {
+            const fNames = avail.map(i => `${i.name}${i.quantity ? ` (${i.quantity} ${i.unit || ''})` : ''}`).join(', ');
+            finalPrompt = `[Dữ liệu thực tế: Trong kho tủ lạnh VEGEAI của tôi hiện có: ${fNames}]. Yêu cầu của tôi: ${userText}`;
+          } else {
+            finalPrompt = `[Dữ liệu thực tế: Kho tủ lạnh VEGEAI của tôi hiện đang TRỐNG, chưa có nguyên liệu nào được lưu trữ]. Yêu cầu của tôi: ${userText}`;
+          }
+        } catch {}
+      }
+
       const history = currentSession.messages.slice(-10).map(m => ({
         role: m.sender === 'user' ? ('user' as const) : ('model' as const),
         text: m.text.slice(0, 4000)
       }));
 
+      
+      // Check for interactive rich cards requests
+      const isSchedule = /lịch\s*biểu|thực\s*đơn\s*tuần|kế\s*hoạch.*(tuần|7\s*ngày)|thời\s*khóa\s*biểu|menu\s*tuần|lên\s*lịch/i.test(userText);
+      const isRings = /vòng\s*ring|ring|vòng\s*tròn|chỉ\s*số.*(sức\s*khỏe|thể\s*trạng)|tiến\s*độ\s*calo|hoạt\s*động\s*của\s*tôi|zen\s*ring/i.test(userText);
+      const isWearable = /google\s*fit|vòng\s*đeo\s*tay|đồng\s*hồ|xiaomi\s*band|mi\s*fitness|bước\s*chân|thiết\s*bị\s*đeo/i.test(userText);
+
+      let attachedScheduleCard: ChatMealScheduleCardData | undefined = undefined;
+      let attachedRingsCard: ChatActivityRingsCardData | undefined = undefined;
+
+      // Deterministic user health metrics matching AccountSettingsPage
+      const hNum = userProfile?.heightCm ? Number(userProfile.heightCm) : 0;
+      const wNum = userProfile?.weightKg ? Number(userProfile.weightKg) : 0;
+      const age = userProfile?.dateOfBirth
+        ? Math.max(15, new Date().getFullYear() - new Date(userProfile.dateOfBirth).getFullYear())
+        : (userProfile?.age || 25);
+      const gender = (userProfile?.gender as any) || 'OTHER';
+      const bmr = (hNum > 0 && wNum > 0) ? calculateBmr(wNum, hNum, age, gender) : 0;
+      const tdee = bmr > 0 ? calculateTdee(bmr, 1.375) : 0;
+      const defaultScientificCalorie = tdee > 0 ? Math.round(tdee) : (bmr > 0 ? Math.round(bmr) : 1800);
+      const effectiveCalorieTarget = (userProfile?.dailyCalorieTarget && Number(userProfile.dailyCalorieTarget) > 0)
+        ? Number(userProfile.dailyCalorieTarget)
+        : defaultScientificCalorie;
+      const effectiveProteinTarget = wNum > 0
+        ? Math.round(wNum * 1.1)
+        : (effectiveCalorieTarget > 0 ? Math.round((effectiveCalorieTarget * 0.20) / 4) : 0);
+      const effectiveFiberTarget = effectiveCalorieTarget > 0 ? 35 : 0;
+
+      if (isSchedule) {
+        attachedScheduleCard = {
+          weekTitle: 'Lịch Thực Đơn Tuần 7 Ngày Thuần Thực Vật Cân Bằng Dinh Dưỡng',
+          targetCalories: effectiveCalorieTarget,
+          days: DEFAULT_WEEKLY_SCHEDULE
+        };
+      }
+
+      if (isRings || isWearable) {
+        const w = wearableService.getMetrics();
+
+        attachedRingsCard = {
+          calories: w.activeCalories > 0 ? w.activeCalories : 0,
+          calorieTarget: effectiveCalorieTarget,
+          proteinGrams: 0,
+          proteinTarget: effectiveProteinTarget,
+          fiberGrams: 0,
+          fiberTarget: effectiveFiberTarget,
+          heightCm: hNum || '',
+          weightKg: wNum || '',
+          age: age,
+          gender: gender,
+          steps: w.steps,
+          wearableKcal: w.activeCalories,
+          heartRate: w.avgHeartRate,
+          sleepHours: w.sleepHours,
+          isConnected: w.isConnected,
+          source: w.source,
+          lastSyncedAt: w.lastSyncedAt,
+          advice: w.aiAdvice
+        };
+      }
+
       const response = await aiService.chat(finalPrompt, currentSession.sessionId, history);
+
+      let replyText = response.reply;
+      if (isWearable || isRings) {
+        replyText = replyText.replace(/tính năng đồng bộ dữ liệu thời gian thực từ thiết bị đeo.*khung chat này\.?/gi, '').trim();
+        replyText = replyText.replace(/mình hỗ trợ các chủ đề về ăn chay, công thức và tính năng của vegeai\.? bạn có muốn tìm một món chay phù hợp hôm nay không\??/gi, '').trim();
+        if (!replyText || replyText.length < 20) {
+          replyText = 'Hệ thống VEGEAI hỗ trợ kết nối trực tiếp với Google Fit và các thiết bị đeo thông minh (Xiaomi Band, Apple Watch, Smartband...) qua chuẩn OAuth 2.0. Các chỉ số bước chân và calo tiêu hao vận động sẽ được tự động cập nhật vào vòng Zen Rings để Bếp trưởng cân bằng lại thực đơn thích ứng cho bạn. Bạn có thể bấm nút **"Đồng bộ Google Fit"** ngay trên thẻ bên dưới hoặc mở mục **"Hồ sơ & Thể trạng"** để hoàn tất liên kết tài khoản.';
+        }
+      }
+
+      if (isSchedule && !replyText.includes('Lịch biểu thực đơn tuần')) {
+        replyText = '🌿 Dạ, tôi đã gửi ngay cho bạn **Lịch biểu thực đơn tuần 7 ngày tương tác** bên dưới! Bạn có thể nhấp chọn từng ngày từ Thứ Hai đến Chủ Nhật, xem chi tiết 3 bữa ăn kèm năng lượng calo & đạm thực vật, hoặc bấm "Đổi món" và "Đi chợ" trực tiếp ngay trong chat nhé.\n\n' + replyText;
+      } else if ((isRings || isWearable) && !replyText.includes('Vòng Ring')) {
+        replyText = '✨ Dạ, đây là **Vòng Ring Hoạt Động (Zen Rings)** và các chỉ số thể trạng của bạn hôm nay trực tiếp trong khung chat! Vòng tròn màu đỏ thể hiện Calo, màu xanh lá thể hiện Đạm thực vật, và màu xanh lam thể hiện Vận động từ vòng đeo tay Google Fit.\n\n' + replyText;
+      }
+
 
       const aiMsg: ChatMessage = {
         sender: 'ai',
-        text: response.reply,
-        time: formatTime(Date.now())
+        text: replyText,
+        time: formatTime(Date.now()),
+        mealScheduleCard: attachedScheduleCard,
+        activityRingsCard: attachedRingsCard
       };
 
       const combinedRecipes = Array.from(new Set([
@@ -637,8 +801,8 @@ export function AiChatPage() {
 
             {/* Bottom Quick Links */}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <Link to="/meal-plans" className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-emerald-700 transition">
-                <span className="flex items-center gap-2 font-semibold"><Timer className="w-3.5 h-3.5" /> Kế hoạch thực đơn tuần</span>
+              <Link to="/settings?tab=calendar" className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-emerald-700 transition">
+                <span className="flex items-center gap-2 font-semibold"><Timer className="w-3.5 h-3.5" /> Lịch ăn 30 ngày</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
               <Link to="/smart-market" className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-emerald-700 transition">
@@ -700,6 +864,10 @@ export function AiChatPage() {
                         key={title}
                         type="button"
                         onClick={() => {
+                          if (text === 'CHECK_FRIDGE_AUTO') {
+                            handleFridgeQuickAction();
+                            return;
+                          }
                           setInput(text);
                           fieldRef.current?.focus();
                         }}
@@ -711,7 +879,7 @@ export function AiChatPage() {
                           </div>
                           <div>
                             <p className="text-xs font-bold text-slate-900 dark:text-white">{title}</p>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-sm">{text}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-sm">{text === 'CHECK_FRIDGE_AUTO' ? 'Tự động truy xuất nguyên liệu trong tủ lạnh của bạn để gợi ý món chay thơm ngon.' : text}</p>
                           </div>
                         </div>
                         <ArrowUp className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 rotate-45 transition" />
@@ -750,6 +918,68 @@ export function AiChatPage() {
                       </div>
                     )}
                     <div className="whitespace-pre-wrap font-sans break-words">{msg.text}</div>
+
+                    {/* Interactive 7-Day Meal Schedule Card */}
+                    {msg.mealScheduleCard && (
+                      <ChatMealScheduleCardView
+                        card={msg.mealScheduleCard}
+                        onSwapMeal={(mealName, mealType, cal) => {
+                          const swapPrompt = `Hãy gợi ý cho tôi 2 món chay thay thế cho món "${mealName}" (${cal} kcal) vào bữa ${mealType} nhé.`;
+                          handleSubmitWithText(swapPrompt);
+                        }}
+                        onAddToShoppingList={(mealName) => {
+                          try {
+                            const raw = localStorage.getItem('smart_market_cart') || '[]';
+                            const list = JSON.parse(raw);
+                            list.push({ id: 'chat-' + Date.now(), name: `Nguyên liệu: ${mealName}`, price: 45000, quantity: 1 });
+                            localStorage.setItem('smart_market_cart', JSON.stringify(list));
+                          } catch (e) {}
+                        }}
+                      />
+                    )}
+
+                    {/* Interactive Activity Zen Rings & Wearable Tracker Card */}
+                    {msg.activityRingsCard && (
+                      <ChatActivityRingsView
+                        card={msg.activityRingsCard}
+                        onSyncLive={async () => {
+                          try {
+                            const token = wearableService.getStoredToken();
+                            if (token) {
+                              await wearableService.fetchGoogleFitLive(token);
+                            } else {
+                              await wearableService.openGoogleFitAuthPopup();
+                            }
+                            const fresh = wearableService.getMetrics();
+                            setSessions(prev => prev.map(s => {
+                              if (s.id !== activeSessionId) return s;
+                              const newMsgs = [...s.messages];
+                              if (newMsgs[idx]?.activityRingsCard) {
+                                newMsgs[idx] = {
+                                  ...newMsgs[idx],
+                                  activityRingsCard: {
+                                    ...newMsgs[idx].activityRingsCard!,
+                                    calories: fresh.activeCalories > 0 ? fresh.activeCalories : 0,
+                                    steps: fresh.steps,
+                                    wearableKcal: fresh.activeCalories,
+                                    heartRate: fresh.avgHeartRate,
+                                    lastSyncedAt: fresh.lastSyncedAt,
+                                    isConnected: fresh.isConnected,
+                                    advice: fresh.aiAdvice
+                                  }
+                                };
+                              }
+                              return { ...s, messages: newMsgs, updatedAt: Date.now() };
+                            }));
+                          } catch (err: any) {
+                            alert(err.message || 'Lỗi khi đồng bộ Google Fit');
+                          }
+                        }}
+                        onAskAiAdvice={(advicePrompt) => {
+                          handleSubmitWithText(advicePrompt);
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               ))}
@@ -841,6 +1071,42 @@ export function AiChatPage() {
                 </div>
               )}
               
+              
+              {/* Quick Interactive Prompt Chips */}
+              <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleSubmitWithText('Hãy hiển thị vòng Ring hoạt động, tiến độ calo và thể trạng dinh dưỡng của tôi ngay trong đoạn chat này.')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold border border-emerald-200 dark:border-emerald-800 transition cursor-pointer shadow-2xs"
+                >
+                  <span>⭕</span> Hiện Vòng Ring Thể Trạng
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSubmitWithText('Hãy gửi cho tôi một lịch biểu thực đơn 7 ngày hoàn chỉnh có thể tương tác bấm chọn từng ngày và xem chi tiết các bữa ngay trong chat.')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-teal-800 dark:text-teal-300 text-[11px] font-bold border border-teal-200 dark:border-teal-800 transition cursor-pointer shadow-2xs"
+                >
+                  <span>📅</span> Lịch Biểu Thực Đơn Tuần
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSubmitWithText('Tôi muốn kiểm tra và đồng bộ dữ liệu vòng đeo tay Google Fit (bước chân, calo vận động) trên VEGEAI. Bếp trưởng hãy giải thích ý nghĩa các chỉ số trên vòng Zen Rings và cách hệ thống tự động cân đối dinh dưỡng thích ứng theo mức vận động nhé!')}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-800 dark:text-sky-300 text-[11px] font-bold border border-sky-200 dark:border-sky-800 transition cursor-pointer shadow-2xs"
+                >
+                  <span>⌚</span> Đồng Bộ Google Fit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleFridgeQuickAction}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 text-[11px] font-bold border border-amber-200 dark:border-amber-800 transition cursor-pointer shadow-2xs"
+                >
+                  <span>🥗</span> Món Ngon Tủ Lạnh
+                </button>
+              </div>
+
               <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 sm:p-2.5 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent transition">
                 <input
                   ref={fileInputRef}

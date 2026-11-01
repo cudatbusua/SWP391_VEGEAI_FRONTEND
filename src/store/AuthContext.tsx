@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { User, LoginFormData, RegisterFormData, ActionResult } from '../types';
 import type { LoginInitResponse } from '../types/api';
 import { authService } from '../services/authService';
@@ -28,19 +28,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [sessionError, setSessionError] = useState('');
   const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const authMutationVersion = useRef(0);
 
   useEffect(() => {
     let active = true;
+    const version = authMutationVersion.current;
     setIsLoading(true);
     setSessionError('');
     const onExpired = () => { setUser(null); setSessionError(''); };
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
     authService.getCurrentUser()
-      .then(saved => { if (active) setUser(saved); })
+      .then(saved => { if (active && version === authMutationVersion.current) setUser(saved); })
       .catch(error => {
         // When session is expired, revoked, or unauthorized, quietly clear user without showing scary banners to guests
         if (error instanceof ApiError && [400, 401, 403].includes(error.status)) {
-          if (active) setUser(null);
+          if (active && version === authMutationVersion.current) setUser(null);
           return;
         }
         if (active) setSessionError(errorMessage(error));
@@ -58,6 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await authService.verifyLoginOtp(usernameOrEmail, otp, rememberMe);
     setIsLoading(false);
     if (res.success && res.data) {
+      authMutationVersion.current++;
       setUser(res.data);
       setSessionError('');
     }
@@ -71,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await authService.login(data);
     setIsLoading(false);
     if (res.success && res.data) {
+      authMutationVersion.current++;
       setUser(res.data);
       setSessionError('');
     }
@@ -82,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const res = await authService.loginWithGoogle(idToken, rememberMe);
     setIsLoading(false);
     if (res.success && res.data) {
+      authMutationVersion.current++;
       setUser(res.data);
       setSessionError('');
     }
@@ -93,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     const result = await authService.logout();
-    if (result.success) { setUser(null); setSessionError(''); }
+    if (result.success) { authMutationVersion.current++; setUser(null); setSessionError(''); }
     return result;
   };
 

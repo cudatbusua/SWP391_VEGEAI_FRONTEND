@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ShoppingBag,
@@ -33,6 +33,9 @@ import { SmartMarketMap } from '../components/SmartMarketMap';
 import { sfx } from '../utils/soundEffects';
 import { fridgeService } from '../services/fridgeService';
 import { userService } from '../services/userService';
+import { useAuth } from '../hooks/useAuth';
+import { marketCartService, type MarketCartItem } from '../services/marketCartService';
+import { LoginForm } from '../features/auth/components/LoginForm';
 import {
   INITIAL_SMART_MARKET_ITEMS,
   type SmartMarketItem,
@@ -46,24 +49,10 @@ import {
 } from '../services/smartMarketRealPlacesService';
 
 const LOCAL_STORAGE_KEY = 'vegeai:smart-market:items-v1';
-const CART_STORAGE_KEY = 'vegeai:smart-market:cart-v1';
 const SESSION_GPS_KEY = 'vegeai:session:gps_coords';
 const SESSION_ADDR_KEY = 'vegeai:session:gps_address';
 
-export interface MultiStoreCartItem {
-  id: string; // storeId + catalogItemId
-  catalogItemId: string;
-  name: string;
-  price: number;
-  priceFormatted: string;
-  unit: string;
-  imageEmoji: string;
-  storeId: string;
-  storeName: string;
-  storeAddress: string;
-  storeCategory: string;
-  count: number;
-}
+export type MultiStoreCartItem = MarketCartItem;
 
 export interface StoreOrderGroup {
   storeId: string;
@@ -76,18 +65,32 @@ export interface StoreOrderGroup {
   deliveryTime: string;
 }
 
-function loadInitialItems(): SmartMarketItem[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {
-    // fallback
-  }
-  return [];
-}
+// Static products must remain addable while the nearby-store request is still loading.
+// This reference store is only cart metadata; it does not represent an order or payment flow.
+const MARKET_REFERENCE_STORE: SmartMarketStore = {
+  id: 'vegeai-market-reference',
+  name: 'Kho nguyên liệu VEGEAI',
+  tagline: 'Danh mục nguyên liệu tham khảo',
+  address: 'Danh mục trực tuyến VEGEAI',
+  distance: '--',
+  distanceKm: 0,
+  duration: '--',
+  rating: 0,
+  reviewsCount: 0,
+  hours: 'Trực tuyến',
+  matchCount: 0,
+  totalNeeded: 0,
+  matchPercent: 0,
+  priceEstimate: '',
+  statusBadge: 'Tham khảo',
+  badgeType: 'medium',
+  category: 'VEGAN_STORE',
+  categoryLabel: 'Kho nguyên liệu chay',
+  notes: 'Dùng để lưu giỏ khi dữ liệu bản đồ chưa tải xong.',
+  featuredItems: [],
+  lat: 0,
+  lon: 0,
+};
 
 const NON_VEGAN_KEYWORDS = [
   'thịt', 'thit', 'heo', 'lợn', 'bò', 'bo', 'gà', 'ga', 'vịt', 'vit', 'chim', 'cừu', 'dê',
@@ -219,10 +222,34 @@ export const PREDEFINED_AREAS = [
 ];
 
 export function SmartMarketPage() {
-  const [items, setItems] = useState<SmartMarketItem[]>(loadInitialItems);
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const cartOwnerId = user?.id ?? null;
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const requireCartLogin = useCallback(() => {
+    if (isAuthenticated) return true;
+    setShowLoginModal(true);
+    return false;
+  }, [isAuthenticated]);
+  const shoppingListStorageKey = cartOwnerId ? `${LOCAL_STORAGE_KEY}:${cartOwnerId}` : null;
+  const [items, setItems] = useState<SmartMarketItem[]>([]);
   const [mainView, setMainView] = useState<'map' | 'checklist'>('map');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unbought' | 'bought'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated || !shoppingListStorageKey) {
+      setItems([]);
+      setMainView('map');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(localStorage.getItem(shoppingListStorageKey) || '[]');
+      setItems(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setItems([]);
+    }
+  }, [isAuthenticated, isLoading, shoppingListStorageKey]);
 
   // Address requirement & gate state: If user has not confirmed an address, do not show map & stores immediately!
   const [isAddressConfirmed, setIsAddressConfirmed] = useState<boolean>(() => {
@@ -274,18 +301,55 @@ export function SmartMarketPage() {
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Multi-Store Cart (ShopeeFood / GrabFood style)
-  const [multiCart, setMultiCart] = useState<MultiStoreCartItem[]>(() => {
-    try { const value = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || '[]'); return Array.isArray(value) ? value : []; }
-    catch { return []; }
-  });
+  const [multiCart, setMultiCart] = useState<MultiStoreCartItem[]>([]);
+  const [cartHydratedFor, setCartHydratedFor] = useState<string | null>(null);
+  const cartDirtyBeforeHydration = useRef(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [cartAddToast, setCartAddToast] = useState('');
   const [catalogSubcategory, setCatalogSubcategory] = useState<string>('ALL');
 
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(multiCart));
-  }, [multiCart]);
+    if (isLoading) return;
+    if (!isAuthenticated || !cartOwnerId) {
+      setMultiCart([]);
+      setCartHydratedFor(null);
+      setShowCheckoutModal(false);
+      return;
+    }
+    let active = true;
+    cartDirtyBeforeHydration.current = false;
+    marketCartService.get()
+      .then(value => { if (active && !cartDirtyBeforeHydration.current) setMultiCart(value); })
+      .catch(() => { if (active) setMultiCart([]); })
+      .finally(() => { if (active) setCartHydratedFor(cartOwnerId); });
+    return () => { active = false; };
+  }, [cartOwnerId, isAuthenticated, isLoading]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !cartOwnerId || cartHydratedFor !== cartOwnerId) return;
+    let cancelled = false;
+    let retryTimer: number | undefined;
+    const sync = async (attempt: number) => {
+      try {
+        await marketCartService.replace(multiCart);
+      } catch {
+        if (cancelled) return;
+        if (attempt < 3) {
+          retryTimer = window.setTimeout(() => sync(attempt + 1), attempt * 1000);
+          return;
+        }
+        setCartAddToast('Chưa thể đồng bộ giỏ sau 3 lần thử. Vui lòng kiểm tra kết nối.');
+        retryTimer = window.setTimeout(() => setCartAddToast(''), 4500);
+      }
+    };
+    const timer = window.setTimeout(() => sync(1), 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [cartHydratedFor, cartOwnerId, isAuthenticated, multiCart]);
 
   const filteredStoreCatalog = useMemo(() => {
     if (!selectedStore?.catalog) return [];
@@ -312,10 +376,11 @@ export function SmartMarketPage() {
   }, [selectedStore, catalogSubcategory]);
 
   const handleAddComboToCart = (combo: MealCombo) => {
+    if (!requireCartLogin()) return;
+    cartDirtyBeforeHydration.current = true;
     sfx.playSuccess();
-    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
-    if (targetStore) {
-      setMultiCart(prev => {
+    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0] || MARKET_REFERENCE_STORE;
+    setMultiCart(prev => {
         let next = [...prev];
         combo.ingredients.forEach(ing => {
           const cartItemId = `${targetStore.id}___combo_${ing.name.toLowerCase().replace(/\s+/g, '_')}`;
@@ -329,8 +394,7 @@ export function SmartMarketPage() {
           });
         });
         return next;
-      });
-    }
+    });
 
     updateItems(prev => {
       const next = prev.map(item => combo.ingredients.some(ingredient => ingredient.name.toLowerCase() === item.name.toLowerCase())
@@ -357,11 +421,12 @@ export function SmartMarketPage() {
   };
 
   const handleAddVietgapVeggie = (veg: typeof VIETGAP_5K_VEGGIES[0]) => {
+    if (!requireCartLogin()) return;
+    cartDirtyBeforeHydration.current = true;
     sfx.playSuccess();
-    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
-    if (targetStore) {
-      const cartItemId = `${targetStore.id}___vg_${veg.name.toLowerCase().replace(/\s+/g, '_')}`;
-      setMultiCart(prev => {
+    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0] || MARKET_REFERENCE_STORE;
+    const cartItemId = `${targetStore.id}___vg_${veg.name.toLowerCase().replace(/\s+/g, '_')}`;
+    setMultiCart(prev => {
         const existing = prev.find(i => i.id === cartItemId);
         if (existing) {
           return prev.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
@@ -380,8 +445,7 @@ export function SmartMarketPage() {
           storeCategory: targetStore.category,
           count: 1
         }];
-      });
-    }
+    });
 
     updateItems(prev => {
       if (!prev.some(it => it.name.toLowerCase() === veg.name.toLowerCase())) {
@@ -410,7 +474,7 @@ export function SmartMarketPage() {
     setItems(prev => {
       const next = updater(prev);
       try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
+        if (shoppingListStorageKey) localStorage.setItem(shoppingListStorageKey, JSON.stringify(next));
       } catch {
         // storage error
       }
@@ -716,6 +780,8 @@ const handleToggle = (id: string) => {
 
   // Multi-Store Cart Actions
   const handleUpdateMultiCart = (item: StoreCatalogItem, store: SmartMarketStore, delta: number) => {
+    if (!requireCartLogin()) return;
+    cartDirtyBeforeHydration.current = true;
     sfx.playTap();
     const cartItemId = `${store.id}___${item.id}`;
     const currentCount = multiCart.find(candidate => candidate.id === cartItemId)?.count || 0;
@@ -901,7 +967,7 @@ const handleToggle = (id: string) => {
               <span>Quán Chay & Siêu Thị Gần Bạn</span>
             </button>
 
-            <button
+            {isAuthenticated && <button
               onClick={() => { sfx.playTap(); setMainView('checklist'); }}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
                 mainView === 'checklist'
@@ -911,7 +977,7 @@ const handleToggle = (id: string) => {
             >
               <ShoppingBag className="w-4 h-4 text-emerald-600" />
               <span>Danh Sách Cần Mua ({boughtCount}/{totalCount})</span>
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -1517,7 +1583,7 @@ const handleToggle = (id: string) => {
             )}
 
             {/* STICKY BOTTOM FLOATING CART BAR (MULTI-STORE SHOPPING CART) */}
-            {boughtCount > 0 && (
+            {isAuthenticated && totalCartCount > 0 && (
               <div className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-8 sm:w-auto z-40 animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div className="bg-slate-900/95 text-white backdrop-blur-md rounded-2xl border border-emerald-500/40 p-3.5 sm:px-6 sm:py-4 shadow-2xl flex items-center justify-between gap-6 ring-2 ring-emerald-500/30">
                   <div className="flex items-center gap-3">
@@ -1526,7 +1592,7 @@ const handleToggle = (id: string) => {
                         <ShoppingCart className="w-5 h-5" />
                       </div>
                       <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-[11px] font-extrabold flex items-center justify-center text-white">
-                        {boughtCount}
+                        {totalCartCount}
                       </span>
                     </div>
                     <div>
@@ -1534,14 +1600,14 @@ const handleToggle = (id: string) => {
                         Giỏ nguyên liệu đã chọn
                       </div>
                       <div className="text-sm sm:text-base font-extrabold text-emerald-400">
-                        {boughtCount} món đã chọn
+                        {totalCartCount} món đã chọn
                       </div>
                     </div>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => { sfx.playTap(); setShowCheckoutModal(true); }}
+                    onClick={() => { if (!requireCartLogin()) return; sfx.playTap(); setShowCheckoutModal(true); }}
                     className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs sm:text-sm transition shadow-lg flex items-center gap-2 cursor-pointer"
                   >
                     <span>Mở giỏ nguyên liệu</span>
@@ -1551,6 +1617,18 @@ const handleToggle = (id: string) => {
               </div>
             )}
 
+          </div>
+        )}
+
+        {showLoginModal && !isAuthenticated && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" onMouseDown={() => setShowLoginModal(false)}>
+            <div role="dialog" aria-modal="true" aria-label="Đăng nhập để sử dụng giỏ nguyên liệu" className="relative w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl max-h-[92vh] overflow-y-auto" onMouseDown={event => event.stopPropagation()}>
+              <button type="button" aria-label="Đóng đăng nhập" onClick={() => setShowLoginModal(false)} className="absolute right-4 top-4 rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X className="h-5 w-5" />
+              </button>
+              <p className="mb-5 pr-10 text-sm text-slate-600 dark:text-slate-300">Đăng nhập ngay tại đây để thêm nguyên liệu. Bản đồ và vị trí đang xem sẽ được giữ nguyên.</p>
+              <LoginForm compact onSuccess={() => setShowLoginModal(false)} />
+            </div>
           </div>
         )}
 
@@ -1593,7 +1671,7 @@ const handleToggle = (id: string) => {
 
               <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-4">
                 <div className="flex justify-between font-extrabold text-slate-900 dark:text-white">
-                  <span>{boughtCount} món trong giỏ</span>
+                  <span>{totalCartCount} món trong giỏ</span>
                 </div>
                 <p className="text-xs text-emerald-800/80 dark:text-emerald-300 mt-1">VEGEAI chỉ hỗ trợ quản lý giỏ nguyên liệu và danh sách cần mua; không đặt hàng, giao hàng hoặc thanh toán.</p>
               </div>

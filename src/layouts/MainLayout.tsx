@@ -54,9 +54,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const guestNavItems: { label: string; path: string; isActive: boolean }[] = [
     { label: 'Khám phá', path: '/explore', isActive: pathname === '/explore' || pathname.startsWith('/recipe') },
-    { label: 'Blog', path: '/blog', isActive: pathname.startsWith('/blog') },
-    { label: 'Hỏi đáp', path: '/questions', isActive: pathname.startsWith('/questions') },
-    { label: 'Bản đồ & Đi chợ', path: '/smart-market', isActive: pathname === '/smart-market' },
+    { label: 'AI Bếp trưởng (Dùng thử)', path: '/ai-chef', isActive: pathname === '/ai-chef' },
+    { label: 'Quán chay & Kho nguyên liệu', path: '/smart-market', isActive: pathname === '/smart-market' || pathname === '/restaurants' },
   ];
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
@@ -201,6 +200,16 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         </nav>
 
         {/* Sub-Navigation Strip (Contextual secondary tabs per functional group) */}
+        {!isAuthenticated && isDiscoverActive && (
+          <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
+            <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
+              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">Khám phá:</span>
+              <Link to="/explore" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>Công thức món chay</Link>
+              <Link to="/blog" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname.startsWith('/blog') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>Blog cộng đồng</Link>
+              <Link to="/videos" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname.startsWith('/videos') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>Video nấu ăn</Link>
+            </div>
+          </div>
+        )}
         {isAuthenticated && (
           <>
             {isDiscoverActive && (
@@ -320,16 +329,18 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                   <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
                     Kho nguyên liệu:
                   </span>
-                  <Link
-                    to="/fridge"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname === '/fridge'
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
-                  >
-                    Tủ lạnh & Hạn sử dụng
-                  </Link>
+                  {isAuthenticated && (
+                    <Link
+                      to="/fridge"
+                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                        pathname === '/fridge'
+                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                      }`}
+                    >
+                      Tủ lạnh & Hạn sử dụng
+                    </Link>
+                  )}
                   <Link
                     to="/smart-market"
                     className={`px-3 py-1 rounded-lg transition shrink-0 ${

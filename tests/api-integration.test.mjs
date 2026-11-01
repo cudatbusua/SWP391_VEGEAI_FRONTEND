@@ -90,6 +90,7 @@ test('nearby places map backend coordinates and send radius in metres', async ()
     { placeId: 'near', name: 'Near', latitude: 10.001, longitude: 106, distanceKm: 0.1, category: 'RESTAURANT' },
     { placeId: 'invalid', name: 'Invalid' },
   ]));
+  fixture.api.setSession(auth(), true);
   const places = await fixture.restaurants.nearby({ lat: 10, lon: 106 }, 5, 'RESTAURANT');
   assert.equal(places.length, 2); assert.equal(places[0].name, 'Near'); assert.equal(places[1].openNow, true);
   const url = new URL(fixture.calls[0].url, 'http://localhost');
@@ -99,11 +100,13 @@ test('nearby places map backend coordinates and send radius in metres', async ()
 
 test('place search encodes keywords and preserves backend errors', async () => {
   const fixture = setup(() => reply([]));
+  fixture.api.setSession(auth(), true);
   assert.equal((await fixture.restaurants.search('Quận 1 & trung tâm', { lat: 10, lon: 106 }, 2)).length, 0);
   const url = new URL(fixture.calls[0].url, 'http://localhost');
   assert.equal(url.pathname, '/api/places/search');
   assert.equal(url.searchParams.get('query'), 'Quận 1 & trung tâm'); assert.equal(url.searchParams.get('radius'), '2000');
   const failure = setup(() => reply(null, 503, 'Places unavailable'));
+  failure.api.setSession(auth(), true);
   await assert.rejects(failure.restaurants.nearby({ lat: 10, lon: 106 }, 2), /Places unavailable/);
 });
 
@@ -117,6 +120,7 @@ test('verified restaurant feeds only include explicitly vegetarian-only or vegan
     { placeId: 'verified-market', name: 'Market', latitude: 10.3, longitude: 106.3, category: 'SUPERMARKET', isVerified: true },
     { placeId: 'mock_verified', name: 'Demo', latitude: 10.4, longitude: 106.4, category: 'RESTAURANT', isVerified: true, types: ['cuisine=vegetarian'] },
   ]));
+  fixture.api.setSession(auth(), true);
   const places = await fixture.restaurants.verifiedRestaurantsNearby({ lat: 10, lon: 106 }, 5);
   assert.deepEqual(places.map(place => place.id), ['verified-1', 'verified-vegan']);
   const url = new URL(fixture.calls[0].url, 'http://localhost');
@@ -124,6 +128,7 @@ test('verified restaurant feeds only include explicitly vegetarian-only or vegan
   assert.equal(url.searchParams.get('radius'), '5000');
 
   const search = setup(() => reply([{ placeId: 'verified-search', name: 'Chay', latitude: 10, longitude: 106, category: 'RESTAURANT', isVerified: true, types: ['diet:vegan=only'] }]));
+  search.api.setSession(auth(), true);
   assert.equal((await search.restaurants.searchVerifiedRestaurants('Quận 1 & gần đây', undefined, 2)).length, 1);
   const searchUrl = new URL(search.calls[0].url, 'http://localhost');
   assert.equal(searchUrl.pathname, '/api/places/verified/search');
@@ -354,14 +359,14 @@ test('failed logout preserves local auth so it can be retried', async () => {
   assert.equal((await fixture.auth.logout()).success, false); assert.equal(fixture.api.hasSession(), true);
 });
 
-test('public questions, published videos and comments stay anonymous', async () => {
+test('questions require a member while published videos and comments stay anonymous', async () => {
   const fixture = setup(() => reply({ items: [], page: 1, size: 8, totalElements: 0, totalPages: 0, first: false, last: true }));
   fixture.api.setSession(auth(), true);
   await fixture.community.questions({ keyword: 'đậu & nấm?', answered: false, page: 1 });
   const query = new URL(fixture.calls[0].url, 'http://localhost');
   assert.equal(query.searchParams.get('keyword'), 'đậu & nấm?');
   assert.equal(query.searchParams.get('answered'), 'false');
-  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+  assert.equal(fixture.calls[0].headers.has('Authorization'), true);
   await fixture.community.videos({ keyword: 'nấu chay', category: 'MON_CHAY', page: 0 });
   assert.equal(new URL(fixture.calls[1].url, 'http://localhost').searchParams.get('category'), 'MON_CHAY');
   assert.equal(fixture.calls[1].headers.has('Authorization'), false);

@@ -14,10 +14,10 @@ function query(values: Record<string, string | number | boolean | undefined>) {
 const id = encodeURIComponent;
 export const communityService = {
   async questions(params: { keyword?: string; answered?: boolean; page: number }, signal?: AbortSignal) {
-    return data(await apiRequest<PageResponse<Question>>('/questions' + query({ ...params, size: 8 }), { auth: 'none', signal }));
+    return data(await apiRequest<PageResponse<Question>>('/questions' + query({ ...params, size: 8 }), { signal }));
   },
   async question(questionId: string, signal?: AbortSignal) {
-    return data(await apiRequest<Question>('/questions/' + id(questionId), { auth: 'none', signal }));
+    return data(await apiRequest<Question>('/questions/' + id(questionId), { signal }));
   },
   async myQuestions(status: QuestionStatus | '', page: number, signal?: AbortSignal) {
     return data(await apiRequest<PageResponse<Question>>('/questions/mine' + query({ status, page, size: 8 }), { signal }));
@@ -60,6 +60,15 @@ export const communityService = {
   },
   async saveMyVideo(input: VideoInput, videoId?: string) {
     return data(await apiRequest<CommunityVideo>(videoId ? '/videos/mine/' + id(videoId) : '/videos', { method: videoId ? 'PUT' : 'POST', body: input }));
+  },
+  async archiveMyVideo(videoId: string, version: number) {
+    return data(await apiRequest<CommunityVideo>('/videos/mine/' + id(videoId) + '/archive', { method: 'POST', body: { version } }));
+  },
+  async restoreMyVideo(videoId: string, version: number) {
+    return data(await apiRequest<CommunityVideo>('/videos/mine/' + id(videoId) + '/restore', { method: 'POST', body: { version } }));
+  },
+  async deleteMyVideo(videoId: string, version: number) {
+    await apiRequest('/videos/mine/' + id(videoId) + query({ version }), { method: 'DELETE' });
   },
   async uploadMyVideoAsset(file: File, video: boolean) {
     const body = new FormData(); body.append('file', file);

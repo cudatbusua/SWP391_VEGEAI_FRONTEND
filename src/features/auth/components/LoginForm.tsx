@@ -5,7 +5,12 @@ import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
 
-export const LoginForm: React.FC = () => {
+interface LoginFormProps {
+  onSuccess?: () => void;
+  compact?: boolean;
+}
+
+export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false }) => {
   const { login, verifyLoginOtp, resendLoginOtp, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -15,7 +20,7 @@ export const LoginForm: React.FC = () => {
     : (typeof requestedPath === 'object' && requestedPath && 'pathname' in requestedPath)
       ? (requestedPath as { pathname: string }).pathname
       : null;
-  const destination = typeof rawPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition|settings|fridge)(?:\/[A-Za-z0-9-]+)*$/.test(rawPath)
+  const destination = typeof rawPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition|settings|fridge|smart-market|restaurants)(?:\/[A-Za-z0-9-]+)*$/.test(rawPath)
     ? rawPath : null;
 
   const resolveDestination = (role?: string): string => {
@@ -23,6 +28,11 @@ export const LoginForm: React.FC = () => {
       return (destination && destination.startsWith('/admin')) ? destination : '/admin';
     }
     return (destination && !destination.startsWith('/admin')) ? destination : '/dashboard';
+  };
+
+  const completeLogin = (role?: string) => {
+    if (onSuccess) onSuccess();
+    else navigate(resolveDestination(role), { replace: true });
   };
 
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
@@ -87,7 +97,7 @@ export const LoginForm: React.FC = () => {
               setIsGoogleSubmitting(true);
               const res = await loginWithGoogle(response.credential, formData.rememberMe);
               if (res.success && res.data) {
-                navigate(resolveDestination(res.data?.role), { replace: true });
+                completeLogin(res.data?.role);
               } else {
                 setGeneralError(res.error || 'Đăng nhập bằng Google không thành công.');
               }
@@ -162,7 +172,7 @@ export const LoginForm: React.FC = () => {
           try {
             const res = await loginWithGoogle(response.credential, formData.rememberMe);
             if (res.success && res.data) {
-              navigate(resolveDestination(res.data?.role), { replace: true });
+              completeLogin(res.data?.role);
             } else {
               setGeneralError(res.error || 'Đăng nhập bằng Google không thành công.');
             }
@@ -219,7 +229,7 @@ export const LoginForm: React.FC = () => {
     try {
       const res = await login(formData);
       if (res.success && res.data) {
-        navigate(resolveDestination(res.data.role), { replace: true });
+        completeLogin(res.data.role);
       } else {
         setGeneralError(res.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
       }
@@ -247,7 +257,7 @@ export const LoginForm: React.FC = () => {
       if (res.success && res.data) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          navigate(resolveDestination(res.data?.role), { replace: true });
+          completeLogin(res.data?.role);
         }, 800);
       } else {
         setGeneralError(res.error || 'Mã xác thực OTP không chính xác hoặc đã hết hạn.');
@@ -283,7 +293,7 @@ export const LoginForm: React.FC = () => {
       {step === 'CREDENTIALS' ? (
         <>
           {/* Form Header */}
-          <div className="mb-8">
+          <div className={compact ? 'mb-5' : 'mb-8'}>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
               Chào mừng bạn trở lại
             </h1>

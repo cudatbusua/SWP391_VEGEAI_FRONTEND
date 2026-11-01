@@ -71,7 +71,7 @@ function VideoAiRecipeCopilot({
             Tự động bóc tách công thức nấu ăn từ Video
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-xl">
-            AI tự động phân tích video ẩm thực chay, liệt kê danh sách nguyên liệu định lượng và từng bước chế biến chi tiết.
+            Với video công khai, AI đọc cả âm thanh và hình ảnh để trích xuất nguyên liệu, các bước và mốc thời gian. Video nội bộ chưa truy cập được sẽ được ghi rõ là chỉ phân tích tiêu đề và mô tả.
           </p>
         </div>
 
@@ -295,7 +295,12 @@ function VideoComments({ videoId }: { videoId: string }) {
 function VideoDetail({ videoId }: { videoId: string }) {
   const { user, isAuthenticated } = useAuth();
   const query = useCommunityQuery('video:' + videoId, signal => communityService.video(videoId, signal));
-  const related = useCommunityQuery('related-videos', signal => communityService.videos({ page: 0 }, signal));
+  const relatedCategory = query.data?.category || '';
+  const related = useCommunityQuery(
+    `related-videos:${relatedCategory}`,
+    signal => communityService.videos({ page: 0, category: relatedCategory }, signal),
+    !!query.data,
+  );
   const favoriteQuery = useCommunityQuery(JSON.stringify(['favorite', videoId, user?.id]), signal => communityService.favorite(videoId, signal), isAuthenticated);
   const [saved, setSaved] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -321,11 +326,11 @@ function VideoDetail({ videoId }: { videoId: string }) {
       </div>
 
       {/* AI Video-to-Recipe Extraction Copilot */}
-      <VideoAiRecipeCopilot
+      {isAuthenticated ? <VideoAiRecipeCopilot
         title={query.data.title}
         description={query.data.description}
         videoUrl={query.data.videoUrl}
-      />
+      /> : <div className="my-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-slate-700"><strong>Tóm tắt công thức từ video</strong><p className="mt-1">Tính năng phân tích âm thanh và hình ảnh dành cho thành viên.</p><Link className="cm-button secondary mt-3" to="/login" state={{ from: '/videos/' + videoId }}>Đăng nhập để phân tích</Link></div>}
 
       {error && <CommunityError message={error} />}
       {favoriteQuery.error && <CommunityError message={favoriteQuery.error} retry={favoriteQuery.refresh} />}

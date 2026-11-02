@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Bell, Check, CheckCheck, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { notificationService, type UserNotification } from '../services/notificationService';
+import { openNotificationStream } from '../services/apiClient';
 import { sfx } from '../utils/soundEffects';
 
 function formatTime(value: string): string {
@@ -47,6 +48,30 @@ export function NotificationBell() {
     const timer = window.setInterval(() => { void refresh(open); }, 60_000);
     return () => window.clearInterval(timer);
   }, [open]);
+
+  // Realtime push: refresh the badge as soon as the server stores a notification (no 60s wait).
+  useEffect(() => {
+    const controller = new AbortController();
+    let retry: number | undefined;
+    const connect = async (attempt: number) => {
+      try {
+        await openNotificationStream(payload => {
+          const notification = payload as UserNotification;
+          sfx.playNotification();
+          setUnreadCount(current => current + 1);
+          setItems(current => (current.some(item => item.id === notification.id) ? current : [notification, ...current].slice(0, 20)));
+        }, controller.signal);
+      } catch {
+        if (controller.signal.aborted) return;
+        retry = window.setTimeout(() => void connect(attempt + 1), Math.min(30_000, 2_000 * (attempt + 1)));
+      }
+    };
+    void connect(0);
+    return () => {
+      controller.abort();
+      if (retry) window.clearTimeout(retry);
+    };
+  }, []);
 
   const toggle = async () => {
     const nextOpen = !open;

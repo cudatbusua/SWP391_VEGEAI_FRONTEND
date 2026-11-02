@@ -27,10 +27,12 @@ import {
   Star,
   PackageCheck,
   Flame,
+  FileDown,
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { SmartMarketMap } from '../components/SmartMarketMap';
 import { sfx } from '../utils/soundEffects';
+import { escapeHtml, printHtml } from '../utils/printDocument';
 import { fridgeService } from '../services/fridgeService';
 import { userService } from '../services/userService';
 import { useAuth } from '../hooks/useAuth';
@@ -349,6 +351,27 @@ export function SmartMarketPage() {
       window.clearTimeout(timer);
       if (retryTimer) window.clearTimeout(retryTimer);
     };
+  }, [cartHydratedFor, cartOwnerId, isAuthenticated, multiCart]);
+
+  // "Danh sách cần mua" mirrors the account cart: items added here or on another device appear in the
+  // list; the bought/checked state stays per-browser so it does not leak between shoppers.
+  useEffect(() => {
+    if (!isAuthenticated || cartHydratedFor !== cartOwnerId || multiCart.length === 0) return;
+    updateItems(prev => {
+      const known = new Set(prev.map(item => item.name.toLowerCase().trim()));
+      const missing: SmartMarketItem[] = multiCart
+        .filter(item => !known.has(item.name.toLowerCase().trim()))
+        .map(item => ({
+          id: `cart-${item.id}`,
+          name: item.name,
+          amount: `${item.count} ${item.unit}`.trim(),
+          category: 'produce',
+          categoryLabel: item.storeCategory === 'VEGAN_STORE' ? 'Cửa hàng chay' : 'Giỏ nguyên liệu',
+          mealNote: item.storeName || 'Từ giỏ nguyên liệu',
+          checked: false
+        }));
+      return missing.length ? [...prev, ...missing] : prev;
+    });
   }, [cartHydratedFor, cartOwnerId, isAuthenticated, multiCart]);
 
   const filteredStoreCatalog = useMemo(() => {
@@ -695,6 +718,29 @@ const handleToggle = (id: string) => {
     }
   };
 
+  const exportShoppingListPdf = () => {
+    if (!items.length) {
+      window.alert('Danh sách cần mua đang trống. Hãy thêm nguyên liệu hoặc nhập từ thực đơn trước khi xuất PDF.');
+      return;
+    }
+    const rows = items.map(item => `
+      <tr>
+        <td>${item.checked ? '☑' : '☐'}</td>
+        <td>${escapeHtml(item.name)}</td>
+        <td class="right">${escapeHtml(item.amount)}</td>
+        <td>${escapeHtml(item.categoryLabel)}</td>
+        <td class="muted">${escapeHtml(item.mealNote)}</td>
+      </tr>`).join('');
+    printHtml('Danh sách đi chợ VEGEAI', `
+      <h1>Danh sách đi chợ VEGEAI</h1>
+      <p class="meta">${boughtCount}/${totalCount} mục đã mua · ${escapeHtml(new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }))}</p>
+      <table>
+        <thead><tr><th></th><th>Nguyên liệu</th><th class="right">Số lượng</th><th>Nhóm</th><th>Ghi chú</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="muted">Danh sách này chỉ lưu trên trình duyệt hiện tại; giỏ nguyên liệu được đồng bộ theo tài khoản.</p>`);
+  };
+
   // AI Ingredient Validation (Blocks Meat & Non-food items)
   const aiValidationWarning = useMemo(() => {
     if (!newName.trim()) return null;
@@ -976,7 +1022,7 @@ const handleToggle = (id: string) => {
               }`}
             >
               <ShoppingBag className="w-4 h-4 text-emerald-600" />
-              <span>Danh Sách Cần Mua ({boughtCount}/{totalCount})</span>
+              <span title="Danh sách cần mua lấy từ giỏ hàng của tài khoản; trạng thái đã mua lưu trên máy này.">Danh sách cần mua ({boughtCount}/{totalCount})</span>
             </button>}
           </div>
         </div>
@@ -1964,6 +2010,14 @@ const handleToggle = (id: string) => {
                   >
                     {boughtCount === totalCount ? "Bỏ chọn hết" : "Chọn hết"}
                   </button>
+                  <button
+                    type="button"
+                    onClick={exportShoppingListPdf}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+                    title="In hoặc lưu danh sách đi chợ thành PDF"
+                  >
+                    <FileDown className="w-4 h-4" /> Xuất PDF
+                  </button>
                   {totalCount > 0 && boughtCount === totalCount && (
                     <button
                       type="button"
@@ -2184,24 +2238,27 @@ const handleToggle = (id: string) => {
                               href={`https://www.bachhoaxanh.com/tim-kiem?key=${encodeURIComponent(item.name)}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 flex items-center gap-0.5 transition"
+                              className="px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 transition"
                             >
+                              <img src="/brands/bhx.png" alt="" loading="lazy" className="h-3.5 w-3.5 rounded-[3px] object-contain" />
                               BHX <ExternalLink size={9} />
                             </a>
                             <a
                               href={`https://cooponline.vn/search?q=${encodeURIComponent(item.name)}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-800 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800 flex items-center gap-0.5 transition"
+                              className="px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-800 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800 flex items-center gap-1 transition"
                             >
+                              <img src="/brands/coop.png" alt="" loading="lazy" className="h-3.5 w-3.5 rounded-[3px] object-contain" />
                               Co.op <ExternalLink size={9} />
                             </a>
                             <a
                               href={`https://winmart.vn/search?keyword=${encodeURIComponent(item.name)}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800 flex items-center gap-0.5 transition"
+                              className="px-2 py-1 rounded-md bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800 flex items-center gap-1 transition"
                             >
+                              <img src="/brands/winmart.png" alt="" loading="lazy" className="h-3.5 w-3.5 rounded-[3px] object-contain" />
                               WinMart <ExternalLink size={9} />
                             </a>
                           </div>

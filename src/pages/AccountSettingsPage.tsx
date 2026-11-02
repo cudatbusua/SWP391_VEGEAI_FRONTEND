@@ -499,7 +499,7 @@ export const AccountSettingsPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
               <div className="relative">
                 <div className="w-24 h-24 overflow-hidden rounded-full bg-linear-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white flex items-center justify-center font-extrabold text-3xl shadow-lg ring-4 ring-emerald-100 dark:ring-emerald-950/60">
-                  {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
+                  {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" onError={() => setAvatar('')} /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
                 </div>
                 <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" title="Đang trực tuyến" />
                 <label className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap cursor-pointer text-[11px] font-bold text-emerald-700 dark:text-emerald-400">

@@ -214,7 +214,7 @@ export function AdminAiMonitoringPage() {
               )}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-              Giám sát thời gian thực các mô hình Google Gemini (2.5 Flash, Vision, Moderation), thống kê độ trễ P95, hạn mức token và nhật ký can thiệp của Quản trị viên.
+              Giám sát thời gian thực các mô hình Google Gemini (Chat, Vision, Moderation), thống kê độ trễ P95, hạn mức token và nhật ký can thiệp của Quản trị viên.
             </p>
           </div>
 

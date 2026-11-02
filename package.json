@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node --test tests/api-integration.test.mjs",
+    "test": "node --test tests/api-integration.test.mjs tests/chat-session-store.test.mjs tests/auth-redirect.test.mjs",
     "test:e2e": "playwright test"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, CalendarDays, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, History, Loader2, RefreshCw, Save, ShoppingBag, Sparkles, Utensils, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, FileDown, History, Loader2, RefreshCw, Save, ShoppingBag, Sparkles, Utensils, X } from 'lucide-react';
 import { MealCalendar31DaysView, calendarGridRange, toDateKey } from './MealCalendar31DaysView';
 import { CommunityConfirm } from './CommunityUi';
 import { PlannedMealDetails } from './PlannedMealDetails';
@@ -11,6 +11,7 @@ import { mealPlanService } from '../services/mealPlanService';
 import { errorMessage } from '../services/apiClient';
 import { sfx } from '../utils/soundEffects';
 import { missingMarketItems } from '../utils/mealPlanMarket';
+import { escapeHtml, formatNumber, printHtml } from '../utils/printDocument';
 import type { NutritionTargets } from '../types/api';
 import type { MealPlan, PlanNutrients, PlannedMeal } from '../types/mealPlan';
 
@@ -198,8 +199,51 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     await swap(choice.recipeId);
   };
 
+  const exportMealPlanPdf = () => {
+    const days = [...(calendar.data ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+    if (!days.length) {
+      setError('Chưa có thực đơn nào trong khoảng đang xem để xuất PDF. Hãy chọn ngày rồi bấm "Lập với AI" hoặc lưu thực đơn trước.');
+      return;
+    }
+    const targets = days[0].targets;
+    const slotLabel = (slot: number) => ['Sáng', 'Trưa', 'Tối', 'Bữa phụ'][slot] ?? `Bữa ${slot + 1}`;
+    const sections = days.map(day => {
+      const rows = day.meals.map(meal => `
+        <tr>
+          <td>${escapeHtml(slotLabel(meal.slot))}</td>
+          <td>${escapeHtml(meal.title)}</td>
+          <td class="right">${meal.portions}</td>
+          <td class="right">${formatNumber(meal.nutrition?.calories)} kcal</td>
+          <td class="right">${formatNumber(meal.nutrition?.protein)} g</td>
+        </tr>`).join('');
+      return `<section class="day">
+        <h2>${escapeHtml(new Date(day.date + 'T12:00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }))}</h2>
+        <table><thead><tr><th>Bữa</th><th>Món</th><th class="right">Khẩu phần</th><th class="right">Calo</th><th class="right">Đạm</th></tr></thead>
+        <tbody>${rows}
+          <tr><td colspan="3"><strong>Tổng ngày</strong></td><td class="right"><strong>${formatNumber(day.totals.calories)} kcal</strong></td><td class="right"><strong>${formatNumber(day.totals.protein)} g</strong></td></tr>
+        </tbody></table>
+      </section>`;
+    }).join('');
+
+    printHtml('Thực đơn VEGEAI', `
+      <h1>Thực đơn chay VEGEAI</h1>
+      <p class="meta">Khoảng ${escapeHtml(days[0].date)} → ${escapeHtml(days[days.length - 1].date)} · Mục tiêu ${formatNumber(targets.dailyCaloriesTarget)} kcal/ngày · Đạm ${formatNumber(targets.proteinTargetG)} g · Chất xơ ${formatNumber(targets.fiberTargetG)} g</p>
+      ${sections}`);
+  };
+
   return (
     <div className="grid lg:grid-cols-12 gap-6 items-start">
+      <div className="lg:col-span-12 flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={exportMealPlanPdf}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+          title="In hoặc lưu thực đơn đang xem thành PDF"
+        >
+          <FileDown className="w-4 h-4" />
+          Xuất PDF thực đơn
+        </button>
+      </div>
       {/* LỊCH THỰC ĐƠN 30–31 NGÀY - BÊN TRÁI */}
       <div className="lg:col-span-5">
         <MealCalendar31DaysView

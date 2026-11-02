@@ -13,6 +13,9 @@ export interface HealthActivityRingsProps {
   weightKg?: number | '';
   age?: number;
   gender?: string;
+  /** Server-calculated values; when given they replace the local estimate. */
+  bmr?: number;
+  tdee?: number;
   showDetails?: boolean;
   compact?: boolean;
   onEditClick?: () => void;
@@ -29,6 +32,8 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
   weightKg,
   age = 26,
   gender = 'OTHER',
+  bmr: serverBmr,
+  tdee: serverTdee,
   showDetails = true,
   compact = false,
   onEditClick,
@@ -39,8 +44,9 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
 
   const bmi = numericHeight && numericWeight ? calculateBmi(numericWeight, numericHeight) : 0;
   const bmiCat = getBmiCategory(bmi);
-  const bmr = numericHeight && numericWeight ? calculateBmr(numericWeight, numericHeight, age, gender) : 0;
-  const tdee = bmr ? calculateTdee(bmr) : 0;
+  const bmr = serverBmr && serverBmr > 0 ? Math.round(serverBmr)
+    : (numericHeight && numericWeight ? calculateBmr(numericWeight, numericHeight, age, gender) : 0);
+  const tdee = serverTdee && serverTdee > 0 ? Math.round(serverTdee) : (bmr ? calculateTdee(bmr) : 0);
 
   // Actual targets - do not fall back to arbitrary numbers if user has not set them
   const effectiveCalorieTarget = calorieTarget > 0 ? calorieTarget : (tdee > 0 ? tdee : 0);

@@ -106,54 +106,34 @@ export const DashboardPage: React.FC = () => {
   const [guestHeight, setGuestHeight] = useState('165');
   const [guestWeight, setGuestWeight] = useState('56');
   const [guestGender, setGuestGender] = useState<'FEMALE' | 'MALE'>('FEMALE');
-  const [guestBmiResult, setGuestBmiResult] = useState<{
-    bmi: number;
-    category: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-  }>(() => {
-    const hM = 165 / 100;
-    const bmiVal = Math.round((56 / (hM * hM)) * 10) / 10;
-    const bmr = 447.593 + (9.247 * 56) + (3.098 * 165) - (4.330 * 25);
-    const tdee = Math.round(bmr * 1.4);
-    return {
-      bmi: bmiVal,
-      category: 'Cân đối lý tưởng',
-      calories: tdee,
-      protein: Math.round((tdee * 0.18) / 4),
-      carbs: Math.round((tdee * 0.55) / 4),
-      fat: Math.round((tdee * 0.27) / 9),
-    };
-  });
+  const [guestBmiResult, setGuestBmiResult] = useState<{ bmi: number; category: string; calories: number }>(
+    { bmi: 0, category: '', calories: 0 },
+  );
 
-  const handleRecalculateGuestBmi = () => {
-    sfx.playTap();
+  // Guests get the same server formula as members (Mifflin-St Jeor); age and activity are fixed assumptions.
+  const handleRecalculateGuestBmi = async () => {
     const h = parseFloat(guestHeight);
     const w = parseFloat(guestWeight);
     if (!h || !w || h <= 0 || w <= 0) return;
-    const hM = h / 100;
-    const bmiVal = Math.round((w / (hM * hM)) * 10) / 10;
-    let cat = 'Bình thường';
-    if (bmiVal < 18.5) cat = 'Nhẹ cân';
-    else if (bmiVal < 24.9) cat = 'Cân đối lý tưởng';
-    else if (bmiVal < 29.9) cat = 'Tiền béo phì';
-    else cat = 'Béo phì';
-
-    const bmr = guestGender === 'MALE'
-      ? 88.362 + (13.397 * w) + (4.799 * h) - (5.677 * 25)
-      : 447.593 + (9.247 * w) + (3.098 * h) - (4.330 * 25);
-    const tdee = Math.round(bmr * 1.4);
-    setGuestBmiResult({
-      bmi: bmiVal,
-      category: cat,
-      calories: tdee,
-      protein: Math.round((tdee * 0.18) / 4),
-      carbs: Math.round((tdee * 0.55) / 4),
-      fat: Math.round((tdee * 0.27) / 9),
-    });
+    try {
+      const targets = await nutritionService.calculate({
+        gender: guestGender, age: 25, heightCm: h, weightKg: w, activityLevel: 'LIGHT', goal: 'MAINTAIN',
+      });
+      setGuestBmiResult({
+        bmi: Math.round(targets.bmi * 10) / 10,
+        category: targets.bmiCategoryLabel,
+        calories: Math.round(targets.dailyCaloriesTarget),
+      });
+    } catch {
+      setGuestBmiResult({ bmi: 0, category: 'Chiều cao 100–280 cm, cân nặng 20–350 kg', calories: 0 });
+    }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated) void handleRecalculateGuestBmi();
+    // Only the initial default values are calculated automatically; later runs follow the button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   // Quick Shopping List state (synced with Smart Market)
   const shoppingStorageKey = 'vegeai:smart-market:items-v1';
@@ -665,9 +645,11 @@ export const DashboardPage: React.FC = () => {
                     proteinGrams={0}
                     proteinTarget={Math.round(nutrition.targets.proteinTargetG)}
                     fiberGrams={0}
-                    fiberTarget={35}
+                    fiberTarget={Math.round(nutrition.targets.fiberTargetG)}
                     heightCm={nutrition.heightCm}
                     weightKg={nutrition.weightKg}
+                    bmr={nutrition.targets.bmr}
+                    tdee={nutrition.targets.tdee}
                     showDetails={true}
                     compact={true}
                     onEditClick={() => navigate('/settings?tab=profile')}
@@ -721,7 +703,7 @@ export const DashboardPage: React.FC = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={handleRecalculateGuestBmi}
+                        onClick={() => { sfx.playTap(); void handleRecalculateGuestBmi(); }}
                         className="px-3 py-1 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition cursor-pointer"
                       >
                         Tính ngay
@@ -733,7 +715,7 @@ export const DashboardPage: React.FC = () => {
                   <div className="flex items-baseline justify-between p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60">
                     <div>
                       <span className="text-2xl font-black text-stone-900 dark:text-white tracking-tight">
-                        {guestBmiResult.calories.toLocaleString('vi-VN')}
+                        {guestBmiResult.calories > 0 ? guestBmiResult.calories.toLocaleString('vi-VN') : '—'}
                       </span>
                       <span className="text-xs font-bold text-stone-500 dark:text-slate-400 ml-1.5">
                         kcal / ngày
@@ -741,7 +723,7 @@ export const DashboardPage: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <span className="inline-block px-3 py-0.5 rounded-full text-xs font-bold bg-white dark:bg-[#121a24] text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                        BMI: {guestBmiResult.bmi}
+                        BMI: {guestBmiResult.bmi > 0 ? guestBmiResult.bmi : '—'}
                       </span>
                       <p className="text-[11px] text-emerald-800 dark:text-emerald-300 font-bold mt-0.5">
                         {guestBmiResult.category}
@@ -776,7 +758,7 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             <div className="mt-5 pt-3 border-t border-stone-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-stone-500 dark:text-slate-400">
-              <span>{isAuthenticated && nutrition?.targets ? `BMR: ${Math.round(nutrition.targets.bmr)} kcal` : 'Tiêu chuẩn Harris-Benedict'}</span>
+              <span>{isAuthenticated && nutrition?.targets ? `BMR: ${Math.round(nutrition.targets.bmr)} kcal` : 'Công thức Mifflin-St Jeor'}</span>
               <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Thuật toán dinh dưỡng xác định</span>
             </div>
           </div>

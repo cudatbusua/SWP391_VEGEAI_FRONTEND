@@ -19,6 +19,9 @@ import { sfx } from '../utils/soundEffects';
 import { wearableService } from '../utils/wearableService';
 import type { WearableMetrics } from '../utils/wearableService';
 import { calculateBmr, calculateTdee } from '../utils/nutritionProfile';
+import { nutritionService } from '../services/nutritionService';
+import { hasSession } from '../services/apiClient';
+import type { NutritionTargets } from '../types/api';
 
 export interface ChatMealScheduleCardData {
   weekTitle: string;
@@ -266,6 +269,15 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [liveMetrics, setLiveMetrics] = useState<WearableMetrics>(() => wearableService.getMetrics());
+  const [serverTargets, setServerTargets] = useState<NutritionTargets | null>(null);
+
+  // Signed-in members get the same server-calculated targets as their profile and dashboard.
+  useEffect(() => {
+    if (!hasSession()) return;
+    const controller = new AbortController();
+    nutritionService.getProfile(controller.signal).then(p => setServerTargets(p.targets)).catch(() => {});
+    return () => controller.abort();
+  }, []);
   const [, setProfileSyncCount] = useState(0);
 
   useEffect(() => {
@@ -305,19 +317,23 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
   const hNum = typeof height === 'number' && height > 0 ? height : 0;
   const wNum = typeof weight === 'number' && weight > 0 ? weight : 0;
 
-  const bmr = (hNum > 0 && wNum > 0) ? calculateBmr(wNum, hNum, age, gender) : 0;
-  const tdee = bmr > 0 ? calculateTdee(bmr, 1.375) : 0;
+  const bmr = serverTargets ? Math.round(serverTargets.bmr) : ((hNum > 0 && wNum > 0) ? calculateBmr(wNum, hNum, age, gender) : 0);
+  const tdee = serverTargets ? Math.round(serverTargets.tdee) : (bmr > 0 ? calculateTdee(bmr, 1.375) : 0);
   const defaultScientificCalorie = tdee > 0 ? Math.round(tdee) : (bmr > 0 ? Math.round(bmr) : 1800);
 
-  const effectiveCalorieTarget = (targetCalorie > 0 && targetCalorie !== 1850)
-    ? targetCalorie
-    : (defaultScientificCalorie > 0 ? defaultScientificCalorie : 2531);
+  const effectiveCalorieTarget = serverTargets
+    ? Math.round(serverTargets.dailyCaloriesTarget)
+    : (targetCalorie > 0 && targetCalorie !== 1850)
+      ? targetCalorie
+      : (defaultScientificCalorie > 0 ? defaultScientificCalorie : 2531);
 
-  const effectiveProteinTarget = wNum > 0
-    ? Math.round(wNum * 1.1)
-    : (effectiveCalorieTarget > 0 ? Math.round((effectiveCalorieTarget * 0.20) / 4) : 0);
+  const effectiveProteinTarget = serverTargets
+    ? Math.round(serverTargets.proteinTargetG)
+    : wNum > 0
+      ? Math.round(wNum * 1.1)
+      : (effectiveCalorieTarget > 0 ? Math.round((effectiveCalorieTarget * 0.20) / 4) : 0);
 
-  const effectiveFiberTarget = effectiveCalorieTarget > 0 ? 35 : 0;
+  const effectiveFiberTarget = serverTargets ? Math.round(serverTargets.fiberTargetG) : (effectiveCalorieTarget > 0 ? 35 : 0);
 
   // Active calories from wearable / live sync
   const currentActiveKcal = liveMetrics.activeCalories > 0
@@ -400,6 +416,8 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
           weightKg={wNum || ''}
           age={age}
           gender={gender}
+          bmr={bmr}
+          tdee={tdee}
           compact={true}
           showDetails={true}
         />

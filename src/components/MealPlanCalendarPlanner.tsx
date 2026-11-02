@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, CalendarDays, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, History, Loader2, RefreshCw, Save, ShoppingBag, Sparkles, Utensils, X } from 'lucide-react';
 import { MealCalendar31DaysView, calendarGridRange, toDateKey } from './MealCalendar31DaysView';
 import { CommunityConfirm } from './CommunityUi';
@@ -34,6 +34,16 @@ const planStatus = (start: string, end: string, today: string) =>
  * (latest save wins on overlapping days); a freshly generated plan stays a local draft until saved.
  */
 export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingList }: MealPlanCalendarPlannerProps) {
+  const location = useLocation();
+  // Both sub-tabs link to this same page and the router does not scroll by itself:
+  // "Thực đơn đã lưu" (#saved-meal-plans) goes to the saved list, "Lịch ăn 30 ngày" (no hash) back to the calendar at the top.
+  useEffect(() => {
+    if (location.hash === '#saved-meal-plans') {
+      document.getElementById('saved-meal-plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (!location.hash) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [location.hash, location.key]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());

@@ -4,6 +4,7 @@ import { ArrowRight, AlertCircle, CheckCircle2, ShieldCheck, ArrowLeft, RefreshC
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
+import { loginDestination } from '../../../utils/authRedirect';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -14,25 +15,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
   const { login, verifyLoginOtp, resendLoginOtp, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const requestedPath: unknown = location.state?.from;
-  const rawPath = typeof requestedPath === 'string'
-    ? requestedPath
-    : (typeof requestedPath === 'object' && requestedPath && 'pathname' in requestedPath)
-      ? (requestedPath as { pathname: string }).pathname
-      : null;
-  const destination = typeof rawPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition|settings|fridge|smart-market|restaurants)(?:\/[A-Za-z0-9-]+)*$/.test(rawPath)
-    ? rawPath : null;
-
-  const resolveDestination = (role?: string): string => {
-    if (role === 'admin') {
-      return (destination && destination.startsWith('/admin')) ? destination : '/admin';
-    }
-    return (destination && !destination.startsWith('/admin')) ? destination : '/dashboard';
-  };
 
   const completeLogin = (role?: string) => {
     if (onSuccess) onSuccess();
-    else navigate(resolveDestination(role), { replace: true });
+    else navigate(loginDestination(role, location.state?.from), { replace: true });
   };
 
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);

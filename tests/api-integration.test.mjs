@@ -441,13 +441,32 @@ test('video embeds use exact provider allowlists and reject unsafe or credential
   assert.equal(videoMedia.videoDuration(3661), '1:01:01');
 });
 
-test('guest cannot call account-bound AI services before logging in', async () => {
+test('guest AI chat is sent anonymously so the three-turn trial can be used', async () => {
+  const fixture = setup(() => reply({ reply: 'Món chay', sessionId: 'chat-1', isGuestTrial: true, remainingGuestQuota: 2 }));
+  const result = await fixture.ai.chat(' Gợi ý món chay ', 'chat-1');
+  assert.equal(result.remainingGuestQuota, 2);
+  assert.equal(result.isGuestTrial, true);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.calls[0].url, '/api/ai/chat');
+  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), { message: 'Gợi ý món chay', sessionId: 'chat-1' });
+});
+
+test('the fourth guest turn surfaces the quota code that triggers the login prompt', async () => {
+  const fixture = setup(() => reply(undefined, 429, 'Guest trial limit reached (3 requests per 24h). Please log in.', 1402));
+  await assert.rejects(fixture.ai.chat('Câu thứ tư'), error => {
+    assert.equal(error.name, 'ApiError');
+    assert.equal(error.status, 429);
+    assert.equal(error.code, 1402);
+    assert.match(error.message, /guest trial limit/i);
+    return true;
+  });
+  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+});
+
+test('fridge scanning requires an account before any upload leaves the browser', async () => {
   const fixture = setup(() => reply({}));
-  for (const action of [
-    () => fixture.ai.chat('Gợi ý món chay'),
-    () => fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })),
-    () => fixture.ai.extractRecipeFromVideo('Món chay'),
-  ]) await assert.rejects(action(), /đăng nhập/);
+  await assert.rejects(fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })), /đăng nhập/);
   assert.equal(fixture.calls.length, 0);
 });
 

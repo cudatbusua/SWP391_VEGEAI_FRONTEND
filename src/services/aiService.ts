@@ -7,13 +7,16 @@ export const aiService = {
     if (history && (history.length > 10 || history.some(item => !item || !['user', 'model'].includes(item.role) || !item.text?.trim() || item.text.length > 4000))) {
       throw new Error('Ngữ cảnh trò chuyện không hợp lệ. Vui lòng bắt đầu cuộc trò chuyện mới.');
     }
+    // Guests are allowed to chat: the backend grants them 3 trial turns per day and answers
+    // 429 (code 1402) after that, which the chat page turns into a login prompt.
     const response = await apiRequest<AiChatResponse>('/ai/chat', {
-      method: 'POST', body: { message: message.trim(), sessionId, history }, timeoutMs: 90000,
+      method: 'POST', auth: 'optional', body: { message: message.trim(), sessionId, history }, timeoutMs: 90000,
     });
     if (!response.data?.reply?.trim()) throw new Error('AI chưa trả về kết quả.');
     return response.data;
   },
 
+  /** Fridge scanning is an account feature: guests are sent to the login screen before any upload. */
   async scanFridge(image: File): Promise<FridgeScanResponse> {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type)) throw new Error('Vui lòng chọn ảnh JPG, PNG hoặc WEBP.');
     if (image.size === 0 || image.size > 5 * 1024 * 1024) throw new Error('Ảnh phải có dung lượng từ 1 byte đến 5 MB.');

@@ -541,7 +541,7 @@ export function AiChatPage() {
         replyText = replyText.replace(/tính năng đồng bộ dữ liệu thời gian thực từ thiết bị đeo.*khung chat này\.?/gi, '').trim();
         replyText = replyText.replace(/mình hỗ trợ các chủ đề về ăn chay, công thức và tính năng của vegeai\.? bạn có muốn tìm một món chay phù hợp hôm nay không\??/gi, '').trim();
         if (!replyText || replyText.length < 20) {
-          replyText = 'Hệ thống VEGEAI hỗ trợ kết nối trực tiếp với Google Fit và các thiết bị đeo thông minh (Xiaomi Band, Apple Watch, Smartband...) qua chuẩn OAuth 2.0. Các chỉ số bước chân và calo tiêu hao vận động sẽ được tự động cập nhật vào vòng Zen Rings để Bếp trưởng cân bằng lại thực đơn thích ứng cho bạn. Bạn có thể bấm nút **"Đồng bộ Google Fit"** ngay trên thẻ bên dưới hoặc mở mục **"Hồ sơ & Thể trạng"** để hoàn tất liên kết tài khoản.';
+          replyText = 'Hệ thống VEGEAI hỗ trợ kết nối trực tiếp với Google Fit và các thiết bị đeo thông minh (Xiaomi Band, Apple Watch, Smartband...) một cách an toàn và bảo mật. Các chỉ số bước chân và calo tiêu hao vận động sẽ được tự động cập nhật vào vòng Zen Rings để Bếp trưởng cân bằng lại thực đơn thích ứng cho bạn. Bạn có thể bấm nút **"Đồng bộ Google Fit"** ngay trên thẻ bên dưới hoặc mở mục **"Hồ sơ & Thể trạng"** để hoàn tất liên kết tài khoản.';
         }
       }
 

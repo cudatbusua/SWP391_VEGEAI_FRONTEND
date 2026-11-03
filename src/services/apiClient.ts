@@ -43,6 +43,14 @@ export function clearSession(): void {
   localStorage.removeItem('wearable_steps');
   localStorage.removeItem('wearable_kcal');
   localStorage.removeItem('wearable_heart_rate');
+  localStorage.removeItem('wearable_active_minutes');
+  localStorage.removeItem('wearable_sleep');
+  localStorage.removeItem('wearable_distance_km');
+  localStorage.removeItem('wearable_heart_points');
+  localStorage.removeItem('wearable_spo2');
+  localStorage.removeItem('wearable_kcal_total');
+  localStorage.removeItem('wearable_user_bmr');
+  localStorage.removeItem('wearable_hr_scope_missing');
   localStorage.removeItem('wearable_source');
   localStorage.removeItem('wearable_last_synced');
   localStorage.removeItem('wearable_preset');

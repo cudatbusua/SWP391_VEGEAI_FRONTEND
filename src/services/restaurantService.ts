@@ -56,7 +56,7 @@ export const restaurantService = {
   },
   async nearby(center: Coordinates, radius: number, category: PlaceCategory = 'ALL'): Promise<Place[]> {
     const params = new URLSearchParams({ lat: String(center.lat), lng: String(center.lon), radius: String(radius * 1000), category });
-    const response = await apiRequest<BackendPlace[]>('/places/nearby?' + params, { auth: 'none', timeoutMs: 45000 });
+    const response = await apiRequest<BackendPlace[]>('/places/nearby?' + params, { auth: 'none', timeoutMs: 60000 });
     if (!response.data) throw new Error('Không thể tìm địa điểm quanh bạn.');
     return mapPlaces(response.data);
   },

@@ -508,14 +508,19 @@ export function SmartMarketPage() {
   const location = useLocation();
   const [importNotice, setImportNotice] = useState<string | null>(null);
 
-  // Fetch real places whenever coordinates change
+  // Show nearby stores immediately, then upgrade to real OpenStreetMap data when it arrives.
   const loadStoresForCoords = useCallback(async (lat: number, lon: number) => {
     setLoadingStores(true);
+    const fallbackStores = buildAnchoredStoresForCoordinates(lat, lon);
+    setStores(fallbackStores);
+    if (fallbackStores.length > 0) {
+      setSelectedStore(current => current ?? fallbackStores[0]);
+    }
     try {
       const realStores = await fetchRealPlacesNearby(lat, lon);
-      setStores(realStores);
       if (realStores.length > 0) {
-        setSelectedStore(realStores[0]);
+        setStores(realStores);
+        setSelectedStore(current => (current && realStores.some(store => store.id === current.id) ? current : realStores[0]));
       }
     } catch (err) {
       console.error('[SMART-MARKET] Failed to load stores:', err);

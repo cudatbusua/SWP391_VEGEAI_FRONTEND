@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, AlertCircle, CheckCircle2, ShieldCheck, ArrowLeft, RefreshCw, KeyRound } from 'lucide-react';
+import { ArrowRight, AlertCircle, CheckCircle2, ShieldCheck, ArrowLeft, RefreshCw, KeyRound, Mail, Lock, Sparkles } from 'lucide-react';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
@@ -283,7 +283,11 @@ export const LoginForm: React.FC = () => {
       {step === 'CREDENTIALS' ? (
         <>
           {/* Form Header */}
-          <div className="mb-8">
+          <div className="mb-7">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/60 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 mb-3">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+              <span>KHÔNG GIAN ẨM THỰC THUẦN CHAY</span>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-2">
               Chào mừng bạn trở lại
             </h1>
@@ -310,6 +314,7 @@ export const LoginForm: React.FC = () => {
             <Input
               label="Tên đăng nhập hoặc email"
               placeholder="member@vegeai.com"
+              leftIcon={<Mail className="w-4 h-4" />}
               value={formData.emailOrPhone}
               onChange={(e) => {
                 setFormData({ ...formData, emailOrPhone: e.target.value });
@@ -322,6 +327,7 @@ export const LoginForm: React.FC = () => {
               label="Mật khẩu"
               type="password"
               placeholder="Nhập mật khẩu"
+              leftIcon={<Lock className="w-4 h-4" />}
               value={formData.password}
               onChange={(e) => {
                 setFormData({ ...formData, password: e.target.value });

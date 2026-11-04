@@ -49,7 +49,7 @@ const reply = (data, status = 200, message = 'OK', code = status) => ({ ok: stat
   json: async () => ({ success: status < 400, code, message, data }) });
 const hash = value => createHash('sha256').update(value).digest('hex');
 
-test('nutrition saves contact, diet and exclusions and authenticates calculation', async () => {
+test('nutrition saves contact privately while calculation remains public', async () => {
   const fixture = setup(() => reply({ targets: { dailyCaloriesTarget: 1800 } }));
   fixture.api.setSession(auth(), true);
   const input = { gender: 'FEMALE', dateOfBirth: '2000-01-01', heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN', phoneNumber: '0912345678', dietaryPreferences: 'VEGAN', allergies: 'Đậu phộng', customDailyCalories: null };
@@ -58,7 +58,7 @@ test('nutrition saves contact, diet and exclusions and authenticates calculation
   assert.deepEqual(JSON.parse(fixture.calls[0].body), input);
   assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
   await fixture.nutrition.calculate({ gender: 'FEMALE', age: 26, heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN' });
-  assert.equal(fixture.calls[1].headers.get('Authorization'), 'Bearer token-1');
+  assert.equal(fixture.calls[1].headers.get('Authorization'), null);
   assert.equal(JSON.parse(fixture.calls[1].body).phoneNumber, undefined);
 });
 
@@ -90,6 +90,7 @@ test('nearby places map backend coordinates and send radius in metres', async ()
     { placeId: 'near', name: 'Near', latitude: 10.001, longitude: 106, distanceKm: 0.1, category: 'RESTAURANT' },
     { placeId: 'invalid', name: 'Invalid' },
   ]));
+  fixture.api.setSession(auth(), true);
   const places = await fixture.restaurants.nearby({ lat: 10, lon: 106 }, 5, 'RESTAURANT');
   assert.equal(places.length, 2); assert.equal(places[0].name, 'Near'); assert.equal(places[1].openNow, true);
   const url = new URL(fixture.calls[0].url, 'http://localhost');
@@ -99,11 +100,13 @@ test('nearby places map backend coordinates and send radius in metres', async ()
 
 test('place search encodes keywords and preserves backend errors', async () => {
   const fixture = setup(() => reply([]));
+  fixture.api.setSession(auth(), true);
   assert.equal((await fixture.restaurants.search('Quận 1 & trung tâm', { lat: 10, lon: 106 }, 2)).length, 0);
   const url = new URL(fixture.calls[0].url, 'http://localhost');
   assert.equal(url.pathname, '/api/places/search');
   assert.equal(url.searchParams.get('query'), 'Quận 1 & trung tâm'); assert.equal(url.searchParams.get('radius'), '2000');
   const failure = setup(() => reply(null, 503, 'Places unavailable'));
+  failure.api.setSession(auth(), true);
   await assert.rejects(failure.restaurants.nearby({ lat: 10, lon: 106 }, 2), /Places unavailable/);
 });
 
@@ -117,6 +120,7 @@ test('verified restaurant feeds only include explicitly vegetarian-only or vegan
     { placeId: 'verified-market', name: 'Market', latitude: 10.3, longitude: 106.3, category: 'SUPERMARKET', isVerified: true },
     { placeId: 'mock_verified', name: 'Demo', latitude: 10.4, longitude: 106.4, category: 'RESTAURANT', isVerified: true, types: ['cuisine=vegetarian'] },
   ]));
+  fixture.api.setSession(auth(), true);
   const places = await fixture.restaurants.verifiedRestaurantsNearby({ lat: 10, lon: 106 }, 5);
   assert.deepEqual(places.map(place => place.id), ['verified-1', 'verified-vegan']);
   const url = new URL(fixture.calls[0].url, 'http://localhost');
@@ -124,6 +128,7 @@ test('verified restaurant feeds only include explicitly vegetarian-only or vegan
   assert.equal(url.searchParams.get('radius'), '5000');
 
   const search = setup(() => reply([{ placeId: 'verified-search', name: 'Chay', latitude: 10, longitude: 106, category: 'RESTAURANT', isVerified: true, types: ['diet:vegan=only'] }]));
+  search.api.setSession(auth(), true);
   assert.equal((await search.restaurants.searchVerifiedRestaurants('Quận 1 & gần đây', undefined, 2)).length, 1);
   const searchUrl = new URL(search.calls[0].url, 'http://localhost');
   assert.equal(searchUrl.pathname, '/api/places/verified/search');
@@ -354,20 +359,20 @@ test('failed logout preserves local auth so it can be retried', async () => {
   assert.equal((await fixture.auth.logout()).success, false); assert.equal(fixture.api.hasSession(), true);
 });
 
-test('public questions stay anonymous while videos require a member token', async () => {
+test('questions require a member while published videos and comments stay anonymous', async () => {
   const fixture = setup(() => reply({ items: [], page: 1, size: 8, totalElements: 0, totalPages: 0, first: false, last: true }));
   fixture.api.setSession(auth(), true);
   await fixture.community.questions({ keyword: 'đậu & nấm?', answered: false, page: 1 });
   const query = new URL(fixture.calls[0].url, 'http://localhost');
   assert.equal(query.searchParams.get('keyword'), 'đậu & nấm?');
   assert.equal(query.searchParams.get('answered'), 'false');
-  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+  assert.equal(fixture.calls[0].headers.has('Authorization'), true);
   await fixture.community.videos({ keyword: 'nấu chay', category: 'MON_CHAY', page: 0 });
   assert.equal(new URL(fixture.calls[1].url, 'http://localhost').searchParams.get('category'), 'MON_CHAY');
-  assert.equal(fixture.calls[1].headers.get('Authorization'), 'Bearer token-1');
+  assert.equal(fixture.calls[1].headers.has('Authorization'), false);
   await fixture.community.comments('video/one', 0);
   assert.ok(fixture.calls[2].url.startsWith('/api/videos/video%2Fone/comments?'));
-  assert.equal(fixture.calls[2].headers.get('Authorization'), 'Bearer token-1');
+  assert.equal(fixture.calls[2].headers.has('Authorization'), false);
 });
 
 test('community private resources and mutations never fall back to unauthenticated writes', async () => {
@@ -436,18 +441,32 @@ test('video embeds use exact provider allowlists and reject unsafe or credential
   assert.equal(videoMedia.videoDuration(3661), '1:01:01');
 });
 
-test('guest cannot call AI, nutrition or video services before logging in', async () => {
+test('guest AI chat is sent anonymously so the three-turn trial can be used', async () => {
+  const fixture = setup(() => reply({ reply: 'Món chay', sessionId: 'chat-1', isGuestTrial: true, remainingGuestQuota: 2 }));
+  const result = await fixture.ai.chat(' Gợi ý món chay ', 'chat-1');
+  assert.equal(result.remainingGuestQuota, 2);
+  assert.equal(result.isGuestTrial, true);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.calls[0].url, '/api/ai/chat');
+  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), { message: 'Gợi ý món chay', sessionId: 'chat-1' });
+});
+
+test('the fourth guest turn surfaces the quota code that triggers the login prompt', async () => {
+  const fixture = setup(() => reply(undefined, 429, 'Guest trial limit reached (3 requests per 24h). Please log in.', 1402));
+  await assert.rejects(fixture.ai.chat('Câu thứ tư'), error => {
+    assert.equal(error.name, 'ApiError');
+    assert.equal(error.status, 429);
+    assert.equal(error.code, 1402);
+    assert.match(error.message, /guest trial limit/i);
+    return true;
+  });
+  assert.equal(fixture.calls[0].headers.has('Authorization'), false);
+});
+
+test('fridge scanning requires an account before any upload leaves the browser', async () => {
   const fixture = setup(() => reply({}));
-  for (const action of [
-    () => fixture.ai.chat('Gợi ý món chay'),
-    () => fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })),
-    () => fixture.ai.extractRecipeFromVideo('Món chay'),
-    () => fixture.nutrition.calculate({ gender: 'FEMALE', age: 26, heightCm: 160, weightKg: 55, activityLevel: 'MODERATE', goal: 'MAINTAIN' }),
-    () => fixture.nutrition.options(),
-    () => fixture.community.videos({ page: 0 }),
-    () => fixture.community.video('video-1'),
-    () => fixture.community.comments('video-1', 0),
-  ]) await assert.rejects(action(), /đăng nhập/);
+  await assert.rejects(fixture.ai.scanFridge(new File(['image'], 'fridge.png', { type: 'image/png' })), /đăng nhập/);
   assert.equal(fixture.calls.length, 0);
 });
 

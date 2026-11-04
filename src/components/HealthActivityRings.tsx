@@ -13,6 +13,9 @@ export interface HealthActivityRingsProps {
   weightKg?: number | '';
   age?: number;
   gender?: string;
+  /** Server-calculated values; when given they replace the local estimate. */
+  bmr?: number;
+  tdee?: number;
   showDetails?: boolean;
   compact?: boolean;
   onEditClick?: () => void;
@@ -29,6 +32,8 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
   weightKg,
   age = 26,
   gender = 'OTHER',
+  bmr: serverBmr,
+  tdee: serverTdee,
   showDetails = true,
   compact = false,
   onEditClick,
@@ -39,8 +44,9 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
 
   const bmi = numericHeight && numericWeight ? calculateBmi(numericWeight, numericHeight) : 0;
   const bmiCat = getBmiCategory(bmi);
-  const bmr = numericHeight && numericWeight ? calculateBmr(numericWeight, numericHeight, age, gender) : 0;
-  const tdee = bmr ? calculateTdee(bmr) : 0;
+  const bmr = serverBmr && serverBmr > 0 ? Math.round(serverBmr)
+    : (numericHeight && numericWeight ? calculateBmr(numericWeight, numericHeight, age, gender) : 0);
+  const tdee = serverTdee && serverTdee > 0 ? Math.round(serverTdee) : (bmr ? calculateTdee(bmr) : 0);
 
   // Actual targets - do not fall back to arbitrary numbers if user has not set them
   const effectiveCalorieTarget = calorieTarget > 0 ? calorieTarget : (tdee > 0 ? tdee : 0);
@@ -111,9 +117,9 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-center">
         {/* Left: Concentric SVG Activity Rings */}
-        <div className="md:col-span-5 flex flex-col items-center justify-center">
+        <div className="xl:col-span-5 flex flex-col items-center justify-center">
           <div className="relative w-44 h-44 flex items-center justify-center">
             <svg className="w-full h-full transform -rotate-90 drop-shadow-xs" viewBox="0 0 160 160">
               {/* Ring 1: Calorie Track (Outer) */}
@@ -218,14 +224,14 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
         </div>
 
         {/* Right: Ring Legend & Biometric Stat Badges */}
-        <div className="md:col-span-7 space-y-4">
+        <div className="xl:col-span-7 space-y-4 min-w-0">
           {/* Ring Metrics Legend */}
           <div className="space-y-2.5">
             {/* Red Ring: Calo */}
-            <div className="p-3 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/40 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
+            <div className="p-3 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/50 dark:border-rose-900/40 flex items-start justify-between gap-2 min-w-0">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <span className="w-3 h-3 rounded-full bg-rose-500 shadow-xs shrink-0" />
-                <div>
+                <div className="min-w-0">
                   <span className="block text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
                     <Flame className="w-3.5 h-3.5 text-rose-500" /> Năng lượng (Calo vận động)
                     {calories > 0 && (
@@ -241,7 +247,7 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="shrink-0 text-right">
                 <span className="text-sm font-black text-rose-600 dark:text-rose-400">
                   {calories > 0 ? calories.toLocaleString('vi-VN') : '—'}
                   <span className="text-[11px] font-semibold text-slate-400 ml-1">kcal</span>
@@ -253,10 +259,10 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
             </div>
 
             {/* Emerald Ring: Đạm thực vật */}
-            <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/40 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
+            <div className="p-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-900/40 flex items-start justify-between gap-2 min-w-0">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-xs shrink-0" />
-                <div>
+                <div className="min-w-0">
                   <span className="block text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
                     <Beef className="w-3.5 h-3.5 text-emerald-500" /> Đạm thực vật (Protein)
                   </span>
@@ -267,7 +273,7 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="shrink-0 text-right">
                 <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
                   {proteinGrams > 0 ? proteinGrams : '—'}
                   <span className="text-[11px] font-semibold text-slate-400 ml-1">g</span>
@@ -279,10 +285,10 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
             </div>
 
             {/* Cyan Ring: Chất xơ & Vi chất */}
-            <div className="p-3 rounded-2xl bg-cyan-50/60 dark:bg-cyan-950/20 border border-cyan-200/50 dark:border-cyan-900/40 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
+            <div className="p-3 rounded-2xl bg-cyan-50/60 dark:bg-cyan-950/20 border border-cyan-200/50 dark:border-cyan-900/40 flex items-start justify-between gap-2 min-w-0">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <span className="w-3 h-3 rounded-full bg-cyan-500 shadow-xs shrink-0" />
-                <div>
+                <div className="min-w-0">
                   <span className="block text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1">
                     <Leaf className="w-3.5 h-3.5 text-cyan-500" /> Chất xơ & Cân bằng rau củ
                   </span>
@@ -293,7 +299,7 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="shrink-0 text-right">
                 <span className="text-sm font-black text-cyan-600 dark:text-cyan-400">
                   {fiberGrams > 0 ? fiberGrams : '—'}
                   <span className="text-[11px] font-semibold text-slate-400 ml-1">g</span>
@@ -308,13 +314,13 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
           {/* Biometrics Summary Row (BMI, BMR, TDEE, Height, Weight) */}
           {showDetails && (
             <div className="pt-2 border-t border-slate-100 dark:border-[#212c3b]">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
                 {/* BMI */}
                 <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 text-center">
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Chỉ số BMI
                   </span>
-                  <div className="flex items-baseline justify-center gap-1 my-0.5">
+                  <div className="flex flex-wrap items-baseline justify-center gap-1 my-0.5 min-w-0">
                     <strong className="text-lg font-black text-slate-900 dark:text-white">
                       {bmi > 0 ? bmi : '—'}
                     </strong>
@@ -329,7 +335,7 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Trao đổi BMR
                   </span>
-                  <div className="flex items-baseline justify-center gap-1 my-0.5">
+                  <div className="flex flex-wrap items-baseline justify-center gap-1 my-0.5 min-w-0">
                     <strong className="text-lg font-black text-slate-900 dark:text-white">
                       {bmr > 0 ? bmr.toLocaleString('vi-VN') : '—'}
                     </strong>
@@ -343,7 +349,7 @@ export const HealthActivityRings: React.FC<HealthActivityRingsProps> = ({
                   <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                     Tiêu hao TDEE
                   </span>
-                  <div className="flex items-baseline justify-center gap-1 my-0.5">
+                  <div className="flex flex-wrap items-baseline justify-center gap-1 my-0.5 min-w-0">
                     <strong className="text-lg font-black text-slate-900 dark:text-white">
                       {tdee > 0 ? tdee.toLocaleString('vi-VN') : '—'}
                     </strong>

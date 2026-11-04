@@ -1,4 +1,5 @@
 import type { SmartMarketStore, StoreCatalogItem } from '../data/smartMarketData';
+import { restaurantService, type Place } from './restaurantService';
 
 /**
  * Calculates Haversine distance in kilometers between two GPS coordinates.
@@ -20,29 +21,7 @@ export function calculateHaversineDistanceKm(lat1: number, lon1: number, lat2: n
  */
 export async function reverseGeocodeAddress(lat: number, lon: number): Promise<string> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 4000);
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
-      {
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal
-      }
-    );
-    clearTimeout(timeout);
-    if (!res.ok) throw new Error('Geocoding response not ok');
-    const data = await res.json();
-    if (data.display_name) {
-      // Pick address parts for concise Vietnamese display
-      const addr = data.address || {};
-      const parts = [
-        addr.road || addr.pedestrian || addr.suburb,
-        addr.quarter || addr.neighbourhood || addr.suburb || addr.ward,
-        addr.city_district || addr.district || addr.county || addr.town,
-        addr.city || addr.state || 'TP. Hồ Chí Minh'
-      ].filter(Boolean);
-      return parts.length > 0 ? parts.join(', ') : data.display_name;
-    }
+    return await restaurantService.reverseGeocode({ lat, lon });
   } catch (err) {
     // Graceful fallback based on known zones
     console.debug('[GEOCODE] Reverse geocode error or timeout:', err);
@@ -119,7 +98,51 @@ export function formatDeliveryTime(distanceKm: number): string {
  * Fetches real places around user's GPS coordinates using OpenStreetMap Overpass.
  * Falls back to authentically calculated local hotspots around the user's exact coordinates.
  */
+function mapBackendPlace(place: Place): SmartMarketStore {
+  const category: SmartMarketStore['category'] = place.category === 'RESTAURANT'
+    ? 'VEGAN_STORE'
+    : place.category === 'GROCERY_STORE' ? 'CONVENIENCE' : 'SUPERMARKET';
+  const distanceKm = place.distance;
+  return {
+    id: place.id,
+    name: place.name,
+    tagline: category === 'VEGAN_STORE' ? 'Địa điểm chay từ OpenStreetMap' : 'Cửa hàng nguyên liệu gần bạn',
+    address: place.address || `${place.name}, gần vị trí của bạn`,
+    distance: `Cách ${distanceKm < 1 ? Math.round(distanceKm * 1000) + 'm' : distanceKm.toFixed(1) + ' km'}`,
+    distanceKm,
+    duration: formatDeliveryTime(distanceKm),
+    rating: place.rating ?? 0,
+    reviewsCount: 0,
+    hours: place.openNow === true ? 'Đang mở cửa' : place.openNow === false ? 'Đang đóng cửa' : 'Chưa có giờ mở cửa',
+    matchCount: 0,
+    totalNeeded: 0,
+    matchPercent: 0,
+    priceEstimate: '',
+    statusBadge: category === 'VEGAN_STORE' ? '🌱 Có thẻ chay trên OSM' : '🛒 Cửa hàng gần bạn',
+    badgeType: 'high',
+    category,
+    categoryLabel: category === 'VEGAN_STORE' ? 'Quán chay & Tiệm đồ chay' : 'Cửa hàng nguyên liệu',
+    notes: place.attribution || '© OpenStreetMap contributors',
+    featuredItems: [],
+    lat: place.lat,
+    lon: place.lon,
+    phone: '',
+    catalog: generateSmartStoreCatalog(place.name, category),
+  };
+}
+
 export async function fetchRealPlacesNearby(userLat: number, userLon: number): Promise<SmartMarketStore[]> {
+  try {
+    const places = await restaurantService.nearby({ lat: userLat, lon: userLon }, 3.5, 'ALL');
+    if (places.length > 0) return places.map(mapBackendPlace);
+  } catch (error) {
+    console.debug('[SMART-MARKET] Backend places unavailable:', error);
+  }
+  return buildAnchoredStoresForCoordinates(userLat, userLon);
+}
+
+/** @deprecated Kept only for visual fallback comparison; production uses the backend proxy above. */
+export async function fetchRealPlacesNearbyLegacy(userLat: number, userLon: number): Promise<SmartMarketStore[]> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4500);

@@ -31,10 +31,21 @@ const currentSeason = (): Season => SEASONS[Math.floor(new Date().getMonth() / 3
 const dishParts = (dishName: string) => dishName.split(/\s*(?:&|,)\s*/).map(part => part.trim()).filter(part => part.length >= 3).slice(0, 3);
 
 async function findRecipes(dishName: string, signal: AbortSignal): Promise<RecipeSummary[]> {
-  const pages = await Promise.all(dishParts(dishName).map(keyword => recipeService.filter({ keyword, page: 0, size: 1 }, signal).catch(() => null)));
+  const keywords = [dishName, ...dishParts(dishName)];
+  const pages = await Promise.all(keywords.map(keyword => recipeService.filter({ keyword, page: 0, size: 1 }, signal).catch(() => null)));
   const found = new Map<string, RecipeSummary>();
   pages.forEach(page => page?.items.forEach(recipe => found.set(recipe.recipeId, recipe)));
   return [...found.values()];
+}
+
+function fallbackDishImage(dishName: string) {
+  const value = dishName.toLocaleLowerCase('vi');
+  if (/(đậu|tofu|cà chua)/.test(value)) return '/images/tofu-tomato.png';
+  if (/(nấm đùi|nấm xào|sả)/.test(value)) return '/images/king-oyster-lemongrass.png';
+  if (/(canh|súp|cải ngọt)/.test(value)) return '/images/choy-sum-oyster-soup.png';
+  if (/(rau|gỏi|salad|củ quả)/.test(value)) return '/images/fresh-vegetables.png';
+  if (/(sốt|nước chấm|tương)/.test(value)) return '/images/vegan-sauces.png';
+  return '/images/vegan-tofu-meal.png';
 }
 
 export function SeasonalRegionalMealsView() {
@@ -59,12 +70,25 @@ export function SeasonalRegionalMealsView() {
   const isAi = data?.source === 'AI';
 
   const [related, setRelated] = useState<Record<string, RecipeSummary[]>>({});
+  const [dishImages, setDishImages] = useState<Record<string, string>>({});
   useEffect(() => {
     setRelated({});
+    setDishImages({});
     if (!data) return;
     const controller = new AbortController();
-    Promise.all(data.suggestions.filter(dish => !dish.recipeId).map(async dish => [dish.dishName, await findRecipes(dish.dishName, controller.signal)] as const))
-      .then(entries => { if (!controller.signal.aborted) setRelated(Object.fromEntries(entries)); })
+    Promise.all(data.suggestions.map(async dish => {
+      if (dish.recipeId) {
+        const recipe = await recipeService.detail(dish.recipeId, controller.signal).catch(() => null);
+        return { name: dish.dishName, recipes: [] as RecipeSummary[], image: recipe?.imageUrl || fallbackDishImage(dish.dishName) };
+      }
+      const recipes = await findRecipes(dish.dishName, controller.signal);
+      return { name: dish.dishName, recipes, image: recipes[0]?.imageUrl || fallbackDishImage(dish.dishName) };
+    }))
+      .then(entries => {
+        if (controller.signal.aborted) return;
+        setRelated(Object.fromEntries(entries.map(entry => [entry.name, entry.recipes])));
+        setDishImages(Object.fromEntries(entries.map(entry => [entry.name, entry.image])));
+      })
       .catch(() => {});
     return () => controller.abort();
   }, [data]);
@@ -170,6 +194,13 @@ export function SeasonalRegionalMealsView() {
           <div className={`grid gap-4 ${dishGridCols(data.suggestions.length)}`}>
             {data.suggestions.map(dish => (
               <div key={dish.mealType + dish.dishName} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 flex flex-col justify-between gap-3 shadow-2xs hover:border-emerald-400 transition">
+                <img
+                  src={dishImages[dish.dishName] || fallbackDishImage(dish.dishName)}
+                  alt={dish.dishName}
+                  className="h-32 w-full rounded-xl object-cover bg-slate-100 dark:bg-slate-800"
+                  loading="lazy"
+                  onError={event => { event.currentTarget.src = fallbackDishImage(dish.dishName); }}
+                />
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider text-[10px]">{dish.mealType}</span>

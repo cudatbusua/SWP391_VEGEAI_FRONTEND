@@ -138,6 +138,56 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
   }
 }
+/**
+ * Opens the Server-Sent Events stream for the notification bell. Uses fetch (not EventSource) so the
+ * same Bearer token and refresh flow as the rest of the app can be reused, and parses frames manually.
+ */
+export async function openNotificationStream(
+  onNotification: (payload: unknown) => void,
+  signal: AbortSignal
+): Promise<void> {
+  if (!hasSession()) return;
+  if (!accessToken || Date.now() >= expiresAt - 10000) await refreshSession();
+  if (!accessToken) throw new ApiError('Vui lòng đăng nhập để nhận thông báo.', 401);
+
+  const response = await fetch(`${API_BASE_URL}/notifications/stream`, {
+    headers: { Accept: 'text/event-stream', Authorization: `Bearer ${accessToken}` },
+    credentials: 'include',
+    signal,
+  });
+  if (!response.ok || !response.body) {
+    throw new ApiError('Không thể kết nối thông báo realtime.', response.status);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary >= 0) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const event = /^event:\s*(.+)$/m.exec(frame)?.[1]?.trim();
+      const data = frame
+        .split('\n')
+        .filter(line => line.startsWith('data:'))
+        .map(line => line.slice(5).trim())
+        .join('\n');
+      if (event === 'notification' && data) {
+        try {
+          onNotification(JSON.parse(data));
+        } catch {
+          // Ignore malformed frames instead of killing the stream.
+        }
+      }
+      boundary = buffer.indexOf('\n\n');
+    }
+  }
+}
+
 export function errorMessage(error: unknown): string {
   if (!error) return 'Có lỗi xảy ra. Vui lòng thử lại.';
 

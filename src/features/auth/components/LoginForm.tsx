@@ -1,28 +1,24 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, AlertCircle, CheckCircle2, ShieldCheck, ArrowLeft, RefreshCw, KeyRound, Mail, Lock, Sparkles } from 'lucide-react';
 import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
+import { loginDestination } from '../../../utils/authRedirect';
 
-export const LoginForm: React.FC = () => {
+interface LoginFormProps {
+  onSuccess?: () => void;
+  compact?: boolean;
+}
+
+export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false }) => {
   const { login, verifyLoginOtp, resendLoginOtp, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const requestedPath: unknown = location.state?.from;
-  const rawPath = typeof requestedPath === 'string'
-    ? requestedPath
-    : (typeof requestedPath === 'object' && requestedPath && 'pathname' in requestedPath)
-      ? (requestedPath as { pathname: string }).pathname
-      : null;
-  const destination = typeof rawPath === 'string' && /^\/(?:blog|questions|videos|admin|meal-plans|nutrition|settings|fridge)(?:\/[A-Za-z0-9-]+)*$/.test(rawPath)
-    ? rawPath : null;
 
-  const resolveDestination = (role?: string): string => {
-    if (role === 'admin') {
-      return (destination && destination.startsWith('/admin')) ? destination : '/admin';
-    }
-    return (destination && !destination.startsWith('/admin')) ? destination : '/dashboard';
+  const completeLogin = (role?: string) => {
+    if (onSuccess) onSuccess();
+    else navigate(loginDestination(role, location.state?.from), { replace: true });
   };
 
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
@@ -87,7 +83,7 @@ export const LoginForm: React.FC = () => {
               setIsGoogleSubmitting(true);
               const res = await loginWithGoogle(response.credential, formData.rememberMe);
               if (res.success && res.data) {
-                navigate(resolveDestination(res.data?.role), { replace: true });
+                completeLogin(res.data?.role);
               } else {
                 setGeneralError(res.error || 'Đăng nhập bằng Google không thành công.');
               }
@@ -162,7 +158,7 @@ export const LoginForm: React.FC = () => {
           try {
             const res = await loginWithGoogle(response.credential, formData.rememberMe);
             if (res.success && res.data) {
-              navigate(resolveDestination(res.data?.role), { replace: true });
+              completeLogin(res.data?.role);
             } else {
               setGeneralError(res.error || 'Đăng nhập bằng Google không thành công.');
             }
@@ -219,7 +215,7 @@ export const LoginForm: React.FC = () => {
     try {
       const res = await login(formData);
       if (res.success && res.data) {
-        navigate(resolveDestination(res.data.role), { replace: true });
+        completeLogin(res.data.role);
       } else {
         setGeneralError(res.error || 'Đăng nhập không thành công. Vui lòng kiểm tra lại thông tin.');
       }
@@ -247,7 +243,7 @@ export const LoginForm: React.FC = () => {
       if (res.success && res.data) {
         setSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
         setTimeout(() => {
-          navigate(resolveDestination(res.data?.role), { replace: true });
+          completeLogin(res.data?.role);
         }, 800);
       } else {
         setGeneralError(res.error || 'Mã xác thực OTP không chính xác hoặc đã hết hạn.');
@@ -283,7 +279,7 @@ export const LoginForm: React.FC = () => {
       {step === 'CREDENTIALS' ? (
         <>
           {/* Form Header */}
-          <div className="mb-7">
+          <div className={compact ? 'mb-5' : 'mb-7'}>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/60 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 mb-3">
               <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
               <span>KHÔNG GIAN ẨM THỰC THUẦN CHAY</span>

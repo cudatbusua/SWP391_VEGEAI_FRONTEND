@@ -35,7 +35,10 @@ const AdminQuestionsPage = lazy(() => import('./pages/AdminQuestionsPage').then(
 const AdminQuestionDetailPage = lazy(() => import('./pages/AdminQuestionsPage').then(module => ({ default: module.AdminQuestionDetailPage })));
 const AdminVideosPage = lazy(() => import('./pages/AdminVideosPage').then(module => ({ default: module.AdminVideosPage })));
 const AdminVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.AdminVideoEditorPage })));
+const UserVideoEditorPage = lazy(() => import('./pages/AdminVideoEditorPage').then(module => ({ default: module.UserVideoEditorPage })));
+const MyVideosPage = lazy(() => import('./pages/MyVideosPage').then(module => ({ default: module.MyVideosPage })));
 const AdminAiMonitoringPage = lazy(() => import('./pages/AdminAiMonitoringPage').then(module => ({ default: module.AdminAiMonitoringPage })));
+const AdminContentInteractionsPage = lazy(() => import('./pages/AdminContentInteractionsPage').then(module => ({ default: module.AdminContentInteractionsPage })));
 import { ThemeProvider } from './store/ThemeContext';
 
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage').then(module => ({ default: module.AccountSettingsPage })));
@@ -71,17 +74,18 @@ export const App: React.FC = () => {
             <Route path="/reset-password" element={<GuestOnlyBoundary><ResetPasswordPage /></GuestOnlyBoundary>} />
             <Route path="/change-password" element={<Navigate to="/settings?tab=security" replace />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/ai-chef" element={<PersonalFeatureBoundary><AiChatPage /></PersonalFeatureBoundary>} />
+            <Route path="/ai-chef" element={<AiChatPage />} />
             <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />
             <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
             <Route path="/nutrition" element={<Navigate to="/settings?tab=profile" replace />} />
             {/* Meal planning now lives on the 30-day calendar; old links keep working. */}
             <Route path="/meal-plans" element={<Navigate to="/settings?tab=calendar" replace />} />
           <Route path="/meal-plans/:id" element={<Navigate to="/settings?tab=calendar" replace />} />
-          <Route path="/smart-market" element={<PersonalFeatureBoundary><SmartMarketPage /></PersonalFeatureBoundary>} />
+          <Route path="/smart-market" element={<SmartMarketPage />} />
           <Route path="/admin" element={<AdminFeatureBoundary><AdminPage /></AdminFeatureBoundary>} />
           <Route path="/admin/users" element={<AdminFeatureBoundary><AdminPage accountsOnly /></AdminFeatureBoundary>} />
           <Route path="/admin/ai-monitoring" element={<AdminFeatureBoundary><AdminAiMonitoringPage /></AdminFeatureBoundary>} />
+          <Route path="/admin/interactions" element={<AdminFeatureBoundary><AdminContentInteractionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/recipes" element={<AdminFeatureBoundary><AdminRecipesPage /></AdminFeatureBoundary>} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/write" element={<PersonalFeatureBoundary><BlogEditorPage /></PersonalFeatureBoundary>} />
@@ -92,13 +96,16 @@ export const App: React.FC = () => {
           <Route path="/admin/blog" element={<AdminFeatureBoundary><AdminBlogPage /></AdminFeatureBoundary>} />
           <Route path="/admin/blog/:id" element={<AdminFeatureBoundary><BlogPostStatusPage adminMode /></AdminFeatureBoundary>} />
           <Route path="/restaurants" element={<RestaurantsPage />} />
-          <Route path="/questions" element={<QuestionsPage />} />
+          <Route path="/questions" element={<PersonalFeatureBoundary><QuestionsPage /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine" element={<PersonalFeatureBoundary><QuestionsPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine/:id" element={<PersonalFeatureBoundary><QuestionDetailPage mine /></PersonalFeatureBoundary>} />
-          <Route path="/questions/:id" element={<QuestionDetailPage />} />
-          <Route path="/videos" element={<PersonalFeatureBoundary><VideosPage /></PersonalFeatureBoundary>} />
+          <Route path="/questions/:id" element={<PersonalFeatureBoundary><QuestionDetailPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos" element={<VideosPage />} />
           <Route path="/videos/saved" element={<PersonalFeatureBoundary><VideosPage saved /></PersonalFeatureBoundary>} />
-          <Route path="/videos/:id" element={<PersonalFeatureBoundary><VideoDetailPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/mine" element={<PersonalFeatureBoundary><MyVideosPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/new" element={<PersonalFeatureBoundary><UserVideoEditorPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/mine/:id/edit" element={<PersonalFeatureBoundary><UserVideoEditorPage /></PersonalFeatureBoundary>} />
+          <Route path="/videos/:id" element={<VideoDetailPage />} />
           <Route path="/admin/questions" element={<AdminFeatureBoundary><AdminQuestionsPage /></AdminFeatureBoundary>} />
           <Route path="/admin/questions/:id" element={<AdminFeatureBoundary><AdminQuestionDetailPage /></AdminFeatureBoundary>} />
           <Route path="/admin/videos" element={<AdminFeatureBoundary><AdminVideosPage /></AdminFeatureBoundary>} />

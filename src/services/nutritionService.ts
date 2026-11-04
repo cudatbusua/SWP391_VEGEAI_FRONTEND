@@ -16,12 +16,12 @@ export const nutritionService = {
     await apiRequest('/nutrition/profile', { method: 'DELETE' });
   },
   async calculate(input: NutritionCalculateInput): Promise<NutritionTargets> {
-    const response = await apiRequest<NutritionTargets>('/nutrition/calculate', { method: 'POST', body: input });
+    const response = await apiRequest<NutritionTargets>('/nutrition/calculate', { auth: 'none', method: 'POST', body: input });
     if (!response.data) throw new Error('Không thể tính mục tiêu dinh dưỡng.');
     return response.data;
   },
   async options(): Promise<NutritionOptions> {
-    const response = await apiRequest<NutritionOptions>('/nutrition/options');
+    const response = await apiRequest<NutritionOptions>('/nutrition/options', { auth: 'none' });
     if (!response.data) throw new Error('Không thể tải lựa chọn dinh dưỡng.');
     return response.data;
   },

@@ -21,5 +21,12 @@ export interface VideoComment {
   id: string; videoId: string; authorId: string; authorName: string; content: string;
   createdAt: string; updatedAt: string; version: number;
 }
+export interface ContentRatingSummary {
+  targetType: 'VIDEO' | 'BLOG' | 'RECIPE';
+  targetId: string;
+  averageStars?: number;
+  ratingCount: number;
+  myRating?: number;
+}
 export const questionStatuses: Record<QuestionStatus, string> = { PENDING: 'Chờ duyệt', APPROVED: 'Đã duyệt', REJECTED: 'Từ chối' };
 export const videoCategories: Record<string, string> = { MON_CHAY: 'Món chay', MON_VIET: 'Món Việt', DO_UONG: 'Đồ uống', LAM_BANH: 'Làm bánh', MEO_BEP: 'Mẹo nhà bếp' };

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, CalendarDays, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, History, Loader2, RefreshCw, Save, ShoppingBag, Sparkles, Utensils, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { AlertCircle, CalendarDays, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, FileDown, History, Loader2, RefreshCw, Save, ShoppingBag, Sparkles, Utensils, X } from 'lucide-react';
 import { MealCalendar31DaysView, calendarGridRange, toDateKey } from './MealCalendar31DaysView';
 import { CommunityConfirm } from './CommunityUi';
 import { PlannedMealDetails } from './PlannedMealDetails';
@@ -11,6 +11,7 @@ import { mealPlanService } from '../services/mealPlanService';
 import { errorMessage } from '../services/apiClient';
 import { sfx } from '../utils/soundEffects';
 import { missingMarketItems } from '../utils/mealPlanMarket';
+import { escapeHtml, formatNumber, printHtml } from '../utils/printDocument';
 import type { NutritionTargets } from '../types/api';
 import type { MealPlan, PlanNutrients, PlannedMeal } from '../types/mealPlan';
 
@@ -34,13 +35,24 @@ const planStatus = (start: string, end: string, today: string) =>
  * (latest save wins on overlapping days); a freshly generated plan stays a local draft until saved.
  */
 export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingList }: MealPlanCalendarPlannerProps) {
+  const location = useLocation();
+  // Both sub-tabs link to this same page and the router does not scroll by itself:
+  // "Thực đơn đã lưu" (#saved-meal-plans) goes to the saved list, "Lịch ăn 30 ngày" (no hash) back to the calendar at the top.
+  useEffect(() => {
+    if (location.hash === '#saved-meal-plans') {
+      document.getElementById('saved-meal-plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (!location.hash) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [location.hash, location.key]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
   const [revision, setRevision] = useState(0);
 
-  const [period, setPeriod] = useState<'WEEK' | 'MONTH'>('WEEK');
+  const period = 'CUSTOM' as const;
+  const [customDays, setCustomDays] = useState(7);
   const [mealsPerDay, setMealsPerDay] = useState(3);
   const [draft, setDraft] = useState<MealPlan | null>(null);
   const [busy, setBusy] = useState(false);
@@ -62,12 +74,6 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     `saved-meal-plans:${user?.id}:${savedPage}:${revision}`,
     signal => mealPlanService.list(savedPage, signal)
   );
-  const options = useCommunityQuery(
-    'calendar-plan-options:' + draft?.id,
-    signal => mealPlanService.options(draft?.id || '', signal),
-    !!draft && draft.status === 'DRAFT'
-  );
-
   const savedDays = useMemo(() => new Map((calendar.data ?? []).map(day => [day.date, day])), [calendar.data]);
   const savedKeys = useMemo(() => new Set(savedDays.keys()), [savedDays]);
   const draftKeys = useMemo(() => new Set(draft?.plan.days.map(day => day.date)), [draft]);
@@ -77,6 +83,11 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
   const draftIndex = draft ? draft.plan.days.findIndex(day => day.date === selectedKey) : -1;
   const draftDay = draftIndex >= 0 ? draft!.plan.days[draftIndex] : null;
   const savedDay = savedDays.get(selectedKey) ?? null;
+  const options = useCommunityQuery(
+    'calendar-plan-options:' + (draft?.id || savedDay?.planId || ''),
+    signal => mealPlanService.options(draft?.id || savedDay?.planId || '', signal),
+    !!draft || !!savedDay
+  );
   const shown: { meals: PlannedMeal[]; totals: PlanNutrients; targets: NutritionTargets } | null = draftDay
     ? { meals: draftDay.meals, totals: draftDay.totals, targets: draft!.plan.targets }
     : savedDay
@@ -111,7 +122,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     setError('');
     setMessage('');
     try {
-      const result = await mealPlanService.generate({ period, startDate: selectedKey, mealsPerDay });
+      const result = await mealPlanService.generate({ period, days: customDays, startDate: selectedKey, mealsPerDay });
       setDraft(result);
       setMessage(`AI đã lập bản nháp ${result.plan.days.length} ngày. Xem từng ngày có chấm cam, đổi món nếu cần rồi bấm "Lưu vào lịch".`);
     } catch (reason) {
@@ -150,12 +161,22 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     setMessage('Đã bỏ bản nháp. Lịch đang hiển thị các thực đơn đã lưu.');
   };
 
-  const swap = async () => {
-    if (!draft || swapping === null || busy || !replacement || draftIndex < 0) return;
+  const swap = async (recipeId = replacement) => {
+    if ((!draft && !savedDay) || swapping === null || busy || !recipeId) return;
     setBusy(true);
     setError('');
     try {
-      setDraft(await mealPlanService.swap(draft.id, draftIndex, swapping, replacement));
+      if (draft) {
+        if (draftIndex < 0) return;
+        setDraft(await mealPlanService.swap(draft.id, draftIndex, swapping, recipeId));
+      } else if (savedDay) {
+        const fullPlan = await mealPlanService.get(savedDay.planId);
+        const dayIndex = fullPlan.plan.days.findIndex(day => day.date === selectedKey);
+        if (dayIndex < 0) throw new Error('Không tìm thấy ngày trong thực đơn đã lưu.');
+        await mealPlanService.swap(savedDay.planId, dayIndex, swapping, recipeId);
+        setRevision(value => value + 1);
+        setMessage('Đã cập nhật món trong thực đơn đã lưu.');
+      }
       setSwapping(null);
       setReplacement('');
     } catch (reason) {
@@ -165,8 +186,64 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     }
   };
 
+  const randomSwap = async () => {
+    if (swapping === null) return;
+    const currentRecipeId = shown?.meals.find(meal => meal.slot === swapping)?.recipeId;
+    const candidates = (options.data ?? []).filter(recipe => recipe.recipeId !== currentRecipeId);
+    if (!candidates.length) {
+      setError('Chưa có món phù hợp khác để đổi ngẫu nhiên.');
+      return;
+    }
+    const choice = candidates[Math.floor(Math.random() * candidates.length)];
+    setReplacement(choice.recipeId);
+    await swap(choice.recipeId);
+  };
+
+  const exportMealPlanPdf = () => {
+    const days = [...(calendar.data ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+    if (!days.length) {
+      setError('Chưa có thực đơn nào trong khoảng đang xem để xuất PDF. Hãy chọn ngày rồi bấm "Lập với AI" hoặc lưu thực đơn trước.');
+      return;
+    }
+    const targets = days[0].targets;
+    const slotLabel = (slot: number) => ['Sáng', 'Trưa', 'Tối', 'Bữa phụ'][slot] ?? `Bữa ${slot + 1}`;
+    const sections = days.map(day => {
+      const rows = day.meals.map(meal => `
+        <tr>
+          <td>${escapeHtml(slotLabel(meal.slot))}</td>
+          <td>${escapeHtml(meal.title)}</td>
+          <td class="right">${meal.portions}</td>
+          <td class="right">${formatNumber(meal.nutrition?.calories)} kcal</td>
+          <td class="right">${formatNumber(meal.nutrition?.protein)} g</td>
+        </tr>`).join('');
+      return `<section class="day">
+        <h2>${escapeHtml(new Date(day.date + 'T12:00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }))}</h2>
+        <table><thead><tr><th>Bữa</th><th>Món</th><th class="right">Khẩu phần</th><th class="right">Calo</th><th class="right">Đạm</th></tr></thead>
+        <tbody>${rows}
+          <tr><td colspan="3"><strong>Tổng ngày</strong></td><td class="right"><strong>${formatNumber(day.totals.calories)} kcal</strong></td><td class="right"><strong>${formatNumber(day.totals.protein)} g</strong></td></tr>
+        </tbody></table>
+      </section>`;
+    }).join('');
+
+    printHtml('Thực đơn VEGEAI', `
+      <h1>Thực đơn chay VEGEAI</h1>
+      <p class="meta">Khoảng ${escapeHtml(days[0].date)} → ${escapeHtml(days[days.length - 1].date)} · Mục tiêu ${formatNumber(targets.dailyCaloriesTarget)} kcal/ngày · Đạm ${formatNumber(targets.proteinTargetG)} g · Chất xơ ${formatNumber(targets.fiberTargetG)} g</p>
+      ${sections}`);
+  };
+
   return (
     <div className="grid lg:grid-cols-12 gap-6 items-start">
+      <div className="lg:col-span-12 flex flex-wrap items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={exportMealPlanPdf}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 px-3.5 py-2 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+          title="In hoặc lưu thực đơn đang xem thành PDF"
+        >
+          <FileDown className="w-4 h-4" />
+          Xuất PDF thực đơn
+        </button>
+      </div>
       {/* LỊCH THỰC ĐƠN 30–31 NGÀY - BÊN TRÁI */}
       <div className="lg:col-span-5">
         <MealCalendar31DaysView
@@ -180,7 +257,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
         />
 
         {/* KẾ HOẠCH ĐÃ LƯU - bấm để nhảy tới ngày bắt đầu trên lịch */}
-        <div className="mt-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4">
+        <div id="saved-meal-plans" className="mt-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4 scroll-mt-36">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shadow-2xs">
@@ -361,19 +438,10 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               Lập thực đơn AI bắt đầu từ {selectedDate.toLocaleDateString('vi-VN')}
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex rounded-xl border border-emerald-300 dark:border-emerald-800 overflow-hidden text-xs font-bold" role="group" aria-label="Thời gian kế hoạch">
-                {(['WEEK', 'MONTH'] as const).map(value => (
-                  <button
-                    type="button"
-                    key={value}
-                    aria-pressed={period === value}
-                    onClick={() => setPeriod(value)}
-                    className={`px-3 py-1.5 transition cursor-pointer ${period === value ? 'bg-emerald-700 text-white' : 'bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950'}`}
-                  >
-                    {value === 'WEEK' ? '7 ngày' : '1 tháng'}
-                  </button>
-                ))}
-              </div>
+              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
+                Số ngày
+                <input type="number" min={1} max={31} value={customDays} onChange={event => setCustomDays(Math.max(1, Math.min(31, Number(event.target.value) || 1)))} className="w-20 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" />
+              </label>
               <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
                 Số bữa/ngày
                 <select
@@ -529,7 +597,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                   <PlannedMealDetails meal={meal} />
 
                   <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                    {draftDay ? (
+                    {draftDay || savedDay ? (
                       <button
                         type="button"
                         onClick={() => { setSwapping(meal.slot); setReplacement(''); setError(''); }}
@@ -568,18 +636,18 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
 
       <CommunityConfirm
         open={swapping !== null}
-        title="Đổi món trong bản nháp"
+        title={savedDay && !draft ? 'Đổi món trong thực đơn đã lưu' : 'Đổi món trong bản nháp'}
         busy={busy}
         disabled={!replacement}
         onCancel={() => { setSwapping(null); setError(''); }}
-        onConfirm={swap}
+        onConfirm={() => void swap()}
       >
         <label className="cm-field">
           Chọn công thức
           <select aria-label="Món thay thế" value={replacement} onChange={event => setReplacement(event.target.value)}>
             <option value="">Chọn món phù hợp</option>
             {options.data
-              ?.filter(recipe => recipe.recipeId !== draftDay?.meals[swapping ?? 0]?.recipeId)
+              ?.filter(recipe => recipe.recipeId !== shown?.meals.find(meal => meal.slot === swapping)?.recipeId)
               .map(recipe => (
                 <option key={recipe.recipeId} value={recipe.recipeId}>
                   {recipe.title} · {recipe.calories} kcal/khẩu phần
@@ -587,6 +655,14 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               ))}
           </select>
         </label>
+        <button
+          type="button"
+          disabled={busy || options.busy || !options.data?.length}
+          onClick={() => void randomSwap()}
+          className="cm-button secondary"
+        >
+          <RefreshCw className="w-4 h-4" /> Đổi ngẫu nhiên
+        </button>
         {options.data && options.data.length < 2 && <p>Chưa có món thay thế phù hợp.</p>}
         {error && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{error}</p>}
       </CommunityConfirm>

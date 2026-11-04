@@ -36,6 +36,12 @@ function mapPlaces(values: BackendPlace[]): Place[] {
 }
 
 export const restaurantService = {
+  async reverseGeocode(center: Coordinates): Promise<string> {
+    const params = new URLSearchParams({ lat: String(center.lat), lng: String(center.lon) });
+    const response = await apiRequest<{ address: string }>('/places/reverse-geocode?' + params, { auth: 'none', timeoutMs: 15000 });
+    if (!response.data?.address) throw new Error('Không thể xác định địa chỉ hiện tại.');
+    return response.data.address;
+  },
   async categories(): Promise<{ category: PlaceCategory; displayName: string }[]> {
     const response = await apiRequest<{ category: PlaceCategory; displayName: string }[]>('/places/categories', { auth: 'none' });
     if (!response.data) throw new Error('Không thể tải danh mục địa điểm.');

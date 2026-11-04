@@ -60,7 +60,7 @@ export const AccountSettingsPage: React.FC = () => {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [avatar, setAvatar] = useState('');
-  const [, setNutrition] = useState<NutritionProfile | null>(null);
+  const [nutrition, setNutrition] = useState<NutritionProfile | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
@@ -136,6 +136,8 @@ export const AccountSettingsPage: React.FC = () => {
 
       if (nutrRes.status === 'fulfilled' && nutrRes.value) {
         setNutrition(nutrRes.value);
+        // The users column mirrors the computed target; only a real override counts as a custom target.
+        setDailyCalorieTarget(nutrRes.value.targets.customCalorieTarget ? nutrRes.value.targets.dailyCaloriesTarget : '');
       }
 
       setIsLoadingProfile(false);
@@ -169,6 +171,14 @@ export const AccountSettingsPage: React.FC = () => {
       setProfileError('Vui lòng nhập họ và tên.');
       return;
     }
+    if (heightCm !== '' && (Number(heightCm) < 100 || Number(heightCm) > 280)) {
+      setProfileError('Chiều cao phải nằm trong khoảng 100–280 cm.');
+      return;
+    }
+    if (weightKg !== '' && (Number(weightKg) < 20 || Number(weightKg) > 350)) {
+      setProfileError('Cân nặng phải nằm trong khoảng 20–350 kg.');
+      return;
+    }
 
     setIsSavingProfile(true);
     try {
@@ -182,11 +192,30 @@ export const AccountSettingsPage: React.FC = () => {
         allergies: selectedAllergies.join(','),
         heightCm: heightCm === '' ? undefined : Number(heightCm),
         weightKg: weightKg === '' ? undefined : Number(weightKg),
-        dailyCalorieTarget: dailyCalorieTarget === '' ? (defaultScientificCalorie > 0 ? defaultScientificCalorie : undefined) : Number(dailyCalorieTarget)
+        // With a nutrition profile the server computes the target; sending one would freeze it as a custom override.
+        dailyCalorieTarget: dailyCalorieTarget !== ''
+          ? Number(dailyCalorieTarget)
+          : (!nutrition && defaultScientificCalorie > 0 ? defaultScientificCalorie : undefined)
       };
 
       const updated = await userService.updateProfile(payload);
       setProfile(updated);
+      if (nutrition) {
+        if (dailyCalorieTarget === '' && nutrition.targets.customCalorieTarget) {
+          await nutritionService.saveProfile({
+            gender: nutrition.gender,
+            dateOfBirth: updated.dateOfBirth || nutrition.dateOfBirth,
+            heightCm: updated.heightCm || nutrition.heightCm,
+            weightKg: updated.weightKg || nutrition.weightKg,
+            activityLevel: nutrition.activityLevel,
+            goal: nutrition.goal,
+            customDailyCalories: null,
+          });
+        }
+        const fresh = await nutritionService.getProfile();
+        setNutrition(fresh);
+        setDailyCalorieTarget(fresh.targets.customCalorieTarget ? fresh.targets.dailyCaloriesTarget : '');
+      }
       try {
         localStorage.setItem('vegeai_user_profile', JSON.stringify(updated));
         window.dispatchEvent(new Event('user_profile_updated'));
@@ -384,21 +413,28 @@ export const AccountSettingsPage: React.FC = () => {
 
   // Deterministic BMR & TDEE Calculations
   const hasPhysicalStats = Boolean(hNum > 0 && wNum > 0);
+  // Server targets use the saved activity level and goal; the local estimate is only for users without a profile.
+  const serverTargets = nutrition?.targets;
   const bmr = useMemo(() => {
+    if (serverTargets) return Math.round(serverTargets.bmr);
     if (hasPhysicalStats) {
       return calculateBmr(wNum, hNum, age, (gender as any) || 'OTHER');
     }
     return 0;
-  }, [hasPhysicalStats, hNum, wNum, age, gender]);
+  }, [serverTargets, hasPhysicalStats, hNum, wNum, age, gender]);
 
-  const tdee = useMemo(() => (bmr > 0 ? calculateTdee(bmr, 1.375) : 0), [bmr]);
+  const tdee = useMemo(() => {
+    if (serverTargets) return Math.round(serverTargets.tdee);
+    return bmr > 0 ? calculateTdee(bmr, 1.375) : 0;
+  }, [serverTargets, bmr]);
 
   // Smart Default Calorie: if user leaves it blank, auto-assign scientific TDEE / BMR
   const defaultScientificCalorie = useMemo(() => {
+    if (serverTargets && !serverTargets.customCalorieTarget) return Math.round(serverTargets.dailyCaloriesTarget);
     if (tdee > 0) return Math.round(tdee);
     if (bmr > 0) return Math.round(bmr);
     return 1800;
-  }, [tdee, bmr]);
+  }, [serverTargets, tdee, bmr]);
 
   const effectiveCalorieTarget = useMemo(() => {
     if (dailyCalorieTarget !== '' && Number(dailyCalorieTarget) > 0) {
@@ -463,7 +499,7 @@ export const AccountSettingsPage: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
               <div className="relative">
                 <div className="w-24 h-24 overflow-hidden rounded-full bg-linear-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white flex items-center justify-center font-extrabold text-3xl shadow-lg ring-4 ring-emerald-100 dark:ring-emerald-950/60">
-                  {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
+                  {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" onError={() => setAvatar('')} /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
                 </div>
                 <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" title="Đang trực tuyến" />
                 <label className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap cursor-pointer text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
@@ -1108,13 +1144,15 @@ export const AccountSettingsPage: React.FC = () => {
             calories={wearableKcal > 0 ? wearableKcal : 0}
             calorieTarget={calorieInput > 0 ? calorieInput : (tdee > 0 ? tdee : 0)}
             proteinGrams={0}
-            proteinTarget={hasPhysicalStats ? Math.round(wNum * 1.1) : (calorieInput > 0 ? Math.round((calorieInput * 0.20) / 4) : 0)}
+            proteinTarget={serverTargets ? Math.round(serverTargets.proteinTargetG) : (hasPhysicalStats ? Math.round(wNum * 1.1) : (calorieInput > 0 ? Math.round((calorieInput * 0.20) / 4) : 0))}
             fiberGrams={0}
-            fiberTarget={hasCalorieTarget ? 35 : 0}
+            fiberTarget={serverTargets ? Math.round(serverTargets.fiberTargetG) : (hasCalorieTarget ? 35 : 0)}
             heightCm={heightCm}
             weightKg={weightKg}
             age={age}
             gender={gender}
+            bmr={serverTargets?.bmr}
+            tdee={serverTargets?.tdee}
             showDetails={true}
           />
 

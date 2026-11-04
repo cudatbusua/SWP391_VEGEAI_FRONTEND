@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ShoppingBag,
@@ -26,15 +26,18 @@ import {
   Tag,
   Star,
   PackageCheck,
-  Truck,
   Flame,
-  BadgePercent
+  FileDown,
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { SmartMarketMap } from '../components/SmartMarketMap';
 import { sfx } from '../utils/soundEffects';
+import { escapeHtml, printHtml } from '../utils/printDocument';
 import { fridgeService } from '../services/fridgeService';
 import { userService } from '../services/userService';
+import { useAuth } from '../hooks/useAuth';
+import { marketCartService, type MarketCartItem } from '../services/marketCartService';
+import { LoginForm } from '../features/auth/components/LoginForm';
 import {
   INITIAL_SMART_MARKET_ITEMS,
   type SmartMarketItem,
@@ -51,20 +54,7 @@ const LOCAL_STORAGE_KEY = 'vegeai:smart-market:items-v1';
 const SESSION_GPS_KEY = 'vegeai:session:gps_coords';
 const SESSION_ADDR_KEY = 'vegeai:session:gps_address';
 
-export interface MultiStoreCartItem {
-  id: string; // storeId + catalogItemId
-  catalogItemId: string;
-  name: string;
-  price: number;
-  priceFormatted: string;
-  unit: string;
-  imageEmoji: string;
-  storeId: string;
-  storeName: string;
-  storeAddress: string;
-  storeCategory: string;
-  count: number;
-}
+export type MultiStoreCartItem = MarketCartItem;
 
 export interface StoreOrderGroup {
   storeId: string;
@@ -77,18 +67,32 @@ export interface StoreOrderGroup {
   deliveryTime: string;
 }
 
-function loadInitialItems(): SmartMarketItem[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch {
-    // fallback
-  }
-  return [];
-}
+// Static products must remain addable while the nearby-store request is still loading.
+// This reference store is only cart metadata; it does not represent an order or payment flow.
+const MARKET_REFERENCE_STORE: SmartMarketStore = {
+  id: 'vegeai-market-reference',
+  name: 'Kho nguyên liệu VEGEAI',
+  tagline: 'Danh mục nguyên liệu tham khảo',
+  address: 'Danh mục trực tuyến VEGEAI',
+  distance: '--',
+  distanceKm: 0,
+  duration: '--',
+  rating: 0,
+  reviewsCount: 0,
+  hours: 'Trực tuyến',
+  matchCount: 0,
+  totalNeeded: 0,
+  matchPercent: 0,
+  priceEstimate: '',
+  statusBadge: 'Tham khảo',
+  badgeType: 'medium',
+  category: 'VEGAN_STORE',
+  categoryLabel: 'Kho nguyên liệu chay',
+  notes: 'Dùng để lưu giỏ khi dữ liệu bản đồ chưa tải xong.',
+  featuredItems: [],
+  lat: 0,
+  lon: 0,
+};
 
 const NON_VEGAN_KEYWORDS = [
   'thịt', 'thit', 'heo', 'lợn', 'bò', 'bo', 'gà', 'ga', 'vịt', 'vit', 'chim', 'cừu', 'dê',
@@ -220,10 +224,34 @@ export const PREDEFINED_AREAS = [
 ];
 
 export function SmartMarketPage() {
-  const [items, setItems] = useState<SmartMarketItem[]>(loadInitialItems);
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const cartOwnerId = user?.id ?? null;
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const requireCartLogin = useCallback(() => {
+    if (isAuthenticated) return true;
+    setShowLoginModal(true);
+    return false;
+  }, [isAuthenticated]);
+  const shoppingListStorageKey = cartOwnerId ? `${LOCAL_STORAGE_KEY}:${cartOwnerId}` : null;
+  const [items, setItems] = useState<SmartMarketItem[]>([]);
   const [mainView, setMainView] = useState<'map' | 'checklist'>('map');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unbought' | 'bought'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated || !shoppingListStorageKey) {
+      setItems([]);
+      setMainView('map');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(localStorage.getItem(shoppingListStorageKey) || '[]');
+      setItems(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setItems([]);
+    }
+  }, [isAuthenticated, isLoading, shoppingListStorageKey]);
 
   // Address requirement & gate state: If user has not confirmed an address, do not show map & stores immediately!
   const [isAddressConfirmed, setIsAddressConfirmed] = useState<boolean>(() => {
@@ -276,10 +304,75 @@ export function SmartMarketPage() {
 
   // Multi-Store Cart (ShopeeFood / GrabFood style)
   const [multiCart, setMultiCart] = useState<MultiStoreCartItem[]>([]);
+  const [cartHydratedFor, setCartHydratedFor] = useState<string | null>(null);
+  const cartDirtyBeforeHydration = useRef(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [cartAddToast, setCartAddToast] = useState('');
   const [catalogSubcategory, setCatalogSubcategory] = useState<string>('ALL');
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated || !cartOwnerId) {
+      setMultiCart([]);
+      setCartHydratedFor(null);
+      setShowCheckoutModal(false);
+      return;
+    }
+    let active = true;
+    cartDirtyBeforeHydration.current = false;
+    marketCartService.get()
+      .then(value => { if (active && !cartDirtyBeforeHydration.current) setMultiCart(value); })
+      .catch(() => { if (active) setMultiCart([]); })
+      .finally(() => { if (active) setCartHydratedFor(cartOwnerId); });
+    return () => { active = false; };
+  }, [cartOwnerId, isAuthenticated, isLoading]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !cartOwnerId || cartHydratedFor !== cartOwnerId) return;
+    let cancelled = false;
+    let retryTimer: number | undefined;
+    const sync = async (attempt: number) => {
+      try {
+        await marketCartService.replace(multiCart);
+      } catch {
+        if (cancelled) return;
+        if (attempt < 3) {
+          retryTimer = window.setTimeout(() => sync(attempt + 1), attempt * 1000);
+          return;
+        }
+        setCartAddToast('Chưa thể đồng bộ giỏ sau 3 lần thử. Vui lòng kiểm tra kết nối.');
+        retryTimer = window.setTimeout(() => setCartAddToast(''), 4500);
+      }
+    };
+    const timer = window.setTimeout(() => sync(1), 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
+  }, [cartHydratedFor, cartOwnerId, isAuthenticated, multiCart]);
+
+  // "Danh sách cần mua" mirrors the account cart: items added here or on another device appear in the
+  // list; the bought/checked state stays per-browser so it does not leak between shoppers.
+  useEffect(() => {
+    if (!isAuthenticated || cartHydratedFor !== cartOwnerId || multiCart.length === 0) return;
+    updateItems(prev => {
+      const known = new Set(prev.map(item => item.name.toLowerCase().trim()));
+      const missing: SmartMarketItem[] = multiCart
+        .filter(item => !known.has(item.name.toLowerCase().trim()))
+        .map(item => ({
+          id: `cart-${item.id}`,
+          name: item.name,
+          amount: `${item.count} ${item.unit}`.trim(),
+          category: 'produce',
+          categoryLabel: item.storeCategory === 'VEGAN_STORE' ? 'Cửa hàng chay' : 'Giỏ nguyên liệu',
+          mealNote: item.storeName || 'Từ giỏ nguyên liệu',
+          checked: false
+        }));
+      return missing.length ? [...prev, ...missing] : prev;
+    });
+  }, [cartHydratedFor, cartOwnerId, isAuthenticated, multiCart]);
 
   const filteredStoreCatalog = useMemo(() => {
     if (!selectedStore?.catalog) return [];
@@ -306,10 +399,11 @@ export function SmartMarketPage() {
   }, [selectedStore, catalogSubcategory]);
 
   const handleAddComboToCart = (combo: MealCombo) => {
+    if (!requireCartLogin()) return;
+    cartDirtyBeforeHydration.current = true;
     sfx.playSuccess();
-    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
-    if (targetStore) {
-      setMultiCart(prev => {
+    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0] || MARKET_REFERENCE_STORE;
+    setMultiCart(prev => {
         let next = [...prev];
         combo.ingredients.forEach(ing => {
           const cartItemId = `${targetStore.id}___combo_${ing.name.toLowerCase().replace(/\s+/g, '_')}`;
@@ -323,11 +417,12 @@ export function SmartMarketPage() {
           });
         });
         return next;
-      });
-    }
+    });
 
     updateItems(prev => {
-      const next = [...prev];
+      const next = prev.map(item => combo.ingredients.some(ingredient => ingredient.name.toLowerCase() === item.name.toLowerCase())
+        ? { ...item, checked: true }
+        : item);
       combo.ingredients.forEach(ing => {
         if (!next.some(it => it.name.toLowerCase() === ing.name.toLowerCase())) {
           next.unshift({
@@ -337,24 +432,24 @@ export function SmartMarketPage() {
             category: 'produce',
             categoryLabel: 'Rau củ & Quả tươi',
             mealNote: `Combo món: ${combo.name}`,
-            checked: false
+            checked: true
           });
         }
       });
       return next;
     });
 
-    setMainView('checklist');
-    setCartAddToast(`Đã thêm trọn combo "${combo.name}" (${combo.ingredients.length} nguyên liệu) vào danh sách cần mua!`);
+    setCartAddToast(`Đã thêm trọn combo "${combo.name}" (${combo.ingredients.length} nguyên liệu) vào giỏ!`);
     setTimeout(() => setCartAddToast(''), 4500);
   };
 
   const handleAddVietgapVeggie = (veg: typeof VIETGAP_5K_VEGGIES[0]) => {
+    if (!requireCartLogin()) return;
+    cartDirtyBeforeHydration.current = true;
     sfx.playSuccess();
-    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0];
-    if (targetStore) {
-      const cartItemId = `${targetStore.id}___vg_${veg.name.toLowerCase().replace(/\s+/g, '_')}`;
-      setMultiCart(prev => {
+    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0] || MARKET_REFERENCE_STORE;
+    const cartItemId = `${targetStore.id}___vg_${veg.name.toLowerCase().replace(/\s+/g, '_')}`;
+    setMultiCart(prev => {
         const existing = prev.find(i => i.id === cartItemId);
         if (existing) {
           return prev.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
@@ -373,8 +468,7 @@ export function SmartMarketPage() {
           storeCategory: targetStore.category,
           count: 1
         }];
-      });
-    }
+    });
 
     updateItems(prev => {
       if (!prev.some(it => it.name.toLowerCase() === veg.name.toLowerCase())) {
@@ -384,15 +478,14 @@ export function SmartMarketPage() {
           amount: '1 gói 500g',
           category: 'produce',
           categoryLabel: 'Rau củ & Quả tươi',
-          mealNote: 'Rau lá đồng giá 5.000đ',
-          checked: false
+          mealNote: 'Rau lá VietGAP',
+          checked: true
         }, ...prev];
       }
-      return prev;
+      return prev.map(item => item.name.toLowerCase() === veg.name.toLowerCase() ? { ...item, checked: true } : item);
     });
 
-    setMainView('checklist');
-    setCartAddToast(`Đã thêm "${veg.name}" (5.000đ) vào danh sách cần mua!`);
+    setCartAddToast(`Đã thêm "${veg.name}" vào giỏ!`);
     setTimeout(() => setCartAddToast(''), 3500);
   };
   const [deliveryNote, setDeliveryNote] = useState('');
@@ -404,7 +497,7 @@ export function SmartMarketPage() {
     setItems(prev => {
       const next = updater(prev);
       try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
+        if (shoppingListStorageKey) localStorage.setItem(shoppingListStorageKey, JSON.stringify(next));
       } catch {
         // storage error
       }
@@ -612,10 +705,40 @@ const handleToggle = (id: string) => {
     updateItems(prev => prev.map(item => ({ ...item, checked: checkAll })));
   };
 
+  const handleDeleteAll = () => {
+    if (!window.confirm('Xóa toàn bộ nguyên liệu khỏi danh sách cần mua và giỏ?')) return;
+    updateItems(() => []);
+    setMultiCart([]);
+    setShowCheckoutModal(false);
+  };
+
   const handleReset = () => {
     if (window.confirm('Khôi phục danh sách đi chợ về danh mục mẫu chuẩn?')) {
       updateItems(() => INITIAL_SMART_MARKET_ITEMS);
     }
+  };
+
+  const exportShoppingListPdf = () => {
+    if (!items.length) {
+      window.alert('Danh sách cần mua đang trống. Hãy thêm nguyên liệu hoặc nhập từ thực đơn trước khi xuất PDF.');
+      return;
+    }
+    const rows = items.map(item => `
+      <tr>
+        <td>${item.checked ? '☑' : '☐'}</td>
+        <td>${escapeHtml(item.name)}</td>
+        <td class="right">${escapeHtml(item.amount)}</td>
+        <td>${escapeHtml(item.categoryLabel)}</td>
+        <td class="muted">${escapeHtml(item.mealNote)}</td>
+      </tr>`).join('');
+    printHtml('Danh sách đi chợ VEGEAI', `
+      <h1>Danh sách đi chợ VEGEAI</h1>
+      <p class="meta">${boughtCount}/${totalCount} mục đã mua · ${escapeHtml(new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }))}</p>
+      <table>
+        <thead><tr><th></th><th>Nguyên liệu</th><th class="right">Số lượng</th><th>Nhóm</th><th>Ghi chú</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p class="muted">Danh sách này chỉ lưu trên trình duyệt hiện tại; giỏ nguyên liệu được đồng bộ theo tài khoản.</p>`);
   };
 
   // AI Ingredient Validation (Blocks Meat & Non-food items)
@@ -662,7 +785,7 @@ const handleToggle = (id: string) => {
       category: newCategory,
       categoryLabel: categoryLabels[newCategory] || 'Khác',
       mealNote: newMealNote.trim() || 'Nguyên liệu tự thêm',
-      checked: false
+      checked: true
     };
 
     updateItems(prev => [newItem, ...prev]);
@@ -677,10 +800,6 @@ const handleToggle = (id: string) => {
   const totalCount = items.length;
   const boughtCount = items.filter(i => i.checked).length;
   const selectedPurchaseItems = useMemo(() => items.filter(item => item.checked), [items]);
-  const selectedPurchaseTotal = useMemo(() => selectedPurchaseItems.reduce((total, item) => {
-    const cartItem = multiCart.find(candidate => candidate.name.trim().toLowerCase() === item.name.trim().toLowerCase());
-    return total + (cartItem ? cartItem.price * cartItem.count : 0);
-  }, 0), [selectedPurchaseItems, multiCart]);
   const unboughtCount = totalCount - boughtCount;
   const progressPercent = totalCount > 0 ? Math.round((boughtCount / totalCount) * 100) : 0;
 
@@ -707,8 +826,12 @@ const handleToggle = (id: string) => {
 
   // Multi-Store Cart Actions
   const handleUpdateMultiCart = (item: StoreCatalogItem, store: SmartMarketStore, delta: number) => {
+    if (!requireCartLogin()) return;
+    cartDirtyBeforeHydration.current = true;
     sfx.playTap();
     const cartItemId = `${store.id}___${item.id}`;
+    const currentCount = multiCart.find(candidate => candidate.id === cartItemId)?.count || 0;
+    const nextCount = Math.max(0, currentCount + delta);
 
     setMultiCart(prev => {
       const existing = prev.find(i => i.id === cartItemId);
@@ -736,6 +859,26 @@ const handleToggle = (id: string) => {
         return [...prev, newItem];
       }
       return prev;
+    });
+
+    updateItems(previous => {
+      const shoppingItemId = `cart-${cartItemId}`;
+      if (nextCount === 0) return previous.filter(candidate => candidate.id !== shoppingItemId);
+      const existing = previous.find(candidate => candidate.id === shoppingItemId);
+      if (existing) {
+        return previous.map(candidate => candidate.id === shoppingItemId
+          ? { ...candidate, amount: `${nextCount} ${item.unit}`, checked: true }
+          : candidate);
+      }
+      return [{
+        id: shoppingItemId,
+        name: item.name,
+        amount: `${nextCount} ${item.unit}`,
+        category: 'produce',
+        categoryLabel: 'Nguyên liệu đã chọn',
+        mealNote: store.name,
+        checked: true,
+      }, ...previous];
     });
   };
 
@@ -870,7 +1013,7 @@ const handleToggle = (id: string) => {
               <span>Quán Chay & Siêu Thị Gần Bạn</span>
             </button>
 
-            <button
+            {isAuthenticated && <button
               onClick={() => { sfx.playTap(); setMainView('checklist'); }}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
                 mainView === 'checklist'
@@ -879,8 +1022,8 @@ const handleToggle = (id: string) => {
               }`}
             >
               <ShoppingBag className="w-4 h-4 text-emerald-600" />
-              <span>Danh Sách Cần Mua ({boughtCount}/{totalCount})</span>
-            </button>
+              <span title="Danh sách cần mua lấy từ giỏ hàng của tài khoản; trạng thái đã mua lưu trên máy này.">Danh sách cần mua ({boughtCount}/{totalCount})</span>
+            </button>}
           </div>
         </div>
 
@@ -970,7 +1113,7 @@ const handleToggle = (id: string) => {
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="px-3 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider shadow-2xs">
-                      🔥 Đồng giá 5.000đ/gói · Rau Lá Quốc Dân
+                      🌿 Rau Lá Quốc Dân · Chọn nhanh
                     </span>
                     <span className="text-xs text-emerald-200 font-semibold flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5" /> Chuẩn VietGAP tươi sớm nay
@@ -980,7 +1123,7 @@ const handleToggle = (id: string) => {
                     Bách Hóa Xanh Chay — Rau Củ Tươi Mỗi Ngày
                   </h3>
                   <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed max-w-2xl">
-                    Đồng giá 5.000đ/gói 500g rau lá quốc dân VietGAP. Giảm thêm 20% khi mua trọn combo nấu ăn theo món!
+                    Chọn nhanh rau lá VietGAP và thêm trực tiếp vào giỏ nguyên liệu cá nhân.
                   </p>
                 </div>
               </div>
@@ -989,7 +1132,7 @@ const handleToggle = (id: string) => {
               <div className="pt-3 border-t border-white/15">
                 <div className="text-[11px] font-bold text-emerald-200 mb-2.5 uppercase tracking-wider flex items-center gap-1.5">
                   <span>🥬</span>
-                  <span>Chọn nhanh rau lá đồng giá 5.000đ/500g (Bấm + để thêm vào giỏ):</span>
+                  <span>Chọn nhanh rau lá VietGAP (bấm + để thêm thẳng vào giỏ):</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                   {VIETGAP_5K_VEGGIES.map(veg => (
@@ -998,16 +1141,13 @@ const handleToggle = (id: string) => {
                       type="button"
                       onClick={() => handleAddVietgapVeggie(veg)}
                       className="group flex items-center justify-between p-2.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-emerald-950 border border-white/15 hover:border-white transition shadow-2xs cursor-pointer text-left"
-                      title={`Bấm để thêm ${veg.name} (5.000đ) vào giỏ`}
+                      title={`Bấm để thêm ${veg.name} vào giỏ`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xl shrink-0">{veg.emoji}</span>
                         <div className="min-w-0">
                           <div className="text-[11px] font-bold truncate">{veg.name.replace(/\s*\(500g\)/i, '')}</div>
-                          <div className="text-[10px] flex items-center gap-1 font-extrabold text-amber-300 group-hover:text-emerald-700">
-                            <span>5.000đ</span>
-                            <span className="line-through opacity-70 text-[9px] font-normal text-slate-300 group-hover:text-slate-400">{veg.originalPrice}</span>
-                          </div>
+                          <div className="text-[10px] font-semibold text-emerald-100 group-hover:text-emerald-700">500g · VietGAP</div>
                         </div>
                       </div>
                       <span className="w-5 h-5 rounded-full bg-emerald-500 group-hover:bg-emerald-700 text-white flex items-center justify-center font-bold text-xs shrink-0 ml-1">
@@ -1049,9 +1189,7 @@ const handleToggle = (id: string) => {
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <span className="text-3xl p-2 rounded-xl bg-white dark:bg-slate-700 shadow-2xs">{combo.emoji}</span>
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-                          {combo.savingFormatted}
-                        </span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">Combo nguyên liệu</span>
                       </div>
 
                       <h4 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-1 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition">
@@ -1091,23 +1229,14 @@ const handleToggle = (id: string) => {
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-black text-emerald-700 dark:text-emerald-400">
-                          {combo.priceFormatted}
-                        </div>
-                        <div className="text-[10px] text-slate-400 line-through">
-                          {combo.originalPriceFormatted}
-                        </div>
-                      </div>
-
                       <button
                         type="button"
                         onClick={() => handleAddComboToCart(combo)}
                         className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                        title={`Mua combo ${combo.name}`}
+                        title={`Thêm combo ${combo.name} vào giỏ`}
                       >
                         <ShoppingCart className="w-3.5 h-3.5" />
-                        <span>Mua combo</span>
+                        <span>Thêm vào giỏ</span>
                       </button>
                     </div>
                   </div>
@@ -1324,15 +1453,6 @@ const handleToggle = (id: string) => {
                     </p>
                   </div>
 
-                  {/* Promo Voucher Banner & Delivery SLA */}
-                  <div className="flex flex-col sm:items-end gap-2 shrink-0">
-                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs font-extrabold text-emerald-800 dark:text-emerald-300 shadow-2xs">
-                      <Truck className="w-3.5 h-3.5" /> Giao nhanh {selectedStore.duration}
-                    </span>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 px-2 py-0.5 rounded-lg border border-rose-200 dark:border-rose-800">
-                      <BadgePercent className="w-3 h-3" /> Mã VEGE15: Giảm 15.000đ
-                    </span>
-                  </div>
                 </div>
 
                 {/* Catalog items grid (ShopeeFood / Mart style) */}
@@ -1396,12 +1516,7 @@ const handleToggle = (id: string) => {
                                 <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
                                   {catItem.name}
                                 </h4>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400">
-                                    {catItem.priceFormatted}
-                                  </span>
-                                  <span className="text-[11px] text-slate-400">/ {catItem.unit}</span>
-                                </div>
+                                <div className="mt-0.5 text-[11px] text-slate-400">Đơn vị: {catItem.unit}</div>
                               </div>
                             </div>
 
@@ -1514,7 +1629,7 @@ const handleToggle = (id: string) => {
             )}
 
             {/* STICKY BOTTOM FLOATING CART BAR (MULTI-STORE SHOPPING CART) */}
-            {boughtCount > 0 && (
+            {isAuthenticated && totalCartCount > 0 && (
               <div className="fixed bottom-6 inset-x-4 sm:inset-x-auto sm:right-8 sm:w-auto z-40 animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div className="bg-slate-900/95 text-white backdrop-blur-md rounded-2xl border border-emerald-500/40 p-3.5 sm:px-6 sm:py-4 shadow-2xl flex items-center justify-between gap-6 ring-2 ring-emerald-500/30">
                   <div className="flex items-center gap-3">
@@ -1523,7 +1638,7 @@ const handleToggle = (id: string) => {
                         <ShoppingCart className="w-5 h-5" />
                       </div>
                       <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-[11px] font-extrabold flex items-center justify-center text-white">
-                        {boughtCount}
+                        {totalCartCount}
                       </span>
                     </div>
                     <div>
@@ -1531,24 +1646,35 @@ const handleToggle = (id: string) => {
                         Giỏ nguyên liệu đã chọn
                       </div>
                       <div className="text-sm sm:text-base font-extrabold text-emerald-400">
-                        {boughtCount} món đã tick
-                        {selectedPurchaseTotal > 0 && <span className="text-[11px] font-normal text-slate-400 ml-1.5">· khoảng {selectedPurchaseTotal.toLocaleString('vi-VN')} đ</span>}
+                        {totalCartCount} món đã chọn
                       </div>
                     </div>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => { sfx.playTap(); setShowCheckoutModal(true); }}
+                    onClick={() => { if (!requireCartLogin()) return; sfx.playTap(); setShowCheckoutModal(true); }}
                     className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs sm:text-sm transition shadow-lg flex items-center gap-2 cursor-pointer"
                   >
-                    <span>Xem giỏ đã chọn</span>
+                    <span>Mở giỏ nguyên liệu</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             )}
 
+          </div>
+        )}
+
+        {showLoginModal && !isAuthenticated && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" onMouseDown={() => setShowLoginModal(false)}>
+            <div role="dialog" aria-modal="true" aria-label="Đăng nhập để sử dụng giỏ nguyên liệu" className="relative w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl max-h-[92vh] overflow-y-auto" onMouseDown={event => event.stopPropagation()}>
+              <button type="button" aria-label="Đóng đăng nhập" onClick={() => setShowLoginModal(false)} className="absolute right-4 top-4 rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X className="h-5 w-5" />
+              </button>
+              <p className="mb-5 pr-10 text-sm text-slate-600 dark:text-slate-300">Đăng nhập ngay tại đây để thêm nguyên liệu. Bản đồ và vị trí đang xem sẽ được giữ nguyên.</p>
+              <LoginForm compact onSuccess={() => setShowLoginModal(false)} />
+            </div>
           </div>
         )}
 
@@ -1561,7 +1687,7 @@ const handleToggle = (id: string) => {
                   <h3 className="text-lg font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5 text-emerald-600" /> Giỏ nguyên liệu đã chọn
                   </h3>
-                  <p className="text-xs text-slate-500 mt-1">Chỉ hiển thị những món bạn đã tick trong Danh Sách Cần Mua.</p>
+                  <p className="text-xs text-slate-500 mt-1">Hiển thị ngay các món bạn đã thêm từ cửa hàng hoặc combo; không có bước thanh toán.</p>
                 </div>
                 <button type="button" onClick={() => setShowCheckoutModal(false)} aria-label="Đóng giỏ nguyên liệu" className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
                   <X className="w-5 h-5" />
@@ -1569,36 +1695,31 @@ const handleToggle = (id: string) => {
               </div>
 
               {selectedPurchaseItems.length === 0 ? (
-                <div className="py-10 text-center text-sm text-slate-500">Chưa có nguyên liệu nào được tick.</div>
+                <div className="py-10 text-center text-sm text-slate-500">Chưa có nguyên liệu nào trong giỏ.</div>
               ) : (
                 <div className="space-y-2">
-                  {selectedPurchaseItems.map(item => {
-                    const cartItem = multiCart.find(candidate => candidate.name.trim().toLowerCase() === item.name.trim().toLowerCase());
-                    return (
+                  {selectedPurchaseItems.map(item => (
                       <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-3.5 bg-slate-50 dark:bg-slate-800/70">
                         <div className="min-w-0">
                           <div className="font-bold text-sm text-slate-900 dark:text-white truncate">{item.name}</div>
                           <div className="text-xs text-slate-500 mt-0.5">{item.amount}{item.categoryLabel ? ` · ${item.categoryLabel}` : ''}</div>
-                          {cartItem && <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1 truncate">Tham khảo tại {cartItem.storeName}</div>}
+                          {item.mealNote && <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1 truncate">{item.mealNote}</div>}
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          {cartItem && <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">{(cartItem.price * cartItem.count).toLocaleString('vi-VN')} đ</span>}
-                          <button type="button" onClick={() => handleToggle(item.id)} title="Bỏ chọn món này" className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer">
-                            <X className="w-4 h-4" />
+                          <button type="button" onClick={() => { handleDelete(item.id); setMultiCart(previous => previous.filter(candidate => candidate.name.trim().toLowerCase() !== item.name.trim().toLowerCase())); }} title="Xóa món này" className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer">
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
-                    );
-                  })}
+                  ))}
                 </div>
               )}
 
               <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-4">
                 <div className="flex justify-between font-extrabold text-slate-900 dark:text-white">
-                  <span>{selectedPurchaseItems.length} món đã chọn</span>
-                  {selectedPurchaseTotal > 0 && <span className="text-emerald-700 dark:text-emerald-400">Dự kiến {selectedPurchaseTotal.toLocaleString('vi-VN')} đ</span>}
+                  <span>{totalCartCount} món trong giỏ</span>
                 </div>
-                <p className="text-xs text-emerald-800/80 dark:text-emerald-300 mt-1">VEGEAI chỉ hỗ trợ lập danh sách và tham khảo giá; không đặt hàng, giao hàng hoặc thanh toán.</p>
+                <p className="text-xs text-emerald-800/80 dark:text-emerald-300 mt-1">VEGEAI chỉ hỗ trợ quản lý giỏ nguyên liệu và danh sách cần mua; không đặt hàng, giao hàng hoặc thanh toán.</p>
               </div>
 
               <div className="flex justify-end">
@@ -1890,6 +2011,23 @@ const handleToggle = (id: string) => {
                     {boughtCount === totalCount ? "Bỏ chọn hết" : "Chọn hết"}
                   </button>
                   <button
+                    type="button"
+                    onClick={exportShoppingListPdf}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+                    title="In hoặc lưu danh sách đi chợ thành PDF"
+                  >
+                    <FileDown className="w-4 h-4" /> Xuất PDF
+                  </button>
+                  {totalCount > 0 && boughtCount === totalCount && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteAll}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-bold transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Xóa hết
+                    </button>
+                  )}
+                  <button
                     onClick={handleReset}
                     className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs transition cursor-pointer"
                     title="Khôi phục danh sách mẫu"
@@ -2091,7 +2229,7 @@ const handleToggle = (id: string) => {
                         <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                           <span className="font-semibold text-emerald-700 dark:text-emerald-400">{item.amount}</span>
                           <span>•</span>
-                          <span className="truncate">{item.mealNote || item.categoryLabel}</span>
+                          <span className="truncate">{item.mealNote && !/(?:\d[\d.]*\s*đ|đồng giá)/i.test(item.mealNote) ? item.mealNote : item.categoryLabel}</span>
                         </div>
                         {!item.checked && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px]" onClick={e => e.stopPropagation()}>
@@ -2100,24 +2238,27 @@ const handleToggle = (id: string) => {
                               href={`https://www.bachhoaxanh.com/tim-kiem?key=${encodeURIComponent(item.name)}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-1.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 flex items-center gap-0.5 transition"
+                              className="px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 transition"
                             >
+                              <img src="/brands/bhx.png" alt="" loading="lazy" className="h-3.5 w-3.5 rounded-[3px] object-contain" />
                               BHX <ExternalLink size={9} />
                             </a>
                             <a
                               href={`https://cooponline.vn/search?q=${encodeURIComponent(item.name)}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-800 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800 flex items-center gap-0.5 transition"
+                              className="px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 text-blue-800 dark:text-blue-300 font-bold border border-blue-200 dark:border-blue-800 flex items-center gap-1 transition"
                             >
+                              <img src="/brands/coop.png" alt="" loading="lazy" className="h-3.5 w-3.5 rounded-[3px] object-contain" />
                               Co.op <ExternalLink size={9} />
                             </a>
                             <a
                               href={`https://winmart.vn/search?keyword=${encodeURIComponent(item.name)}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800 flex items-center gap-0.5 transition"
+                              className="px-2 py-1 rounded-md bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 text-rose-800 dark:text-rose-300 font-bold border border-rose-200 dark:border-rose-800 flex items-center gap-1 transition"
                             >
+                              <img src="/brands/winmart.png" alt="" loading="lazy" className="h-3.5 w-3.5 rounded-[3px] object-contain" />
                               WinMart <ExternalLink size={9} />
                             </a>
                           </div>

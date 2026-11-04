@@ -20,7 +20,16 @@ import {
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { aiService } from '../services/aiService';
-import { errorMessage } from '../services/apiClient';
+import { ApiError, errorMessage } from '../services/apiClient';
+import {
+  GUEST_CHAT_STORAGE_KEY,
+  chatSessionsKey,
+  clearChatSessions,
+  readChatSessions,
+  stashChatHandoff,
+  takeChatHandoff,
+  writeChatSessions
+} from '../features/ai/chatSessionStore';
 import { useAuth } from '../hooks/useAuth';
 import {
   ChatMealScheduleCardView,
@@ -72,25 +81,24 @@ export function AiChatPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const location = useLocation();
 
-  // Keep account history isolated from guest history. The v2 guest key also
-  // discards legacy guest data polluted while authentication was hydrating.
-  const storageKey = user?.id
-    ? `vegeai:ai-chef:sessions:${user.id}`
-    : 'vegeai:ai-chef:sessions:guest:v2';
+  // Keep account history isolated from guest history: each account reads only its own key,
+  // guests read only the guest key, so a shared machine can never show the other side.
+  const storageKey = chatSessionsKey(user?.id);
   const loadedStorageKeyRef = useRef('');
   const skipNextPersistRef = useRef(false);
+  const pendingHandoffRef = useRef<{ session: ChatSession; draft: string } | null>(null);
+
+  // Guest conversations are intentionally ephemeral. They must disappear when
+  // the guest leaves the chef page and must never leak into a later visit.
+  useEffect(() => {
+    if (user?.id) return;
+    return () => clearChatSessions(localStorage, GUEST_CHAT_STORAGE_KEY);
+  }, [user?.id]);
 
   // Session state
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // fallback
-    }
+    const stored = readChatSessions<ChatSession>(localStorage, storageKey);
+    if (stored) return stored;
     return [
       {
         id: 'default-welcome',
@@ -145,44 +153,69 @@ export function AiChatPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showQuotaModal, setShowQuotaModal] = useState(false);
+  // Route the guest must return to after logging in from a fridge/scan prompt.
+  const [fridgeLoginFrom, setFridgeLoginFrom] = useState<string | null>(null);
+  const [resumedAfterLogin, setResumedAfterLogin] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isAuthLoading) return;
-    let nextSessions: ChatSession[] | null = null;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) nextSessions = parsed;
-      }
-    } catch {
-      // Fall back to a clean welcome session.
-    }
-    if (!nextSessions) {
-      nextSessions = [{
-        id: 'default-welcome',
-        title: 'Chào mừng bạn đến với Bếp trưởng',
-        category: 'ai-chef',
-        messages: [{
-          sender: 'ai',
-          text: 'Xin chào! Tôi là Bếp trưởng VEGEAI. Tôi có thể giúp bạn lên thực đơn chay, phân tích nguyên liệu từ tủ lạnh, hoặc hướng dẫn nấu các món chay bổ dưỡng và ngon miệng. Hôm nay bạn muốn nấu gì?',
-          time: formatTime(Date.now())
-        }],
-        updatedAt: Date.now()
-      }];
-    }
+    const nextSessions = readChatSessions<ChatSession>(localStorage, storageKey) ?? [{
+      id: 'default-welcome',
+      title: 'Chào mừng bạn đến với Bếp trưởng',
+      category: 'ai-chef' as const,
+      messages: [{
+        sender: 'ai' as const,
+        text: 'Xin chào! Tôi là Bếp trưởng VEGEAI. Tôi có thể giúp bạn lên thực đơn chay, phân tích nguyên liệu từ tủ lạnh, hoặc hướng dẫn nấu các món chay bổ dưỡng và ngon miệng. Hôm nay bạn muốn nấu gì?',
+        time: formatTime(Date.now())
+      }],
+      updatedAt: Date.now()
+    }];
     skipNextPersistRef.current = true;
     loadedStorageKeyRef.current = storageKey;
     setSessions(nextSessions);
-    setActiveSessionId(nextSessions[0].id);
+    setActiveSessionId(previousId => nextSessions.some(s => s.id === previousId) ? previousId : nextSessions[0].id);
     setActiveTabCategory('all');
     setError('');
   }, [isAuthLoading, storageKey]);
 
+  // Restore the conversation and the unanswered question kept while the guest logged in from
+  // the "out of free turns" prompt, so the login round-trip leaves them exactly where they were.
+  useEffect(() => {
+    if (isAuthLoading || !user?.id) return;
+    const handoff = takeChatHandoff<ChatSession>(sessionStorage);
+    if (!handoff) return;
+    pendingHandoffRef.current = null;
+    const signature = (m: ChatMessage) => `${m.sender}|${m.time}|${m.text}`;
+    setSessions(prev => {
+      const existing = prev.find(s => s.id === handoff.session.id);
+      if (!existing) return [handoff.session, ...prev];
+      // Same session id (e.g. the default welcome session): keep the guest turns first and
+      // append anything the account wrote in the meantime, without duplicating messages.
+      const restored = new Set(handoff.session.messages.map(signature));
+      const merged: ChatSession = {
+        ...existing,
+        ...handoff.session,
+        messages: [...handoff.session.messages, ...existing.messages.filter(m => !restored.has(signature(m)))],
+        updatedAt: Date.now()
+      };
+      return prev.map(s => (s.id === existing.id ? merged : s));
+    });
+    setActiveSessionId(handoff.session.id);
+    setActiveTabCategory('all');
+    if (handoff.draft) setInput(handoff.draft);
+    setShowQuotaModal(false);
+    setResumedAfterLogin(true);
+  }, [isAuthLoading, user?.id]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user?.id) {
+      e.target.value = '';
+      setFridgeLoginFrom('/fridge-scan');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -215,11 +248,7 @@ export function AiChatPage() {
       skipNextPersistRef.current = false;
       return;
     }
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(sessions));
-    } catch {
-      // Ignore storage errors
-    }
+    writeChatSessions(localStorage, storageKey, sessions);
   }, [isAuthLoading, sessions, storageKey]);
 
   // Current session
@@ -326,11 +355,7 @@ export function AiChatPage() {
 
     const handleClearGuestSessions = () => {
     if (window.confirm('Bạn có chắc muốn xóa sạch toàn bộ lịch sử trò chuyện khách trên trình duyệt này?')) {
-      try {
-        localStorage.removeItem(storageKey);
-      } catch (err) {
-        // ignore
-      }
+      clearChatSessions(localStorage, storageKey);
       const initialSession: ChatSession = {
         id: 'default-welcome',
         title: 'Chào mừng bạn đến với Bếp trưởng',
@@ -350,6 +375,10 @@ export function AiChatPage() {
   };
 
   const handleFridgeQuickAction = async () => {
+    if (!user?.id) {
+      setFridgeLoginFrom('/ai-chef');
+      return;
+    }
     try {
       const items = await fridgeService.list();
       const availableItems = items.filter(i => i.status === 'ACTIVE');
@@ -579,8 +608,12 @@ export function AiChatPage() {
       }));
     } catch (err) {
       const errTxt = errorMessage(err);
-      const isQuota = /hết lượt|guest trial|quota/i.test(errTxt);
-      if (isQuota) {
+      // The guest trial limit is a stable contract (429 + GUEST_AI_QUOTA_EXCEEDED 1402).
+      const quotaExceeded = err instanceof ApiError && (err.code === 1402 || err.status === 429);
+      if (quotaExceeded && !user?.id) {
+        // Keep the conversation and the question the guest was about to send, so the
+        // login round-trip returns them to exactly the same place.
+        pendingHandoffRef.current = { session: currentSession, draft: userText };
         setShowQuotaModal(true);
         const quotaMsg = {
           sender: 'ai' as const,
@@ -605,6 +638,18 @@ export function AiChatPage() {
       setBusy(false);
     }
   };
+
+  // Dashboard / fridge / meal-plan shortcuts land here with ?prompt=... — send it once so the
+  // button actually does what it promises, then strip the query so a refresh does not resend it.
+  const promotedPromptRef = useRef('');
+  useEffect(() => {
+    if (isAuthLoading) return;
+    const prompt = new URLSearchParams(location.search).get('prompt');
+    if (!prompt || promotedPromptRef.current === prompt) return;
+    promotedPromptRef.current = prompt;
+    window.history.replaceState(window.history.state, '', '/ai-chef');
+    handleSubmitWithText(prompt);
+  }, [isAuthLoading, location.search]);
 
   // Filtered session list
   const filteredSessions = sessions.filter(s => {
@@ -662,7 +707,7 @@ export function AiChatPage() {
                   Chế độ Khách (Chưa đăng nhập) — Quyền riêng tư & Bộ nhớ trình duyệt
                 </p>
                 <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5 leading-relaxed">
-                  Lịch sử trò chuyện này chỉ được lưu tạm thời trên trình duyệt máy bạn qua <strong>LocalStorage</strong> và KHÔNG đồng bộ lên tài khoản hay các thiết bị khác. Nếu bạn mở trên máy khác hoặc trình duyệt khác, đoạn chat này sẽ không hiển thị.
+                  Bạn có <strong>3 lượt hỏi thử miễn phí</strong>; hết 3 lượt hệ thống sẽ mời đăng nhập để tiếp tục. Lịch sử trò chuyện này chỉ được lưu tạm thời trên trình duyệt máy bạn qua <strong>LocalStorage</strong> và KHÔNG đồng bộ lên tài khoản hay các thiết bị khác, cũng không hiển thị cho tài khoản đăng nhập trên cùng máy.
                 </p>
               </div>
             </div>
@@ -682,6 +727,24 @@ export function AiChatPage() {
                 Đăng ký tài khoản
               </Link>
             </div>
+          </div>
+        )}
+
+        {/* Guest trial reminder + resumed-conversation confirmation */}
+        {resumedAfterLogin && (
+          <div className="mb-6 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-xs text-emerald-900 dark:text-emerald-200 flex items-start sm:items-center gap-2.5">
+            <ChefHat className="w-4 h-4 shrink-0" />
+            <span>
+              Bạn đã đăng nhập. Cuộc trò chuyện và câu hỏi đang viết dở được giữ nguyên — bấm gửi để tiếp tục.
+            </span>
+            <button
+              type="button"
+              onClick={() => setResumedAfterLogin(false)}
+              className="ml-auto text-emerald-700/70 hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-100 cursor-pointer"
+              aria-label="Đóng thông báo"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
@@ -1111,10 +1174,16 @@ export function AiChatPage() {
                 
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => {
+                    if (!user?.id) {
+                      setFridgeLoginFrom('/fridge-scan');
+                      return;
+                    }
+                    fileInputRef.current?.click();
+                  }}
                   disabled={busy}
                   className="shrink-0 p-2 sm:p-2.5 text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-xl transition cursor-pointer"
-                  title="Chụp ảnh hoặc chọn ảnh tủ lạnh / món ăn"
+                  title={user?.id ? 'Chụp ảnh hoặc chọn ảnh tủ lạnh / món ăn' : 'Đăng nhập để quét ảnh tủ lạnh'}
                 >
                   <Camera className="w-5 h-5" />
                 </button>
@@ -1173,12 +1242,24 @@ export function AiChatPage() {
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Link
                   to="/login"
+                  state={{ from: '/ai-chef' }}
+                  onClick={() => {
+                    if (pendingHandoffRef.current) {
+                      stashChatHandoff(sessionStorage, pendingHandoffRef.current);
+                    }
+                  }}
                   className="flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition text-center"
                 >
-                  Đăng nhập
+                  Đăng nhập &amp; tiếp tục
                 </Link>
                 <Link
                   to="/register"
+                  state={{ from: '/ai-chef' }}
+                  onClick={() => {
+                    if (pendingHandoffRef.current) {
+                      stashChatHandoff(sessionStorage, pendingHandoffRef.current);
+                    }
+                  }}
                   className="flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition text-center shadow-xs"
                 >
                   Đăng ký miễn phí
@@ -1186,7 +1267,50 @@ export function AiChatPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setShowQuotaModal(false)}
+                onClick={() => {
+                  pendingHandoffRef.current = null;
+                  setShowQuotaModal(false);
+                }}
+                className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer pt-1"
+              >
+                Để sau
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Fridge features are account-only: prompt before any upload happens. */}
+        {fridgeLoginFrom && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <div className="bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 mx-auto flex items-center justify-center shadow-xs">
+                <Camera className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                Đăng nhập để dùng Tủ lạnh thông minh
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Quét ảnh tủ lạnh, lưu nguyên liệu và nhận gợi ý món ăn cá nhân hóa cần một tài khoản VEGEAI miễn phí.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Link
+                  to="/login"
+                  state={{ from: fridgeLoginFrom }}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition text-center shadow-xs"
+                >
+                  Đăng nhập
+                </Link>
+                <Link
+                  to="/register"
+                  state={{ from: fridgeLoginFrom }}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition text-center"
+                >
+                  Đăng ký
+                </Link>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFridgeLoginFrom(null)}
                 className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer pt-1"
               >
                 Để sau

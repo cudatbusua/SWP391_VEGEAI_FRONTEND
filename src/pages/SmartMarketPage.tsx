@@ -1262,20 +1262,6 @@ const handleToggle = (id: string) => {
                       : 'Vui lòng cập nhật địa chỉ để quét các quán chay & siêu thị thực tế gần bạn nhất.'}
                   </p>
                 </div>
-                {isAddressConfirmed && (
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
-                      🗺️ OpenStreetMap &amp; GPS Thực Tế
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddressConfirmed(false)}
-                      className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
-                    >
-                      Đổi vị trí
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
 

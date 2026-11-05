@@ -183,12 +183,10 @@ function VideoAiRecipeCopilot({
 
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                to="/ai-chef"
-                state={{
-                  source: 'video-recipe',
-                  title: `Nấu: ${recipe.title}`,
-                  initialPrompt: `Tôi muốn hỏi thêm về món "${recipe.title}" từ video "${title}". Nguyên liệu chính: ${recipe.ingredients.slice(0, 8).join(', ')}. Thời gian khoảng ${recipe.cookTimeMinutes} phút, ước tính ${recipe.estimatedCalories} kcal. Hãy tư vấn ngắn gọn và trả lời câu hỏi tiếp theo của tôi dựa trên thông tin món này.`
-                }}
+                // AiChatPage auto-sends the ?prompt= query once (it ignores an initialPrompt in route state).
+                to={'/ai-chef?prompt=' + encodeURIComponent(
+                  `Tôi muốn hỏi thêm về món "${recipe.title}" từ video "${title}". Nguyên liệu chính: ${(recipe.ingredients ?? []).slice(0, 8).join(', ')}. Thời gian khoảng ${recipe.cookTimeMinutes} phút, ước tính ${recipe.estimatedCalories} kcal. Hãy tư vấn ngắn gọn và trả lời câu hỏi tiếp theo của tôi dựa trên thông tin món này.`
+                )}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs"
               >
                 <ChefHat size={14} /> Chuyển sang AI Bếp Trưởng

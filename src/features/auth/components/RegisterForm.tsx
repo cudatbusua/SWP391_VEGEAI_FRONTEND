@@ -5,6 +5,7 @@ import { Input } from '../../../components/Input';
 import { Button } from '../../../components/Button';
 import { useAuth } from '../../../hooks/useAuth';
 import { isStrictEmail, calculatePasswordStrength } from '../../../utils/validation';
+import { TermsPolicyDialog, type PolicySection } from './TermsPolicyDialog';
 
 export const RegisterForm: React.FC = () => {
   const { register } = useAuth();
@@ -22,6 +23,21 @@ export const RegisterForm: React.FC = () => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [generalError, setGeneralError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const [policySection, setPolicySection] = useState<PolicySection>('terms');
+  const [hasReadPolicy, setHasReadPolicy] = useState(false);
+
+  const openPolicy = (section: PolicySection) => {
+    setPolicySection(section);
+    setPolicyOpen(true);
+  };
+
+  const acceptPolicy = () => {
+    setHasReadPolicy(true);
+    setPolicyOpen(false);
+    setFormData(data => ({ ...data, agreeTerms: true }));
+    setErrors(errs => ({ ...errs, agreeTerms: '' }));
+  };
 
   // Dynamic password strength bar
   const strength = calculatePasswordStrength(formData.password);
@@ -57,8 +73,10 @@ export const RegisterForm: React.FC = () => {
       errs.confirmPassword = 'Mật khẩu nhập lại không khớp';
     }
 
-    if (!formData.agreeTerms) {
-      errs.agreeTerms = 'Vui lòng đồng ý với điều khoản sử dụng';
+    if (!hasReadPolicy || !formData.agreeTerms) {
+      errs.agreeTerms = hasReadPolicy
+        ? 'Vui lòng đồng ý với điều khoản sử dụng'
+        : 'Vui lòng đọc hết Điều khoản sử dụng và Chính sách bảo mật trước khi đăng ký';
     }
 
     setErrors(errs);
@@ -191,30 +209,41 @@ export const RegisterForm: React.FC = () => {
           />
         </div>
 
-        {/* Checkbox điều khoản (Image 1 & 2) */}
+        {/* Checkbox điều khoản: chỉ tick được sau khi đã đọc hết chính sách */}
         <div className="pt-1">
-          <label className="flex items-start gap-2.5 text-xs text-gray-600 dark:text-slate-300 cursor-pointer select-none">
+          <div className="flex items-start gap-2.5 text-xs text-gray-600 dark:text-slate-300">
             <input
+              id="agree-terms"
               type="checkbox"
               checked={formData.agreeTerms}
               onChange={(e) => {
+                // Not read yet: open the policy instead of ticking the box.
+                if (!hasReadPolicy) {
+                  openPolicy('terms');
+                  return;
+                }
                 setFormData({ ...formData, agreeTerms: e.target.checked });
                 if (errors.agreeTerms) setErrors({ ...errors, agreeTerms: '' });
               }}
-              className="mt-0.5 w-4 h-4 rounded text-emerald-600 border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-emerald-500 shrink-0"
+              className="mt-0.5 w-4 h-4 rounded text-emerald-600 border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-emerald-500 shrink-0 cursor-pointer"
             />
             <span className="leading-normal">
-              Tôi đồng ý với{' '}
-              <a href="#" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">
+              <label htmlFor="agree-terms" className="cursor-pointer select-none">Tôi đã đọc và đồng ý với</label>{' '}
+              <button type="button" onClick={() => openPolicy('terms')} className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline cursor-pointer">
                 Điều khoản sử dụng
-              </a>{' '}
+              </button>{' '}
               và{' '}
-              <a href="#" className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">
+              <button type="button" onClick={() => openPolicy('privacy')} className="text-emerald-700 dark:text-emerald-400 font-semibold hover:underline cursor-pointer">
                 Chính sách bảo mật
-              </a>{' '}
+              </button>{' '}
               của VEGEAI.
+              {!hasReadPolicy && (
+                <span className="block mt-0.5 text-[11px] text-gray-400 dark:text-slate-500">
+                  Bạn cần đọc hết điều khoản trước khi đồng ý.
+                </span>
+              )}
             </span>
-          </label>
+          </div>
 
           {errors.agreeTerms && (
             <p className="mt-1.5 text-xs text-red-500 dark:text-red-400 flex items-center gap-1 font-medium">
@@ -248,6 +277,13 @@ export const RegisterForm: React.FC = () => {
         </Link>
       </div>
 
+      <TermsPolicyDialog
+        open={policyOpen}
+        section={policySection}
+        alreadyRead={hasReadPolicy}
+        onClose={() => setPolicyOpen(false)}
+        onAccept={acceptPolicy}
+      />
     </div>
   );
 };

@@ -64,7 +64,7 @@ function VideoAiRecipeCopilot({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-[11px] font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
-            <Sparkles size={13} /> AI Video-to-Recipe Copilot
+            <Sparkles size={13} /> AI Video-to-Recipe Gemini
           </span>
           <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white mt-1.5 flex items-center gap-2">
             <ChefHat className="text-emerald-700 dark:text-emerald-400" size={22} />

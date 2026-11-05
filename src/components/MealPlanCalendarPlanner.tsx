@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, CalendarDays, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, FileDown, History, Loader2, RefreshCw, Save, ShoppingBag, Sparkles, Utensils, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, FileDown, History, Loader2, RefreshCw, Save, ShoppingBag, Sparkles, Trash2, Utensils, X } from 'lucide-react';
 import { MealCalendar31DaysView, calendarGridRange, toDateKey } from './MealCalendar31DaysView';
 import { CommunityConfirm } from './CommunityUi';
 import { PlannedMealDetails } from './PlannedMealDetails';
@@ -13,12 +13,23 @@ import { sfx } from '../utils/soundEffects';
 import { missingMarketItems } from '../utils/mealPlanMarket';
 import { escapeHtml, formatNumber, printHtml } from '../utils/printDocument';
 import type { NutritionTargets } from '../types/api';
-import type { MealPlan, PlanNutrients, PlannedMeal } from '../types/mealPlan';
+import type { MealPlan, MealPlanSummary, PlanNutrients, PlannedMeal } from '../types/mealPlan';
 
 interface MealPlanCalendarPlannerProps {
   dailyCalorieTarget?: number;
   onAddToShoppingList: (mealTitle: string) => void;
 }
+
+/** Vietnamese meal names by how many meals the day has; extra meals become snacks between the main ones. */
+const MEAL_NAMES: Record<number, string[]> = {
+  1: ['Bữa chính'],
+  2: ['Bữa sáng', 'Bữa tối'],
+  3: ['Bữa sáng', 'Bữa trưa', 'Bữa tối'],
+  4: ['Bữa sáng', 'Bữa trưa', 'Bữa phụ chiều', 'Bữa tối'],
+  5: ['Bữa sáng', 'Bữa phụ sáng', 'Bữa trưa', 'Bữa phụ chiều', 'Bữa tối'],
+  6: ['Bữa sáng', 'Bữa phụ sáng', 'Bữa trưa', 'Bữa phụ chiều', 'Bữa tối', 'Bữa phụ tối'],
+};
+const mealName = (slot: number, mealsPerDay: number) => MEAL_NAMES[mealsPerDay]?.[slot] ?? `Bữa ${slot + 1}`;
 
 const shortDate = (key: string) => new Date(key + 'T12:00:00').toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' });
 
@@ -60,6 +71,9 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
   const [message, setMessage] = useState('');
   const [swapping, setSwapping] = useState<number | null>(null);
   const [replacement, setReplacement] = useState('');
+  const [deleting, setDeleting] = useState<MealPlanSummary | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const range = useMemo(() => {
     const { from, to } = calendarGridRange(calendarMonth);
@@ -154,6 +168,26 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     selectDate(start);
   };
 
+  const removePlan = async () => {
+    if (!deleting || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError('');
+    try {
+      await mealPlanService.remove(deleting.id);
+      // Deleting the last item of a later page would leave that page empty.
+      if (savedPlans.data && savedPlans.data.items.length === 1 && savedPage > 0) setSavedPage(page => page - 1);
+      setDeleting(null);
+      setSwapping(null);
+      setRevision(value => value + 1);
+      setError('');
+      setMessage('Đã xóa kế hoạch khỏi lịch.');
+    } catch (reason) {
+      setDeleteError(errorMessage(reason));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   const discard = () => {
     setDraft(null);
     setSwapping(null);
@@ -206,11 +240,10 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
       return;
     }
     const targets = days[0].targets;
-    const slotLabel = (slot: number) => ['Sáng', 'Trưa', 'Tối', 'Bữa phụ'][slot] ?? `Bữa ${slot + 1}`;
     const sections = days.map(day => {
       const rows = day.meals.map(meal => `
         <tr>
-          <td>${escapeHtml(slotLabel(meal.slot))}</td>
+          <td>${escapeHtml(mealName(meal.slot, day.meals.length))}</td>
           <td>${escapeHtml(meal.title)}</td>
           <td class="right">${meal.portions}</td>
           <td class="right">${formatNumber(meal.nutrition?.calories)} kcal</td>
@@ -317,7 +350,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                   // Overlapping plans share dates; the selected day belongs to the plan the calendar shows for it.
                   const isViewing = savedDay ? savedDay.planId === plan.id : selectedKey >= plan.startDate && selectedKey <= plan.endDate;
                   return (
-                    <li key={plan.id}>
+                    <li key={plan.id} className="relative">
                       <button
                         type="button"
                         onClick={() => jumpToPlan(plan.firstVisibleDate)}
@@ -339,7 +372,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                         </span>
 
                         <span className="min-w-0 flex-1">
-                          <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="flex flex-wrap items-center gap-1.5 pr-7">
                             <strong className="text-sm font-extrabold text-slate-900 dark:text-white">
                               {plan.period === 'WEEK' ? 'Thực đơn 7 ngày' : 'Thực đơn 1 tháng'}
                             </strong>
@@ -377,6 +410,16 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                         </span>
 
                         <ChevronRight className={`w-4 h-4 shrink-0 transition group-hover:translate-x-0.5 ${isViewing ? 'text-emerald-600' : 'text-slate-300 dark:text-slate-600 group-hover:text-emerald-600'}`} />
+                      </button>
+                      {/* Sibling of the card button (buttons cannot nest), pinned to its top-right corner */}
+                      <button
+                        type="button"
+                        onClick={() => { setDeleting(plan); setDeleteError(''); }}
+                        aria-label="Xóa kế hoạch này"
+                        title="Xóa kế hoạch này"
+                        className="absolute top-2 right-2 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:text-slate-500 dark:hover:text-rose-400 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </li>
                   );
@@ -577,7 +620,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-                        <span className="font-bold">Bữa {meal.slot + 1}</span>
+                        <span className="font-bold text-emerald-700 dark:text-emerald-400">{mealName(meal.slot, shown.meals.length)}</span>
                         <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold">
                           {meal.portions} khẩu phần
                         </span>
@@ -665,6 +708,23 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
         </button>
         {options.data && options.data.length < 2 && <p>Chưa có món thay thế phù hợp.</p>}
         {error && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{error}</p>}
+      </CommunityConfirm>
+
+      <CommunityConfirm
+        open={deleting !== null}
+        title="Xóa kế hoạch đã lưu"
+        busy={deleteBusy}
+        destructive
+        onCancel={() => { setDeleting(null); setDeleteError(''); }}
+        onConfirm={() => void removePlan()}
+      >
+        {deleting && (
+          <p className="text-sm">
+            Xóa <strong>{deleting.period === 'WEEK' ? 'Thực đơn 7 ngày' : 'Thực đơn 1 tháng'}</strong> ({shortDate(deleting.startDate)} → {shortDate(deleting.endDate)})?
+            {' '}Các ngày của kế hoạch này sẽ bị gỡ khỏi lịch; nếu một kế hoạch lưu trước đó cũng có những ngày này thì lịch sẽ hiển thị lại kế hoạch đó. Không thể hoàn tác.
+          </p>
+        )}
+        {deleteError && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{deleteError}</p>}
       </CommunityConfirm>
     </div>
   );

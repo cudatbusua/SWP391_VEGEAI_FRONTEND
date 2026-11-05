@@ -15,5 +15,6 @@ export const mealPlanService = {
   async options(planId: string, signal?: AbortSignal) { return data(await apiRequest<RecipeSummary[]>('/meal-plans/' + id(planId) + '/options', { signal })); },
   async swap(planId: string, day: number, slot: number, recipeId: string) { return data(await apiRequest<MealPlan>('/meal-plans/' + id(planId) + '/days/' + day + '/meals/' + slot, { method: 'PUT', body: { recipeId } })); },
   async save(planId: string) { return data(await apiRequest<MealPlan>('/meal-plans/' + id(planId) + '/save', { method: 'POST' })); },
+  async remove(planId: string) { await apiRequest('/meal-plans/' + id(planId), { method: 'DELETE' }); },
   async seasonalRegional(season: Season, region: Region, signal?: AbortSignal, refresh = false) { return data(await apiRequest<SeasonalRegionalResponse>('/meal-plans/seasonal-regional?season=' + season + '&region=' + region + (refresh ? '&refresh=true' : ''), { signal, timeoutMs: 90000 })); },
 };

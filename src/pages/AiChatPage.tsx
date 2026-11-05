@@ -43,7 +43,7 @@ import { DEFAULT_WEEKLY_SCHEDULE } from '../data/weeklyScheduleData';
 import { wearableService } from '../utils/wearableService';
 import { userService } from '../services/userService';
 import { fridgeService } from '../services/fridgeService';
-import { calculateBmr, calculateTdee } from '../utils/nutritionProfile';
+import { calculateBmr, calculateTdee, calculateExactAge } from '../utils/nutritionProfile';
 
 export type SessionCategory = 'fridge-scan' | 'ai-chef';
 
@@ -119,31 +119,47 @@ export function AiChatPage() {
   const [activeSessionId, setActiveSessionId] = useState<string>(() => sessions[0]?.id || 'default-welcome');
   const [activeTabCategory, setActiveTabCategory] = useState<'all' | 'fridge-scan' | 'ai-chef'>('all');
   const [userProfile, setUserProfile] = useState<any>(() => {
+    if (!user?.id) return null;
     try {
-      const stored = localStorage.getItem('vegeai_user_profile');
-      if (stored) return JSON.parse(stored);
+      const stored = localStorage.getItem(`vegeai_user_profile:${user.id}`) || localStorage.getItem('vegeai_user_profile');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (!parsed?.userId || parsed.userId === user.id) return parsed;
+      }
     } catch {}
     return null;
   });
 
   useEffect(() => {
     const handleProfileUpdate = () => {
+      if (!user?.id) {
+        setUserProfile(null);
+        return;
+      }
       try {
-        const stored = localStorage.getItem('vegeai_user_profile');
-        if (stored) setUserProfile(JSON.parse(stored));
+        const stored = localStorage.getItem(`vegeai_user_profile:${user.id}`) || localStorage.getItem('vegeai_user_profile');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (!parsed?.userId || parsed.userId === user.id) setUserProfile(parsed);
+        }
       } catch {}
     };
     window.addEventListener('user_profile_updated', handleProfileUpdate);
     return () => window.removeEventListener('user_profile_updated', handleProfileUpdate);
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
-    if (user?.id) {
-      userService.getProfile().then(p => {
-        setUserProfile(p);
-        try { localStorage.setItem('vegeai_user_profile', JSON.stringify(p)); } catch {}
-      }).catch(() => {});
+    if (!user?.id) {
+      setUserProfile(null);
+      return;
     }
+    userService.getProfile().then(p => {
+      setUserProfile(p);
+      try {
+        localStorage.setItem(`vegeai_user_profile:${user.id}`, JSON.stringify(p));
+        localStorage.setItem('vegeai_user_profile', JSON.stringify(p));
+      } catch {}
+    }).catch(() => {});
   }, [user?.id]);
 
   const [input, setInput] = useState('');
@@ -259,14 +275,41 @@ export function AiChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [currentSession?.messages, busy]);
 
-  // Handle incoming Hand-off from FridgeScanPage
+  // Handle incoming Hand-off from FridgeScanPage, VideoDetailPage, RecipeDetailPage, or BlogDetailPage
+  const handledHandoffRef = useRef<string>('');
   useEffect(() => {
-    const state = location.state as { source?: string; ingredients?: string[]; title?: string } | null;
-    if (state?.ingredients && state.ingredients.length > 0) {
+    if (isAuthLoading || loadedStorageKeyRef.current !== storageKey) return;
+    const state = location.state as {
+      source?: string;
+      ingredients?: string[];
+      title?: string;
+      initialPrompt?: string;
+      recipeContext?: {
+        title: string;
+        cookTimeMinutes?: number;
+        estimatedCalories?: number;
+        dietaryType?: string;
+        ingredients?: string[];
+        instructions?: string[];
+        safetyNotes?: string[];
+      };
+    } | null;
+
+    if (!state) return;
+    const stateFingerprint = JSON.stringify({
+      s: state.source,
+      t: state.title,
+      p: state.initialPrompt,
+      i: state.ingredients,
+    });
+    if (handledHandoffRef.current === stateFingerprint) return;
+
+    // 1. Hand-off from FridgeScanPage
+    if (state.ingredients && state.ingredients.length > 0) {
+      handledHandoffRef.current = stateFingerprint;
       const ingredientsList = state.ingredients.join(', ');
       const sessionTitle = state.title || `Quét tủ lạnh (${state.ingredients.length} món)`;
-      
-      // Create new fridge-scan session
+
       const newSession: ChatSession = {
         id: `scan-${Date.now()}`,
         title: sessionTitle,
@@ -285,7 +328,6 @@ export function AiChatPage() {
       setActiveSessionId(newSession.id);
       setActiveTabCategory('fridge-scan');
 
-      // Auto trigger AI response for the scan
       setBusy(true);
       setError('');
       aiService.chat(newSession.messages[0].text)
@@ -299,7 +341,8 @@ export function AiChatPage() {
                 messages: [
                   ...s.messages,
                   { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
-                ]
+                ],
+                updatedAt: Date.now()
               };
             }
             return s;
@@ -310,11 +353,85 @@ export function AiChatPage() {
         })
         .finally(() => {
           setBusy(false);
-          // clear location state so back/forward won't duplicate
+          window.history.replaceState({}, document.title);
+        });
+      return;
+    }
+
+    // 2. Hand-off from Recipe / Video / Blog into a brand-new chat session
+    if (state.initialPrompt || state.recipeContext) {
+      handledHandoffRef.current = stateFingerprint;
+      const rc = state.recipeContext;
+      const sessionTitle = state.title || (rc?.title ? `Nấu: ${rc.title}` : 'Tư vấn công thức chay');
+      const initialMessages: ChatMessage[] = [];
+
+      if (rc) {
+        const ingText = rc.ingredients && rc.ingredients.length > 0
+          ? `\n• **Nguyên liệu (${rc.ingredients.length}):** ${rc.ingredients.join(', ')}`
+          : '';
+        const stepText = rc.instructions && rc.instructions.length > 0
+          ? `\n• **Các bước chính:**\n${rc.instructions.map((st, idx) => `  ${idx + 1}. ${st.replace(/^Bước\s*\d+:\s*/i, '')}`).join('\n')}`
+          : '';
+        initialMessages.push({
+          sender: 'ai',
+          text: `🌿 **Đã mở phiên tư vấn mới cho món: ${rc.title}**\n• **Thời gian:** ${rc.cookTimeMinutes ?? 20} phút · **Năng lượng:** ~${rc.estimatedCalories ?? '--'} kcal/khẩu phần · **Chế độ:** ${rc.dietaryType || 'Thuần chay'}${ingText}${stepText}`,
+          time: formatTime(Date.now())
+        });
+      }
+
+      const userPromptText = state.initialPrompt || `Hãy tư vấn chi tiết hơn về món "${rc?.title || sessionTitle}" và cách chế biến giữ trọn dinh dưỡng nhé!`;
+      initialMessages.push({
+        sender: 'user',
+        text: userPromptText,
+        time: formatTime(Date.now())
+      });
+
+      const newSession: ChatSession = {
+        id: `recipe-${Date.now()}`,
+        title: sessionTitle,
+        category: 'ai-chef',
+        messages: initialMessages,
+        updatedAt: Date.now()
+      };
+
+      setSessions(prev => [newSession, ...prev]);
+      setActiveSessionId(newSession.id);
+      setActiveTabCategory('all');
+
+      setBusy(true);
+      setError('');
+      const historyForAi = initialMessages.slice(0, -1).map(m => ({
+        role: m.sender === 'user' ? ('user' as const) : ('model' as const),
+        text: m.text.slice(0, 4000)
+      }));
+
+      aiService.chat(userPromptText, undefined, historyForAi)
+        .then(res => {
+          setSessions(prev => prev.map(s => {
+            if (s.id === newSession.id) {
+              return {
+                ...s,
+                sessionId: res.sessionId,
+                recommendedRecipes: res.recommendedRecipes,
+                messages: [
+                  ...s.messages,
+                  { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
+                ],
+                updatedAt: Date.now()
+              };
+            }
+            return s;
+          }));
+        })
+        .catch(err => {
+          setError(errorMessage(err));
+        })
+        .finally(() => {
+          setBusy(false);
           window.history.replaceState({}, document.title);
         });
     }
-  }, [location.state]);
+  }, [isAuthLoading, location.state, storageKey]);
 
   const createNewSession = (category: SessionCategory = 'ai-chef') => {
     const newSession: ChatSession = {
@@ -515,9 +632,7 @@ export function AiChatPage() {
       // Deterministic user health metrics matching AccountSettingsPage
       const hNum = userProfile?.heightCm ? Number(userProfile.heightCm) : 0;
       const wNum = userProfile?.weightKg ? Number(userProfile.weightKg) : 0;
-      const age = userProfile?.dateOfBirth
-        ? Math.max(15, new Date().getFullYear() - new Date(userProfile.dateOfBirth).getFullYear())
-        : (userProfile?.age || 25);
+      const age = calculateExactAge(userProfile?.dateOfBirth, userProfile?.age || 25);
       const gender = (userProfile?.gender as any) || 'OTHER';
       const bmr = (hNum > 0 && wNum > 0) ? calculateBmr(wNum, hNum, age, gender) : 0;
       const tdee = bmr > 0 ? calculateTdee(bmr, 1.375) : 0;
@@ -1161,6 +1276,19 @@ export function AiChatPage() {
                 >
                   <span>🥗</span> Món Ngon Tủ Lạnh
                 </button>
+
+                <Link
+                  to="/smart-market"
+                  state={{
+                    recipeTitle: currentSession?.title || 'Nguyên liệu từ AI Bếp Trưởng',
+                    ingredients:
+                      (location.state as { recipeContext?: { ingredients?: string[] } } | null)?.recipeContext
+                        ?.ingredients || undefined,
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold border border-emerald-200 dark:border-emerald-800 transition cursor-pointer shadow-2xs"
+                >
+                  <span>📍</span> Tìm Nơi Bán Nguyên Liệu &amp; Quán Chay (GPS)
+                </Link>
               </div>
 
               <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 sm:p-2.5 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent transition">

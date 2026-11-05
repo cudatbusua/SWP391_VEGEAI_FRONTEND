@@ -18,7 +18,7 @@ import type { ScheduledDayPlan } from '../data/weeklyScheduleData';
 import { sfx } from '../utils/soundEffects';
 import { wearableService } from '../utils/wearableService';
 import type { WearableMetrics } from '../utils/wearableService';
-import { calculateBmr, calculateTdee } from '../utils/nutritionProfile';
+import { calculateBmr, calculateTdee, calculateExactAge } from '../utils/nutritionProfile';
 import { nutritionService } from '../services/nutritionService';
 import { hasSession } from '../services/apiClient';
 import type { NutritionTargets } from '../types/api';
@@ -308,7 +308,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
       const sp = JSON.parse(storedProfRaw);
       if (sp.heightCm && (!height || height === 165)) height = sp.heightCm;
       if (sp.weightKg && (!weight || weight === 58)) weight = sp.weightKg;
-      if (sp.dateOfBirth) age = Math.max(15, new Date().getFullYear() - new Date(sp.dateOfBirth).getFullYear());
+      if (sp.dateOfBirth) age = calculateExactAge(sp.dateOfBirth, age);
       if (sp.gender) gender = sp.gender;
       if (sp.dailyCalorieTarget && Number(sp.dailyCalorieTarget) > 0) targetCalorie = Number(sp.dailyCalorieTarget);
     }

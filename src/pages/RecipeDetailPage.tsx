@@ -1,12 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock, Flame, Users, RefreshCw, BookOpen, ArrowUpRight } from 'lucide-react';
+import { ArrowLeft, Clock, Flame, Users, RefreshCw, BookOpen, ArrowUpRight, ChefHat, ShoppingBag, MapPin } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { RecipeImage } from '../components/RecipeImage';
 import { VideoPlayer } from '../components/CommunityUi';
 import { recipeService } from '../services/recipeService';
 import { errorMessage } from '../services/apiClient';
 import type { RecipeDetail } from '../types/recipe';
+
+function inferIngredientCategory(name: string): { category: 'produce' | 'protein' | 'grains' | 'spices'; categoryLabel: string } {
+  const lower = name.toLowerCase();
+  if (lower.includes('đậu') || lower.includes('tofu') || lower.includes('tàu hũ') || lower.includes('chả') || lower.includes('sườn') || lower.includes('tempeh') || lower.includes('hạt điều') || lower.includes('hạt sen')) {
+    return { category: 'protein', categoryLabel: 'Đậu hũ & Đạm thực vật' };
+  }
+  if (lower.includes('nước tương') || lower.includes('xì dầu') || lower.includes('muối') || lower.includes('tiêu') || lower.includes('đường') || lower.includes('dầu') || lower.includes('sốt') || lower.includes('hạt nêm') || lower.includes('hạt nấm') || lower.includes('tương') || lower.includes('bột') || lower.includes('mè')) {
+    return { category: 'spices', categoryLabel: 'Gia vị bếp chay' };
+  }
+  if (lower.includes('gạo') || lower.includes('bún') || lower.includes('phở') || lower.includes('mì') || lower.includes('miến') || lower.includes('yến mạch') || lower.includes('bánh')) {
+    return { category: 'grains', categoryLabel: 'Tinh bột & Ngũ cốc' };
+  }
+  return { category: 'produce', categoryLabel: 'Rau củ & Nấm tươi' };
+}
 
 export function RecipeDetailPage() {
   const { id } = useParams();
@@ -22,6 +36,9 @@ export function RecipeDetailPage() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [id, reload]);
+
+  const ingredientStrings = recipe?.ingredients?.map(ing => `${ing.name}: ${ing.amount} ${ing.unit}`.trim()) || [];
+
   return <MainLayout><div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <Link to="/explore" className="inline-flex gap-2 items-center text-sm font-semibold text-emerald-700 dark:text-emerald-400 mb-6 hover:underline"><ArrowLeft size={16} /> Quay lại khám phá công thức</Link>
     {loading && <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải công thức...</p>}
@@ -45,6 +62,62 @@ export function RecipeDetailPage() {
               <div key={label} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700"><dt className="text-slate-400">{label}</dt><dd className="font-extrabold text-slate-800 dark:text-white mt-0.5">{value == null ? 'Chưa có' : value + ' g'}</dd></div>)}
           </dl>
         </section>
+
+        {/* Action Buttons: Hand-off to AI Chef new session & Smart Market ingredient store finder */}
+        <div className="flex flex-wrap items-center gap-2.5 mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+          <Link
+            to="/ai-chef"
+            state={{
+              source: 'recipe-detail',
+              title: `Nấu: ${recipe.title}`,
+              recipeContext: {
+                title: recipe.title,
+                cookTimeMinutes: (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0) || 20,
+                estimatedCalories: recipe.calories || 0,
+                dietaryType: recipe.tags?.map(t => t.name).join(', ') || 'Thuần chay',
+                ingredients: ingredientStrings,
+                instructions: recipe.instructions || [],
+              },
+              initialPrompt: `Tôi đang xem công thức món "${recipe.title}" (${recipe.calories ?? '--'} kcal/khẩu phần, Đạm: ${recipe.proteinGrams ?? '--'}g, Tinh bột: ${recipe.carbsGrams ?? '--'}g, Chất béo: ${recipe.fatGrams ?? '--'}g, Chất xơ: ${recipe.fiberGrams ?? '--'}g). Nguyên liệu gồm: ${ingredientStrings.join(', ')}. Bếp trưởng hãy tư vấn bí quyết nấu món này ngon nhất, cách biến tấu hoặc bảo quản và trả lời câu hỏi tiếp theo của tôi nhé!`
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs"
+          >
+            <ChefHat size={15} /> Chuyển sang AI Bếp Trưởng
+          </Link>
+          <Link
+            to="/smart-market"
+            state={{
+              planTitle: recipe.title,
+              recipeSummary: {
+                title: recipe.title,
+                cookTimeMinutes: (recipe.prepTimeMinutes || 0) + (recipe.cookTimeMinutes || 0) || 20,
+                calories: recipe.calories || 0,
+                servings: recipe.servings || 2,
+              },
+              importedItems: recipe.ingredients?.map((ing, idx) => {
+                const { category, categoryLabel } = inferIngredientCategory(ing.name);
+                return {
+                  id: `rec-ing-${Date.now()}-${idx}`,
+                  name: ing.name.trim(),
+                  amount: `${ing.amount} ${ing.unit}`.trim(),
+                  category,
+                  categoryLabel,
+                  mealNote: `Món: ${recipe.title}`,
+                  checked: false,
+                };
+              }) || []
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-xs"
+          >
+            <ShoppingBag size={15} /> Đi chợ mua nguyên liệu
+          </Link>
+          <Link
+            to="/restaurants"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:border-emerald-400 text-slate-700 dark:text-slate-200 text-xs font-bold transition"
+          >
+            <MapPin size={15} className="text-emerald-600" /> Quán chay gần đây
+          </Link>
+        </div>
       </div>
     </div>
       <div className="grid md:grid-cols-[1fr_2fr] gap-8 mt-8">
@@ -93,4 +166,3 @@ export function RecipeDetailPage() {
     </>}
   </div></MainLayout>;
 }
-

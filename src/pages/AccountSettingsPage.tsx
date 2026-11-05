@@ -31,7 +31,7 @@ import { SeasonalRegionalMealsView } from '../components/SeasonalRegionalMealsVi
 import { sfx } from '../utils/soundEffects';
 import { HealthActivityRings } from '../components/HealthActivityRings';
 import { WearableGoogleFitTracker } from '../components/WearableGoogleFitTracker';
-import { dietLabels, calculateBmr, calculateTdee } from '../utils/nutritionProfile';
+import { dietLabels, calculateBmr, calculateTdee, calculateExactAge } from '../utils/nutritionProfile';
 import type { UserProfile, UpdateUserProfile, NutritionProfile } from '../types/api';
 import { errorMessage } from '../services/apiClient';
 
@@ -381,7 +381,7 @@ export const AccountSettingsPage: React.FC = () => {
   };
 
   // Deterministic BMI & Health Metrics Calculations
-  const age = dateOfBirth ? Math.max(15, new Date().getFullYear() - new Date(dateOfBirth).getFullYear()) : 25;
+  const age = calculateExactAge(dateOfBirth, 25);
   const hNum = heightCm === '' ? 0 : Number(heightCm);
   const wNum = weightKg === '' ? 0 : Number(weightKg);
 

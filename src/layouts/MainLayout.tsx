@@ -45,17 +45,17 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const memberNavItems: { key: string; label: string; path: string; isActive: boolean }[] = [
     { key: 'dashboard', label: 'Tổng quan', path: '/dashboard', isActive: isDashboardActive },
-    { key: 'discover', label: 'Khám phá', path: '/explore', isActive: isDiscoverActive },
+    { key: 'discover', label: 'Khám phá & Cộng đồng', path: '/explore', isActive: isDiscoverActive },
     { key: 'ai-chef', label: 'AI Bếp trưởng', path: '/ai-chef', isActive: isAiChefActive },
-    { key: 'pantry', label: 'Kho nguyên liệu & Đi chợ', path: '/fridge', isActive: isPantryActive },
+    { key: 'pantry', label: 'Kho Tủ Lạnh & Điểm Bán', path: '/fridge', isActive: isPantryActive },
     { key: 'calendar', label: 'Lịch biểu & Thực đơn', path: '/settings?tab=calendar', isActive: isNutritionActive },
     { key: 'profile', label: 'Hồ sơ & Thể trạng', path: '/settings?tab=profile', isActive: pathname === '/settings' && location.search.includes('tab=profile') },
   ];
 
   const guestNavItems: { label: string; path: string; isActive: boolean }[] = [
-    { label: 'Khám phá', path: '/explore', isActive: pathname === '/explore' || pathname.startsWith('/recipe') },
+    { label: 'Khám phá & Cộng đồng', path: '/explore', isActive: isDiscoverActive && pathname !== '/restaurants' },
     { label: 'AI Bếp trưởng (Dùng thử)', path: '/ai-chef', isActive: pathname === '/ai-chef' },
-    { label: 'Quán chay & Kho nguyên liệu', path: '/smart-market', isActive: pathname === '/smart-market' || pathname === '/restaurants' },
+    { label: 'Định vị Quán chay & Điểm bán', path: '/smart-market', isActive: pathname === '/smart-market' || pathname === '/restaurants' },
   ];
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
@@ -203,10 +203,12 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         {!isAuthenticated && isDiscoverActive && (
           <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
             <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
-              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">Khám phá:</span>
-              <Link to="/explore" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>Công thức món chay</Link>
-              <Link to="/blog" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname.startsWith('/blog') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>Blog cộng đồng</Link>
-              <Link to="/videos" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname.startsWith('/videos') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>Video nấu ăn</Link>
+              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">Khám phá & Cộng đồng:</span>
+              <Link to="/explore" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>🍲 Công thức món chay</Link>
+              <Link to="/blog" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname.startsWith('/blog') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>📰 Bảng tin Cộng đồng (AI)</Link>
+              <Link to="/videos" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname.startsWith('/videos') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>🎬 Video nấu ăn</Link>
+              <Link to="/smart-market" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname === '/smart-market' ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>📍 Điểm bán nguyên liệu & Quán chay (GPS)</Link>
+              <Link to="/restaurants" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname === '/restaurants' ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>🥗 Bản đồ Quán chay</Link>
             </div>
           </div>
         )}
@@ -214,49 +216,77 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           <>
             {isDiscoverActive && (
               <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
-                <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
-                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
-                    Khám phá:
-                  </span>
+                <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-2 overflow-x-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
+                      Khám phá & Cộng đồng:
+                    </span>
+                    <Link
+                      to="/explore"
+                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                        pathname === '/explore' || pathname.startsWith('/recipe')
+                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                      }`}
+                    >
+                      🍲 Công thức món chay
+                    </Link>
+                    <Link
+                      to="/blog"
+                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                        pathname.startsWith('/blog') && pathname !== '/blog/write'
+                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                      }`}
+                    >
+                      📰 Bảng tin Cộng đồng (AI)
+                    </Link>
+                    <Link
+                      to="/videos"
+                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                        pathname.startsWith('/videos')
+                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                      }`}
+                    >
+                      🎬 Video nấu ăn
+                    </Link>
+                    <Link
+                      to="/questions"
+                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                        pathname.startsWith('/questions')
+                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                      }`}
+                    >
+                      💬 Hỏi đáp chuyên gia
+                    </Link>
+                    <Link
+                      to="/smart-market"
+                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                        pathname === '/smart-market'
+                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                      }`}
+                    >
+                      📍 Điểm bán nguyên liệu & Quán chay (GPS)
+                    </Link>
+                    <Link
+                      to="/restaurants"
+                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                        pathname === '/restaurants'
+                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                      }`}
+                    >
+                      🥗 Quán chay gần đây
+                    </Link>
+                  </div>
                   <Link
-                    to="/explore"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname === '/explore' || pathname.startsWith('/recipe')
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
+                    to="/blog/write"
+                    className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] shrink-0 transition shadow-2xs"
                   >
-                    Công thức món chay
-                  </Link>
-                  <Link
-                    to="/blog"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname.startsWith('/blog')
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
-                  >
-                    Blog cộng đồng
-                  </Link>
-                  <Link
-                    to="/videos"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname.startsWith('/videos')
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
-                  >
-                    Video nấu ăn
-                  </Link>
-                  <Link
-                    to="/questions"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname.startsWith('/questions')
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
-                  >
-                    Hỏi đáp chuyên gia
+                    ✍️ Đăng bài chia sẻ
                   </Link>
                 </div>
               </div>
@@ -276,7 +306,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                         : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                     }`}
                   >
-                    Lịch ăn 30 ngày & Bữa ăn
+                    Lịch ăn 30 ngày (Bữa chính + Món phụ & Món dặm)
                   </Link>
                   <Link
                     to="/settings?tab=calendar#saved-meal-plans"
@@ -317,7 +347,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                         : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                     }`}
                   >
-                    Quét ảnh & Nhận diện tủ lạnh
+                    Quét ảnh & Thêm nguyên liệu vào Tủ lạnh
                   </Link>
                 </div>
               </div>
@@ -327,7 +357,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
                 <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
                   <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
-                    Kho nguyên liệu:
+                    Kho Tủ Lạnh & Điểm Bán:
                   </span>
                   {isAuthenticated && (
                     <Link
@@ -338,9 +368,15 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                           : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                       }`}
                     >
-                      Tủ lạnh & Hạn sử dụng
+                      🧊 Kho Tủ Lạnh & Hạn sử dụng
                     </Link>
                   )}
+                  <Link
+                    to="/fridge-scan"
+                    className="px-3 py-1 rounded-lg transition shrink-0 hover:text-emerald-700 dark:hover:text-emerald-400"
+                  >
+                    📸 Quét Ảnh Thêm Vào Tủ Lạnh
+                  </Link>
                   <Link
                     to="/smart-market"
                     className={`px-3 py-1 rounded-lg transition shrink-0 ${
@@ -349,7 +385,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                         : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                     }`}
                   >
-                    Danh sách đi chợ & Bản đồ quán chay
+                    📍 Định vị Quán chay & Điểm bán nguyên liệu (GPS)
                   </Link>
                 </div>
               </div>
@@ -403,10 +439,16 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             <Link to="/smart-market" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               Đi chợ & Bản đồ
             </Link>
+            <Link to="/restaurants" className="hover:text-emerald-700 dark:hover:text-emerald-400">
+              Quán chay gần đây
+            </Link>
             <Link to="/ai-chef" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               AI Bếp trưởng
             </Link>
-            </> : <Link to="/restaurants" className="hover:text-emerald-700 dark:hover:text-emerald-400">Quán chay gần đây</Link>}
+            </> : <>
+            <Link to="/smart-market" className="hover:text-emerald-700 dark:hover:text-emerald-400">Đi chợ & Bản đồ</Link>
+            <Link to="/restaurants" className="hover:text-emerald-700 dark:hover:text-emerald-400">Quán chay gần đây</Link>
+            </>}
             <Link to="/blog" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               Cộng đồng
             </Link>

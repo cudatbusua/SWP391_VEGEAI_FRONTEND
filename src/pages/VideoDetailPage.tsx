@@ -183,7 +183,6 @@ function VideoAiRecipeCopilot({
 
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                // AiChatPage auto-sends the ?prompt= query once (it ignores an initialPrompt in route state).
                 to={'/ai-chef?prompt=' + encodeURIComponent(
                   `Tôi muốn hỏi thêm về món "${recipe.title}" từ video "${title}". Nguyên liệu chính: ${(recipe.ingredients ?? []).slice(0, 8).join(', ')}. Thời gian khoảng ${recipe.cookTimeMinutes} phút, ước tính ${recipe.estimatedCalories} kcal. Hãy tư vấn ngắn gọn và trả lời câu hỏi tiếp theo của tôi dựa trên thông tin món này.`
                 )}
@@ -195,15 +194,34 @@ function VideoAiRecipeCopilot({
                 to="/smart-market"
                 state={{
                   planTitle: recipe.title,
-                  importedItems: recipe.ingredients?.map((ing, idx) => ({
-                    id: `vid-ing-${Date.now()}-${idx}`,
-                    name: ing.split('(')[0].trim(),
-                    amount: ing.includes('(') ? ing.split('(')[1].replace(')', '').trim() : '1 phần',
-                    category: 'produce' as const,
-                    categoryLabel: 'Rau củ & Gia vị',
-                    mealNote: recipe.title,
-                    checked: false
-                  }))
+                  recipeSummary: {
+                    title: recipe.title,
+                    cookTimeMinutes: recipe.cookTimeMinutes,
+                    calories: recipe.estimatedCalories,
+                    servings: 2
+                  },
+                  importedItems: recipe.ingredients?.map((ing, idx) => {
+                    const colonParts = ing.split(':');
+                    const rawName = colonParts.length > 1 ? colonParts[0].trim() : ing.split('(')[0].trim();
+                    const rawAmount = colonParts.length > 1
+                      ? colonParts.slice(1).join(':').trim()
+                      : (ing.includes('(') ? ing.split('(')[1].replace(')', '').trim() : '1 phần');
+                    const lower = rawName.toLowerCase();
+                    const isProtein = lower.includes('đậu') || lower.includes('tofu') || lower.includes('tàu hũ') || lower.includes('hạt');
+                    const isSpice = lower.includes('nước tương') || lower.includes('xì dầu') || lower.includes('dầu') || lower.includes('sốt') || lower.includes('hạt nấm') || lower.includes('hạt nêm') || lower.includes('muối') || lower.includes('tiêu');
+                    const isGrain = lower.includes('gạo') || lower.includes('bún') || lower.includes('phở') || lower.includes('mì');
+                    const category = isProtein ? ('protein' as const) : isSpice ? ('spices' as const) : isGrain ? ('grains' as const) : ('produce' as const);
+                    const categoryLabel = isProtein ? 'Đậu hũ & Đạm thực vật' : isSpice ? 'Gia vị bếp chay' : isGrain ? 'Tinh bột & Ngũ cốc' : 'Rau củ & Nấm tươi';
+                    return {
+                      id: `vid-ing-${Date.now()}-${idx}`,
+                      name: rawName,
+                      amount: rawAmount || '1 phần',
+                      category,
+                      categoryLabel,
+                      mealNote: `Món: ${recipe.title}`,
+                      checked: false
+                    };
+                  })
                 }}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-xs"
               >

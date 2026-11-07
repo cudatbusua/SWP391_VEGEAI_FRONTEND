@@ -36,8 +36,9 @@ test('guest browses market, logs in in-place, then adds a server-backed cart ite
   });
 
   await page.goto('/smart-market');
-  await page.getByRole('button', { name: 'Thảo Điền' }).click();
-  await page.getByTitle(/Thêm combo Canh Chua Chay Nam Bộ vào giỏ/i).click();
+  await page.getByPlaceholder(/Nhập địa chỉ, đường hoặc quận\/huyện/i).fill('Thảo Điền');
+  await page.getByRole('button', { name: /Xác nhận vị trí/i }).click();
+  await page.getByTitle(/Thêm combo Canh Chua Chay Nam Bộ vào giỏ/i).first().click();
 
   const dialog = page.getByRole('dialog', { name: 'Đăng nhập để sử dụng giỏ nguyên liệu' });
   await expect(dialog).toBeVisible();

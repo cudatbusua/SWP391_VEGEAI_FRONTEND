@@ -18,7 +18,7 @@ import type { ScheduledDayPlan } from '../data/weeklyScheduleData';
 import { sfx } from '../utils/soundEffects';
 import { wearableService } from '../utils/wearableService';
 import type { WearableMetrics } from '../utils/wearableService';
-import { calculateBmr, calculateTdee } from '../utils/nutritionProfile';
+import { calculateBmr, calculateTdee, calculateExactAge } from '../utils/nutritionProfile';
 import { nutritionService } from '../services/nutritionService';
 import { hasSession } from '../services/apiClient';
 import type { NutritionTargets } from '../types/api';
@@ -308,7 +308,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
       const sp = JSON.parse(storedProfRaw);
       if (sp.heightCm && (!height || height === 165)) height = sp.heightCm;
       if (sp.weightKg && (!weight || weight === 58)) weight = sp.weightKg;
-      if (sp.dateOfBirth) age = Math.max(15, new Date().getFullYear() - new Date(sp.dateOfBirth).getFullYear());
+      if (sp.dateOfBirth) age = calculateExactAge(sp.dateOfBirth, age);
       if (sp.gender) gender = sp.gender;
       if (sp.dailyCalorieTarget && Number(sp.dailyCalorieTarget) > 0) targetCalorie = Number(sp.dailyCalorieTarget);
     }
@@ -362,7 +362,8 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 
   const handleAskAdvice = () => {
     sfx.playTap();
-    const prompt = `Dựa vào vòng Ring hoạt động hôm nay của tôi (Bước chân: ${currentSteps.toLocaleString('vi-VN')}, Calo tiêu hao: ${currentActiveKcal} kcal, Nhịp tim: ${currentHeartRate} bpm), Bếp trưởng hãy tư vấn thực đơn bữa tối chay để bù đắp năng lượng và hồi phục cơ bắp tối ưu nhé!`;
+    const heartRateText = currentHeartRate > 0 ? `, Nhịp tim: ${currentHeartRate} bpm` : '';
+    const prompt = `Dựa vào vòng Ring hoạt động hôm nay của tôi (Bước chân: ${currentSteps.toLocaleString('vi-VN')}, Calo tiêu hao: ${currentActiveKcal} kcal${heartRateText}), Bếp trưởng hãy tư vấn thực đơn bữa tối chay để bù đắp năng lượng và hồi phục cơ bắp tối ưu nhé!`;
     onAskAiAdvice?.(prompt);
   };
 
@@ -430,7 +431,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
             <Watch className="w-4 h-4 text-emerald-400" />
             <strong className="font-bold text-white text-xs">Dữ liệu thiết bị thông minh (Google Fit / Smartband):</strong>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isConnected ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-300 border border-slate-700'}`}>
-              {isConnected ? '🟢 Đã liên kết' : 'Mô phỏng'}
+              {isConnected ? '🟢 Đã liên kết' : 'Chưa liên kết'}
             </span>
           </div>
           <span className="text-[10px] text-slate-400">Cập nhật: {lastSyncedAt}</span>
@@ -460,7 +461,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
               <Heart className="w-3 h-3 text-rose-400" /> Nhịp tim
             </span>
             <strong className="text-sm sm:text-base font-extrabold text-rose-300 block mt-0.5">
-              {currentHeartRate > 0 ? `${currentHeartRate} bpm` : '0 bpm'}
+              {currentHeartRate > 0 ? `${currentHeartRate} bpm` : '—'}
             </strong>
           </div>
         </div>

@@ -1,6 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, CalendarDays, CheckCircle2, ChefHat, ChevronLeft, ChevronRight, FileDown, History, Loader2, RefreshCw, Save, ShoppingBag, Sparkles, Trash2, Utensils, X } from 'lucide-react';
+import {
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  ChefHat,
+  ChevronLeft,
+  ChevronRight,
+  FileDown,
+  History,
+  Loader2,
+  MapPin,
+  RefreshCw,
+  Save,
+  ShoppingBag,
+  Sparkles,
+  Trash2,
+  Utensils,
+  X,
+} from 'lucide-react';
 import { MealCalendar31DaysView, calendarGridRange, toDateKey } from './MealCalendar31DaysView';
 import { CommunityConfirm } from './CommunityUi';
 import { PlannedMealDetails } from './PlannedMealDetails';
@@ -20,35 +38,99 @@ interface MealPlanCalendarPlannerProps {
   onAddToShoppingList: (mealTitle: string) => void;
 }
 
-/** Vietnamese meal names by how many meals the day has; extra meals become snacks between the main ones. */
-const MEAL_NAMES: Record<number, string[]> = {
-  1: ['Bữa chính'],
-  2: ['Bữa sáng', 'Bữa tối'],
-  3: ['Bữa sáng', 'Bữa trưa', 'Bữa tối'],
-  4: ['Bữa sáng', 'Bữa trưa', 'Bữa phụ chiều', 'Bữa tối'],
-  5: ['Bữa sáng', 'Bữa phụ sáng', 'Bữa trưa', 'Bữa phụ chiều', 'Bữa tối'],
-  6: ['Bữa sáng', 'Bữa phụ sáng', 'Bữa trưa', 'Bữa phụ chiều', 'Bữa tối', 'Bữa phụ tối'],
-};
-const mealName = (slot: number, mealsPerDay: number) => MEAL_NAMES[mealsPerDay]?.[slot] ?? `Bữa ${slot + 1}`;
+const shortDate = (key: string) =>
+  new Date(key + 'T12:00:00').toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' });
 
-const shortDate = (key: string) => new Date(key + 'T12:00:00').toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' });
+export function getMealSlotMeta(slot: number): {
+  label: string;
+  shortLabel: string;
+  group: 'MAIN' | 'SIDE_SNACK';
+  groupLabel: string;
+  badgeClass: string;
+} {
+  switch (slot) {
+    case 0:
+      return {
+        label: '🌅 Bữa Sáng · Món chính',
+        shortLabel: 'Bữa Sáng (Món chính)',
+        group: 'MAIN',
+        groupLabel: 'Bữa chính',
+        badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-200 dark:border-emerald-800',
+      };
+    case 1:
+      return {
+        label: '☀️ Bữa Trưa · Món chính',
+        shortLabel: 'Bữa Trưa (Món chính)',
+        group: 'MAIN',
+        groupLabel: 'Bữa chính',
+        badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-200 dark:border-emerald-800',
+      };
+    case 2:
+      return {
+        label: '🌙 Bữa Tối · Món chính',
+        shortLabel: 'Bữa Tối (Món chính)',
+        group: 'MAIN',
+        groupLabel: 'Bữa chính',
+        badgeClass: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-200 dark:border-emerald-800',
+      };
+    case 3:
+      return {
+        label: '🥗 Món Phụ · Ăn kèm / Salad / Canh',
+        shortLabel: 'Món Phụ (Ăn kèm)',
+        group: 'SIDE_SNACK',
+        groupLabel: 'Món phụ & Món dặm',
+        badgeClass: 'bg-teal-100 text-teal-900 border-teal-300 dark:bg-teal-950/70 dark:text-teal-200 dark:border-teal-800',
+      };
+    case 4:
+      return {
+        label: '🍵 Món Dặm · Bữa xế dinh dưỡng',
+        shortLabel: 'Món Dặm (Bữa xế)',
+        group: 'SIDE_SNACK',
+        groupLabel: 'Món phụ & Món dặm',
+        badgeClass: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/70 dark:text-amber-200 dark:border-amber-800',
+      };
+    default:
+      return {
+        label: `🥛 Món Dặm Bổ Sung #${slot - 3}`,
+        shortLabel: `Món Dặm #${slot - 3}`,
+        group: 'SIDE_SNACK',
+        groupLabel: 'Món phụ & Món dặm',
+        badgeClass: 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-950/70 dark:text-purple-200 dark:border-purple-800',
+      };
+  }
+}
 
-/** Where a saved plan sits relative to today, with the colours used for its date tile and chip. */
+const MEAL_STRUCTURE_OPTIONS = [
+  { value: 5, label: '5 món/ngày (3 Bữa chính: Sáng, Trưa, Tối + 1 Món phụ + 1 Món dặm) (thêm món phụ & món dặm, khẩu phần mỗi món sẽ nhỏ hơn)' },
+  { value: 4, label: '4 món/ngày (3 Bữa chính: Sáng, Trưa, Tối + 1 Món phụ ăn kèm)' },
+  { value: 6, label: '6 món/ngày (3 Bữa chính + 1 Món phụ + 2 Món dặm xế/tối)' },
+  { value: 3, label: '3 món/ngày (Chỉ 3 Bữa chính: Sáng · Trưa · Tối)' },
+  { value: 2, label: '2 bữa chính/ngày (Trưa · Tối)' },
+  { value: 1, label: '1 bữa chính/ngày' },
+];
+
 const planStatus = (start: string, end: string, today: string) =>
   today > end
-    ? { label: 'Đã qua', tile: 'bg-slate-400 dark:bg-slate-600', chip: 'text-slate-500 bg-slate-100 border-slate-200 dark:text-slate-400 dark:bg-slate-800 dark:border-slate-700' }
+    ? {
+        label: 'Đã qua',
+        tile: 'bg-slate-400 dark:bg-slate-600',
+        chip: 'text-slate-500 bg-slate-100 border-slate-200 dark:text-slate-400 dark:bg-slate-800 dark:border-slate-700',
+      }
     : today >= start
-    ? { label: 'Đang diễn ra', tile: 'bg-emerald-600', chip: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-800' }
-    : { label: 'Sắp tới', tile: 'bg-sky-500', chip: 'text-sky-700 bg-sky-50 border-sky-200 dark:text-sky-300 dark:bg-sky-950/60 dark:border-sky-800' };
+    ? {
+        label: 'Đang diễn ra',
+        tile: 'bg-emerald-600',
+        chip: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-800',
+      }
+    : {
+        label: 'Sắp tới',
+        tile: 'bg-sky-500',
+        chip: 'text-sky-700 bg-sky-50 border-sky-200 dark:text-sky-300 dark:bg-sky-950/60 dark:border-sky-800',
+      };
 
-/**
- * 30–31 day meal calendar with in-place AI planning: saved plans are merged by the backend
- * (latest save wins on overlapping days); a freshly generated plan stays a local draft until saved.
- */
 export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingList }: MealPlanCalendarPlannerProps) {
   const location = useLocation();
-  // Both sub-tabs link to this same page and the router does not scroll by itself:
-  // "Thực đơn đã lưu" (#saved-meal-plans) goes to the saved list, "Lịch ăn 30 ngày" (no hash) back to the calendar at the top.
+
   useEffect(() => {
     if (location.hash === '#saved-meal-plans') {
       document.getElementById('saved-meal-plans')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -56,6 +138,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [location.hash, location.key]);
+
   const { user } = useAuth();
   const navigate = useNavigate();
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date());
@@ -64,13 +147,16 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
 
   const period = 'CUSTOM' as const;
   const [customDays, setCustomDays] = useState(7);
+  // Default keeps the original 3 main meals; side/snack dishes are opt-in (backend splits daily calories evenly across slots).
   const [mealsPerDay, setMealsPerDay] = useState(3);
+
   const [draft, setDraft] = useState<MealPlan | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [swapping, setSwapping] = useState<number | null>(null);
   const [replacement, setReplacement] = useState('');
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
   const [deleting, setDeleting] = useState<MealPlanSummary | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -79,27 +165,28 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     const { from, to } = calendarGridRange(calendarMonth);
     return { from: toDateKey(from), to: toDateKey(to) };
   }, [calendarMonth]);
+
   const calendar = useCommunityQuery(
     `meal-calendar:${user?.id}:${range.from}:${range.to}:${revision}`,
-    signal => mealPlanService.calendar(range.from, range.to, signal)
+    (signal) => mealPlanService.calendar(range.from, range.to, signal)
   );
   const [savedPage, setSavedPage] = useState(0);
   const savedPlans = useCommunityQuery(
     `saved-meal-plans:${user?.id}:${savedPage}:${revision}`,
-    signal => mealPlanService.list(savedPage, signal)
+    (signal) => mealPlanService.list(savedPage, signal)
   );
-  const savedDays = useMemo(() => new Map((calendar.data ?? []).map(day => [day.date, day])), [calendar.data]);
+  const savedDays = useMemo(() => new Map((calendar.data ?? []).map((day) => [day.date, day])), [calendar.data]);
   const savedKeys = useMemo(() => new Set(savedDays.keys()), [savedDays]);
-  const draftKeys = useMemo(() => new Set(draft?.plan.days.map(day => day.date)), [draft]);
+  const draftKeys = useMemo(() => new Set(draft?.plan.days.map((day) => day.date)), [draft]);
 
   const selectedKey = toDateKey(selectedDate);
   const todayKey = toDateKey(new Date());
-  const draftIndex = draft ? draft.plan.days.findIndex(day => day.date === selectedKey) : -1;
+  const draftIndex = draft ? draft.plan.days.findIndex((day) => day.date === selectedKey) : -1;
   const draftDay = draftIndex >= 0 ? draft!.plan.days[draftIndex] : null;
   const savedDay = savedDays.get(selectedKey) ?? null;
   const options = useCommunityQuery(
     'calendar-plan-options:' + (draft?.id || savedDay?.planId || ''),
-    signal => mealPlanService.options(draft?.id || savedDay?.planId || '', signal),
+    (signal) => mealPlanService.options(draft?.id || savedDay?.planId || '', signal),
     !!draft || !!savedDay
   );
   const shown: { meals: PlannedMeal[]; totals: PlanNutrients; targets: NutritionTargets } | null = draftDay
@@ -108,20 +195,29 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     ? { meals: savedDay.meals, totals: savedDay.totals, targets: savedDay.targets }
     : null;
   const canGenerate = selectedKey >= todayKey;
-  const overlapsSaved = draft ? draft.plan.days.filter(day => savedKeys.has(day.date)).length : 0;
+  const overlapsSaved = draft ? draft.plan.days.filter((day) => savedKeys.has(day.date)).length : 0;
 
-  // Smart market covers the whole draft, or the saved days of the month being viewed.
   const monthPrefix = toDateKey(calendarMonth).slice(0, 7);
   const marketDays = draft
     ? draft.plan.days
-    : (calendar.data ?? []).filter(day => day.date.startsWith(monthPrefix));
+    : (calendar.data ?? []).filter((day) => day.date.startsWith(monthPrefix));
+
   const exportToMarket = async () => {
     if (!marketDays.length) return;
     const title = draft
-      ? `Bản nháp ${shortDate(draft.plan.startDate)} - ${shortDate(draft.plan.endDate)}`
+      ? `Thực đơn dự kiến ${shortDate(draft.plan.startDate)} - ${shortDate(draft.plan.endDate)}`
       : `Thực đơn ${calendarMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}`;
-    const importedItems = await missingMarketItems(marketDays.flatMap(day => day.meals), 'Từ ' + title.toLowerCase());
-    navigate('/smart-market', { state: { importedItems, planTitle: title } });
+    const importedItems = await missingMarketItems(
+      marketDays.flatMap((day) => day.meals),
+      'Từ ' + title.toLowerCase()
+    );
+    const ingredientStrings = importedItems.map((item) => `${item.name}: ${item.amount}`);
+    navigate('/smart-market', {
+      state: {
+        recipeTitle: title,
+        ingredients: ingredientStrings.length > 0 ? ingredientStrings : marketDays.flatMap((d) => d.meals.map((m) => m.title)),
+      },
+    });
   };
 
   const selectDate = (date: Date) => {
@@ -136,9 +232,16 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     setError('');
     setMessage('');
     try {
-      const result = await mealPlanService.generate({ period, days: customDays, startDate: selectedKey, mealsPerDay });
+      const result = await mealPlanService.generate({
+        period,
+        days: customDays,
+        startDate: selectedKey,
+        mealsPerDay,
+      });
       setDraft(result);
-      setMessage(`AI đã lập bản nháp ${result.plan.days.length} ngày. Xem từng ngày có chấm cam, đổi món nếu cần rồi bấm "Lưu vào lịch".`);
+      setMessage(
+        `AI đã lập bản nháp thực đơn ${result.plan.days.length} ngày (gồm Bữa chính & Món phụ/Món dặm). Hãy kiểm tra các ngày có chấm cam, đổi món nếu muốn rồi bấm "Xác nhận lưu vào lịch".`
+      );
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
@@ -152,9 +255,10 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     setError('');
     try {
       await mealPlanService.save(draft.id);
+      setShowSaveConfirmModal(false);
       setDraft(null);
-      setRevision(value => value + 1);
-      setMessage('Đã lưu thực đơn vào lịch.');
+      setRevision((value) => value + 1);
+      setMessage('Đã xác nhận và lưu thực đơn vào lịch biểu thành công!');
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
@@ -174,11 +278,12 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     setDeleteError('');
     try {
       await mealPlanService.remove(deleting.id);
-      // Deleting the last item of a later page would leave that page empty.
-      if (savedPlans.data && savedPlans.data.items.length === 1 && savedPage > 0) setSavedPage(page => page - 1);
+      if (savedPlans.data && savedPlans.data.items.length === 1 && savedPage > 0) {
+        setSavedPage((page) => page - 1);
+      }
       setDeleting(null);
       setSwapping(null);
-      setRevision(value => value + 1);
+      setRevision((value) => value + 1);
       setError('');
       setMessage('Đã xóa kế hoạch khỏi lịch.');
     } catch (reason) {
@@ -191,6 +296,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
   const discard = () => {
     setDraft(null);
     setSwapping(null);
+    setShowSaveConfirmModal(false);
     setError('');
     setMessage('Đã bỏ bản nháp. Lịch đang hiển thị các thực đơn đã lưu.');
   };
@@ -205,10 +311,10 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
         setDraft(await mealPlanService.swap(draft.id, draftIndex, swapping, recipeId));
       } else if (savedDay) {
         const fullPlan = await mealPlanService.get(savedDay.planId);
-        const dayIndex = fullPlan.plan.days.findIndex(day => day.date === selectedKey);
+        const dayIndex = fullPlan.plan.days.findIndex((day) => day.date === selectedKey);
         if (dayIndex < 0) throw new Error('Không tìm thấy ngày trong thực đơn đã lưu.');
         await mealPlanService.swap(savedDay.planId, dayIndex, swapping, recipeId);
-        setRevision(value => value + 1);
+        setRevision((value) => value + 1);
         setMessage('Đã cập nhật món trong thực đơn đã lưu.');
       }
       setSwapping(null);
@@ -222,8 +328,8 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
 
   const randomSwap = async () => {
     if (swapping === null) return;
-    const currentRecipeId = shown?.meals.find(meal => meal.slot === swapping)?.recipeId;
-    const candidates = (options.data ?? []).filter(recipe => recipe.recipeId !== currentRecipeId);
+    const currentRecipeId = shown?.meals.find((meal) => meal.slot === swapping)?.recipeId;
+    const candidates = (options.data ?? []).filter((recipe) => recipe.recipeId !== currentRecipeId);
     if (!candidates.length) {
       setError('Chưa có món phù hợp khác để đổi ngẫu nhiên.');
       return;
@@ -236,33 +342,66 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
   const exportMealPlanPdf = () => {
     const days = [...(calendar.data ?? [])].sort((a, b) => a.date.localeCompare(b.date));
     if (!days.length) {
-      setError('Chưa có thực đơn nào trong khoảng đang xem để xuất PDF. Hãy chọn ngày rồi bấm "Lập với AI" hoặc lưu thực đơn trước.');
+      setError(
+        'Chưa có thực đơn nào trong khoảng đang xem để xuất PDF. Hãy chọn ngày rồi bấm "Lập với AI" hoặc lưu thực đơn trước.'
+      );
       return;
     }
     const targets = days[0].targets;
-    const sections = days.map(day => {
-      const rows = day.meals.map(meal => `
+    const sections = days
+      .map((day) => {
+        const rows = day.meals
+          .map(
+            (meal) => `
         <tr>
-          <td>${escapeHtml(mealName(meal.slot, day.meals.length))}</td>
+          <td>${escapeHtml(getMealSlotMeta(meal.slot).shortLabel)}</td>
           <td>${escapeHtml(meal.title)}</td>
           <td class="right">${meal.portions}</td>
           <td class="right">${formatNumber(meal.nutrition?.calories)} kcal</td>
           <td class="right">${formatNumber(meal.nutrition?.protein)} g</td>
-        </tr>`).join('');
-      return `<section class="day">
-        <h2>${escapeHtml(new Date(day.date + 'T12:00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }))}</h2>
-        <table><thead><tr><th>Bữa</th><th>Món</th><th class="right">Khẩu phần</th><th class="right">Calo</th><th class="right">Đạm</th></tr></thead>
+        </tr>`
+          )
+          .join('');
+        return `<section class="day">
+        <h2>${escapeHtml(
+          new Date(day.date + 'T12:00:00').toLocaleDateString('vi-VN', {
+            weekday: 'long',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          })
+        )}</h2>
+        <table><thead><tr><th>Phân loại bữa</th><th>Món ăn</th><th class="right">Khẩu phần</th><th class="right">Calo</th><th class="right">Đạm</th></tr></thead>
         <tbody>${rows}
-          <tr><td colspan="3"><strong>Tổng ngày</strong></td><td class="right"><strong>${formatNumber(day.totals.calories)} kcal</strong></td><td class="right"><strong>${formatNumber(day.totals.protein)} g</strong></td></tr>
+          <tr><td colspan="3"><strong>Tổng ngày</strong></td><td class="right"><strong>${formatNumber(
+            day.totals.calories
+          )} kcal</strong></td><td class="right"><strong>${formatNumber(day.totals.protein)} g</strong></td></tr>
         </tbody></table>
       </section>`;
-    }).join('');
+      })
+      .join('');
 
-    printHtml('Thực đơn VEGEAI', `
-      <h1>Thực đơn chay VEGEAI</h1>
-      <p class="meta">Khoảng ${escapeHtml(days[0].date)} → ${escapeHtml(days[days.length - 1].date)} · Mục tiêu ${formatNumber(targets.dailyCaloriesTarget)} kcal/ngày · Đạm ${formatNumber(targets.proteinTargetG)} g · Chất xơ ${formatNumber(targets.fiberTargetG)} g</p>
-      ${sections}`);
+    printHtml(
+      'Thực đơn VEGEAI',
+      `
+      <h1>Thực đơn chay VEGEAI (Bữa chính & Món phụ / Món dặm)</h1>
+      <p class="meta">Khoảng ${escapeHtml(days[0].date)} → ${escapeHtml(
+        days[days.length - 1].date
+      )} · Mục tiêu ${formatNumber(targets.dailyCaloriesTarget)} kcal/ngày · Đạm ${formatNumber(
+        targets.proteinTargetG
+      )} g · Chất xơ ${formatNumber(targets.fiberTargetG)} g</p>
+      ${sections}`
+    );
   };
+
+  const mainMealsShown = useMemo(
+    () => (shown ? shown.meals.filter((m) => m.slot <= 2) : []),
+    [shown]
+  );
+  const sideAndSnackMealsShown = useMemo(
+    () => (shown ? shown.meals.filter((m) => m.slot >= 3) : []),
+    [shown]
+  );
 
   return (
     <div className="grid lg:grid-cols-12 gap-6 items-start">
@@ -277,6 +416,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
           Xuất PDF thực đơn
         </button>
       </div>
+
       {/* LỊCH THỰC ĐƠN 30–31 NGÀY - BÊN TRÁI */}
       <div className="lg:col-span-5">
         <MealCalendar31DaysView
@@ -289,8 +429,11 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
           draftDays={draftKeys}
         />
 
-        {/* KẾ HOẠCH ĐÃ LƯU - bấm để nhảy tới ngày bắt đầu trên lịch */}
-        <div id="saved-meal-plans" className="mt-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4 scroll-mt-36">
+        {/* KẾ HOẠCH ĐÃ LƯU */}
+        <div
+          id="saved-meal-plans"
+          className="mt-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-6 shadow-xs space-y-4 scroll-mt-36"
+        >
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 flex items-center justify-center shadow-2xs">
@@ -298,7 +441,9 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               </div>
               <div>
                 <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Kế hoạch đã lưu</h3>
-                <p className="text-[11px] text-slate-400">Bấm vào một kế hoạch để xem trên lịch · kế hoạch bị thay hết sẽ tự ẩn</p>
+                <p className="text-[11px] text-slate-400">
+                  Bấm vào một kế hoạch để xem trên lịch · kế hoạch bị thay hết sẽ tự ẩn
+                </p>
               </div>
             </div>
             {!!savedPlans.data?.totalElements && (
@@ -310,8 +455,11 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
 
           {savedPlans.busy && (
             <ul role="status" aria-label="Đang tải kế hoạch" className="space-y-2.5">
-              {[0, 1, 2].map(index => (
-                <li key={index} className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 animate-pulse">
+              {[0, 1, 2].map((index) => (
+                <li
+                  key={index}
+                  className="flex items-center gap-3 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 animate-pulse"
+                >
                   <div className="w-12 h-14 rounded-xl bg-slate-100 dark:bg-slate-800" />
                   <div className="flex-1 space-y-2">
                     <div className="h-3 w-2/3 rounded bg-slate-100 dark:bg-slate-800" />
@@ -323,9 +471,16 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
           )}
 
           {savedPlans.error && (
-            <div role="alert" className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between gap-2">
+            <div
+              role="alert"
+              className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between gap-2"
+            >
               <span>{savedPlans.error}</span>
-              <button type="button" onClick={savedPlans.refresh} className="inline-flex items-center gap-1 font-bold hover:underline cursor-pointer shrink-0">
+              <button
+                type="button"
+                onClick={savedPlans.refresh}
+                className="inline-flex items-center gap-1 font-bold hover:underline cursor-pointer shrink-0"
+              >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Tải lại
               </button>
@@ -336,19 +491,22 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
             <div className="py-6 px-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center">
               <CalendarDays className="w-6 h-6 mx-auto text-slate-300 dark:text-slate-600" />
               <p className="mt-2 text-sm font-bold text-slate-700 dark:text-slate-300">Chưa có kế hoạch nào</p>
-              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Chọn một ngày trên lịch rồi bấm "Lập với AI" để bắt đầu.</p>
+              <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                Chọn một ngày trên lịch rồi bấm "Lập với AI" để bắt đầu.
+              </p>
             </div>
           )}
 
           {savedPlans.data && savedPlans.data.items.length > 0 && (
             <>
               <ul className="space-y-2.5">
-                {savedPlans.data.items.map(plan => {
+                {savedPlans.data.items.map((plan) => {
                   const start = new Date(plan.firstVisibleDate + 'T12:00:00');
                   const status = planStatus(plan.firstVisibleDate, plan.lastVisibleDate, todayKey);
                   const isPartial = plan.visibleDays < plan.totalDays;
-                  // Overlapping plans share dates; the selected day belongs to the plan the calendar shows for it.
-                  const isViewing = savedDay ? savedDay.planId === plan.id : selectedKey >= plan.startDate && selectedKey <= plan.endDate;
+                  const isViewing = savedDay
+                    ? savedDay.planId === plan.id
+                    : selectedKey >= plan.startDate && selectedKey <= plan.endDate;
                   return (
                     <li key={plan.id} className="relative">
                       <button
@@ -362,8 +520,14 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                             : 'border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 hover:bg-emerald-50/40 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20'
                         }`}
                       >
-                        <span className={`w-12 shrink-0 rounded-xl overflow-hidden text-center shadow-2xs border ${isViewing ? 'border-emerald-600' : 'border-slate-200 dark:border-slate-700'}`}>
-                          <span className={`block py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white ${status.tile}`}>
+                        <span
+                          className={`w-12 shrink-0 rounded-xl overflow-hidden text-center shadow-2xs border ${
+                            isViewing ? 'border-emerald-600' : 'border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`block py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white ${status.tile}`}
+                          >
                             Th{start.getMonth() + 1}
                           </span>
                           <span className="block py-1 text-lg font-black leading-tight text-slate-900 dark:text-white bg-white dark:bg-slate-900 tabular-nums">
@@ -374,9 +538,11 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-1.5 pr-7">
                             <strong className="text-sm font-extrabold text-slate-900 dark:text-white">
-                              {plan.period === 'WEEK' ? 'Thực đơn 7 ngày' : 'Thực đơn 1 tháng'}
+                              {plan.period === 'WEEK' ? 'Thực đơn 7 ngày' : `Thực đơn ${plan.totalDays} ngày`}
                             </strong>
-                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${status.chip}`}>{status.label}</span>
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${status.chip}`}>
+                              {status.label}
+                            </span>
                             {isPartial && (
                               <span
                                 className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300 dark:bg-amber-950/50 dark:border-amber-800"
@@ -389,29 +555,27 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                           <span className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                             <span className="inline-flex items-center gap-1 font-semibold text-slate-600 dark:text-slate-300">
                               <CalendarDays className="w-3 h-3" />
-                              {/* Only the days this plan still owns on the calendar */}
                               {plan.firstVisibleDate === plan.lastVisibleDate
                                 ? shortDate(plan.firstVisibleDate)
                                 : `${shortDate(plan.firstVisibleDate)} → ${shortDate(plan.lastVisibleDate)}`}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Utensils className="w-3 h-3" />
-                              {plan.mealsPerDay} bữa/ngày
+                              {plan.mealsPerDay <= 3
+                                ? `${plan.mealsPerDay} bữa chính/ngày`
+                                : `3 bữa chính + ${plan.mealsPerDay - 3} món phụ/dặm`}
                             </span>
-                          </span>
-                          {isPartial && (
-                            <span className="mt-0.5 block text-[10px] text-slate-400">
-                              Gốc {shortDate(plan.startDate)} → {shortDate(plan.endDate)}, các ngày còn lại đã thay bằng kế hoạch lưu sau
-                            </span>
-                          )}
-                          <span className="mt-0.5 block text-[10px] text-slate-400">
-                            Lưu lúc {new Date(plan.savedAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}
                           </span>
                         </span>
 
-                        <ChevronRight className={`w-4 h-4 shrink-0 transition group-hover:translate-x-0.5 ${isViewing ? 'text-emerald-600' : 'text-slate-300 dark:text-slate-600 group-hover:text-emerald-600'}`} />
+                        <ChevronRight
+                          className={`w-4 h-4 shrink-0 transition group-hover:translate-x-0.5 ${
+                            isViewing
+                              ? 'text-emerald-600'
+                              : 'text-slate-300 dark:text-slate-600 group-hover:text-emerald-600'
+                          }`}
+                        />
                       </button>
-                      {/* Sibling of the card button (buttons cannot nest), pinned to its top-right corner */}
                       <button
                         type="button"
                         onClick={() => { setDeleting(plan); setDeleteError(''); }}
@@ -429,11 +593,25 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               {savedPlans.data.totalPages > 1 && (
                 <nav aria-label="Phân trang kế hoạch" className="flex justify-center">
                   <div className="inline-flex items-center gap-1 p-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                    <button type="button" aria-label="Kế hoạch trang trước" disabled={savedPlans.data.first} onClick={() => setSavedPage(page => page - 1)} className="p-1.5 rounded-full hover:bg-white dark:hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer">
+                    <button
+                      type="button"
+                      aria-label="Kế hoạch trang trước"
+                      disabled={savedPlans.data.first}
+                      onClick={() => setSavedPage((page) => page - 1)}
+                      className="p-1.5 rounded-full hover:bg-white dark:hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
+                    >
                       <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
-                    <span className="px-2 tabular-nums">Trang {savedPage + 1}/{savedPlans.data.totalPages}</span>
-                    <button type="button" aria-label="Kế hoạch trang sau" disabled={savedPlans.data.last} onClick={() => setSavedPage(page => page + 1)} className="p-1.5 rounded-full hover:bg-white dark:hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer">
+                    <span className="px-2 tabular-nums">
+                      Trang {savedPage + 1}/{savedPlans.data.totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Kế hoạch trang sau"
+                      disabled={savedPlans.data.last}
+                      onClick={() => setSavedPage((page) => page + 1)}
+                      className="p-1.5 rounded-full hover:bg-white dark:hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent transition cursor-pointer"
+                    >
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -445,7 +623,10 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
       </div>
 
       {/* LẬP THỰC ĐƠN AI & THỰC ĐƠN CỦA NGÀY ĐANG CHỌN - BÊN PHẢI */}
-      <section id="weekly-schedule" className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
+      <section
+        id="weekly-schedule"
+        className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6"
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div>
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2.5">
@@ -454,7 +635,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               {draftDay
-                ? 'Bản nháp AI, chưa lưu vào lịch.'
+                ? 'Bản nháp AI (bao gồm Bữa chính & Món phụ/Món dặm), đang chờ bạn xác nhận lưu vào lịch.'
                 : savedDay
                 ? `Thuộc thực đơn ${savedDay.period === 'WEEK' ? 'tuần' : 'tháng'} đã lưu.`
                 : 'Ngày này chưa có thực đơn.'}
@@ -465,80 +646,104 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               type="button"
               onClick={() => void exportToMarket()}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 transition shadow-2xs self-start sm:self-auto cursor-pointer"
-              title={draft ? 'Lọc nguyên liệu còn thiếu của bản nháp sang Danh sách đi chợ' : 'Lọc nguyên liệu còn thiếu của các thực đơn đã lưu trong tháng đang xem'}
+              title="Định vị GPS các quán chay & cửa hàng bán nguyên liệu còn thiếu cho thực đơn này"
             >
-              <ShoppingBag className="w-4 h-4" />
-              <span>Đi chợ thông minh {draft ? '(bản nháp)' : '(cả tháng)'}</span>
+              <MapPin className="w-4 h-4" />
+              <span>Tìm nơi bán nguyên liệu thiếu (GPS)</span>
             </button>
           )}
         </div>
 
         {/* LẬP THỰC ĐƠN VỚI AI TỪ NGÀY ĐANG CHỌN */}
         {!draft && (
-          <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-3.5">
             <div className="flex items-center gap-2 text-sm font-extrabold text-emerald-900 dark:text-emerald-200">
               <Sparkles className="w-4 h-4 text-emerald-600" />
-              Lập thực đơn AI bắt đầu từ {selectedDate.toLocaleDateString('vi-VN')}
+              Lập thực đơn tuần AI (Bữa chính + Món phụ &amp; Món dặm) bắt đầu từ {selectedDate.toLocaleDateString('vi-VN')}
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                Số ngày
-                <input type="number" min={1} max={31} value={customDays} onChange={event => setCustomDays(Math.max(1, Math.min(31, Number(event.target.value) || 1)))} className="w-20 px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" />
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+              <label className="sm:col-span-3 flex flex-col gap-1 text-xs font-bold text-slate-700 dark:text-slate-300">
+                <span>Số ngày lên lịch</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={customDays}
+                  onChange={(event) => setCustomDays(Math.max(1, Math.min(31, Number(event.target.value) || 1)))}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-bold"
+                />
               </label>
-              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300">
-                Số bữa/ngày
+              <label className="sm:col-span-6 flex flex-col gap-1 text-xs font-bold text-slate-700 dark:text-slate-300">
+                <span>Cấu trúc Bữa chính &amp; Món phụ / Món dặm mỗi ngày</span>
                 <select
                   value={mealsPerDay}
-                  onChange={event => setMealsPerDay(Number(event.target.value))}
-                  className="px-2 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  onChange={(event) => setMealsPerDay(Number(event.target.value))}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 font-semibold"
                 >
-                  {[1, 2, 3, 4, 5, 6].map(count => <option key={count} value={count}>{count}</option>)}
+                  {MEAL_STRUCTURE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
                 </select>
               </label>
-              <button
-                type="button"
-                onClick={generate}
-                disabled={busy || !canGenerate}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold transition shadow-2xs cursor-pointer"
-              >
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {busy ? 'AI đang lập thực đơn…' : 'Lập với AI'}
-              </button>
+              <div className="sm:col-span-3">
+                <button
+                  type="button"
+                  onClick={generate}
+                  disabled={busy || !canGenerate}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black transition shadow-2xs cursor-pointer"
+                >
+                  {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {busy ? 'Đang lập...' : 'Lập với AI'}
+                </button>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-[11px] text-slate-600 dark:text-slate-400">
               {canGenerate
-                ? 'AI chọn món theo mục tiêu dinh dưỡng, chế độ ăn và dị ứng trong hồ sơ của bạn. Ngày đã có thực đơn sẽ được thay khi bạn lưu kế hoạch mới.'
+                ? '💡 AI tự động phân bổ 3 Bữa chính (Sáng · Trưa · Tối) kèm Món phụ ăn kèm & Món dặm xế/tối khớp mục tiêu Calo, Đạm và dị ứng của bạn. Sau khi tạo nháp, bạn sẽ xác nhận trước khi lưu chính thức vào lịch.'
                 : 'Chọn hôm nay hoặc một ngày trong tương lai để lập thực đơn.'}
             </p>
           </div>
         )}
 
+        {/* DRAFT CONFIRMATION BAR */}
         {draft && (
-          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="text-xs text-amber-900 dark:text-amber-200">
+          <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="text-xs text-amber-950 dark:text-amber-200 space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-200/80 text-amber-950 font-black text-[10px] uppercase tracking-wider">
+                ⏳ Chờ xác nhận lên lịch
+              </div>
               <p className="font-extrabold text-sm">
-                Bản nháp AI: {shortDate(draft.plan.startDate)} – {shortDate(draft.plan.endDate)} · {draft.plan.days.length} ngày · {draft.plan.mealsPerDay} bữa/ngày
+                Bản nháp AI: {shortDate(draft.plan.startDate)} – {shortDate(draft.plan.endDate)} · {draft.plan.days.length} ngày ·{' '}
+                {draft.plan.mealsPerDay <= 3
+                  ? `${draft.plan.mealsPerDay} bữa chính/ngày`
+                  : `3 Bữa chính + ${draft.plan.mealsPerDay - 3} Món phụ/Món dặm`}
               </p>
-              {overlapsSaved > 0 && <p className="mt-0.5">Khi lưu sẽ thay thực đơn đã lưu của {overlapsSaved} ngày trùng.</p>}
+              {overlapsSaved > 0 && (
+                <p className="text-amber-800 dark:text-amber-300">
+                  Lưu ý: Khi xác nhận lưu sẽ cập nhật đè lên {overlapsSaved} ngày đã có thực đơn trước đó.
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={discard}
                 disabled={busy}
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-950 transition cursor-pointer"
+                className="inline-flex items-center gap-1 px-3.5 py-2.5 rounded-xl border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-950 transition cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
-                Bỏ nháp
+                Hủy bản nháp
               </button>
               <button
                 type="button"
-                onClick={save}
+                onClick={() => setShowSaveConfirmModal(true)}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-black transition shadow-sm cursor-pointer"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Lưu vào lịch
+                Xác nhận &amp; Lưu vào lịch
               </button>
             </div>
           </div>
@@ -548,30 +753,29 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
           <details className="text-xs text-slate-600 dark:text-slate-400">
             <summary className="font-bold cursor-pointer">Lưu ý kế hoạch ({draft.plan.warnings.length})</summary>
             <ul className="list-disc pl-5 mt-2 space-y-1">
-              {draft.plan.warnings.map(warning => <li key={warning}>{warning}</li>)}
+              {draft.plan.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
             </ul>
           </details>
         )}
 
         {error && swapping === null && (
-          <div role="alert" className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
+          <div
+            role="alert"
+            className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2"
+          >
             <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
             <span>{error}</span>
           </div>
         )}
         {message && !error && (
-          <div role="status" className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+          <div
+            role="status"
+            className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2"
+          >
             <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
             <span>{message}</span>
-          </div>
-        )}
-        {calendar.error && (
-          <div role="alert" className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 flex items-center justify-between gap-2">
-            <span>Không tải được lịch thực đơn: {calendar.error}</span>
-            <button type="button" onClick={calendar.refresh} className="inline-flex items-center gap-1 font-bold hover:underline cursor-pointer">
-              <RefreshCw className="w-3.5 h-3.5" />
-              Tải lại
-            </button>
           </div>
         )}
 
@@ -584,114 +788,367 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
           <div className="p-6 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-sm text-slate-500 dark:text-slate-400">
             {draft
               ? 'Ngày này nằm ngoài bản nháp. Chọn một ngày có chấm cam để xem thực đơn AI.'
-              : 'Chưa có thực đơn cho ngày này. Dùng "Lập với AI" ở trên để lập thực đơn bắt đầu từ ngày đang chọn.'}
+              : 'Chưa có thực đơn cho ngày này. Dùng "Lập với AI" ở trên để lập thực đơn (Bữa chính + Món phụ & Món dặm) bắt đầu từ ngày đang chọn.'}
           </div>
         ) : (
-          <div className="space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-              {shown.meals.length} bữa · Dự kiến / Mục tiêu
-            </h3>
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                Tổng quan dinh dưỡng ngày ({mainMealsShown.length} Bữa chính
+                {sideAndSnackMealsShown.length > 0 ? ` + ${sideAndSnackMealsShown.length} Món phụ & Món dặm` : ''})
+              </h3>
+              <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900">
+                  🍽️ {mainMealsShown.length} Bữa chính
+                </span>
+                {sideAndSnackMealsShown.length > 0 && (
+                  <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900">
+                    🥗🍵 {sideAndSnackMealsShown.length} Món phụ &amp; Món dặm
+                  </span>
+                )}
+              </div>
+            </div>
+
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {([
-                ['Năng lượng', shown.totals.calories, shown.targets.dailyCaloriesTarget, 'kcal'],
-                ['Đạm', shown.totals.protein, shown.targets.proteinTargetG, 'g'],
-                ['Carb', shown.totals.carbs, shown.targets.carbsTargetG, 'g'],
-                ['Chất béo', shown.totals.fat, shown.targets.fatTargetG, 'g'],
-              ] as const).map(([label, value, target, unit]) => (
-                <div key={label} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
+              {(
+                [
+                  ['Năng lượng', shown.totals.calories, shown.targets.dailyCaloriesTarget, 'kcal'],
+                  ['Đạm', shown.totals.protein, shown.targets.proteinTargetG, 'g'],
+                  ['Carb', shown.totals.carbs, shown.targets.carbsTargetG, 'g'],
+                  ['Chất béo', shown.totals.fat, shown.targets.fatTargetG, 'g'],
+                ] as const
+              ).map(([label, value, target, unit]) => (
+                <div
+                  key={label}
+                  className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80"
+                >
                   <dt className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{label}</dt>
                   <dd className="text-lg font-extrabold text-slate-900 dark:text-white tabular-nums">
                     {Math.round(value)}
-                    <small className="block text-[10px] font-semibold text-slate-400">/ {Math.round(target)} {unit}</small>
+                    <small className="block text-[10px] font-semibold text-slate-400">
+                      / {Math.round(target)} {unit}
+                    </small>
                   </dd>
                 </div>
               ))}
             </dl>
 
-            <div className="grid grid-cols-1 gap-4">
-              {shown.meals.map(meal => (
-                <div
-                  key={meal.slot + ':' + meal.recipeId}
-                  className={`p-5 rounded-2xl border bg-white dark:bg-slate-850 shadow-2xs space-y-3 ${draftDay ? 'border-amber-200 dark:border-amber-900' : 'border-slate-200/80 dark:border-slate-800'}`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-24 sm:w-28 shrink-0 rounded-xl overflow-hidden">
-                      <RecipeImage src={meal.imageUrl} title={meal.title} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
-                        <span className="font-bold text-emerald-700 dark:text-emerald-400">{mealName(meal.slot, shown.meals.length)}</span>
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold">
-                          {meal.portions} khẩu phần
-                        </span>
-                      </div>
-                      <Link to={`/recipe/${meal.recipeId}`} className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-2 hover:text-emerald-700 dark:hover:text-emerald-400">
-                        {meal.title}
-                      </Link>
-                      <p className="mt-1 text-xs">
-                        <span className="font-extrabold text-emerald-700 dark:text-emerald-400">{Math.round(meal.nutrition.calories)} kcal</span>
-                        <span className="text-slate-500 dark:text-slate-400">
-                          {' '}· Đạm {Math.round(meal.nutrition.protein)}g · Carb {Math.round(meal.nutrition.carbs)}g · Béo {Math.round(meal.nutrition.fat)}g
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <PlannedMealDetails meal={meal} />
-
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                    {draftDay || savedDay ? (
-                      <button
-                        type="button"
-                        onClick={() => { setSwapping(meal.slot); setReplacement(''); setError(''); }}
-                        disabled={busy || options.busy || !!options.error}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline disabled:opacity-50 cursor-pointer"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Đổi món</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => navigate('/ai-chef?prompt=' + encodeURIComponent(`Hãy gợi ý cho tôi 2 món chay thay thế cho món "${meal.title}" (${Math.round(meal.nutrition.calories)} kcal).`))}
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
-                      >
-                        <ChefHat className="w-3.5 h-3.5" />
-                        <span>Đổi món với AI</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => onAddToShoppingList(meal.title)}
-                      className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 transition cursor-pointer"
-                      title="Thêm nguyên liệu vào danh sách đi chợ"
+            {/* GROUP 1: BỮA ĂN CHÍNH (SÁNG, TRƯA, TỐI) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                  <Utensils className="w-3.5 h-3.5" /> Các Bữa Ăn Chính Trong Ngày ({mainMealsShown.length})
+                </h4>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                {mainMealsShown.map((meal) => {
+                  const slotMeta = getMealSlotMeta(meal.slot);
+                  return (
+                    <div
+                      key={meal.slot + ':' + meal.recipeId}
+                      className={`p-5 rounded-2xl border bg-white dark:bg-slate-850 shadow-2xs space-y-3 ${
+                        draftDay ? 'border-amber-200 dark:border-amber-900' : 'border-slate-200/80 dark:border-slate-800'
+                      }`}
                     >
-                      <ShoppingBag className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                      <div className="flex items-start gap-4">
+                        <div className="w-24 sm:w-28 shrink-0 rounded-xl overflow-hidden">
+                          <RecipeImage src={meal.imageUrl} title={meal.title} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-xs mb-1.5">
+                            <span
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${slotMeta.badgeClass}`}
+                            >
+                              {slotMeta.label}
+                            </span>
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                              {meal.portions} khẩu phần
+                            </span>
+                          </div>
+                          <Link
+                            to={`/recipe/${meal.recipeId}`}
+                            className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-2 hover:text-emerald-700 dark:hover:text-emerald-400"
+                          >
+                            {meal.title}
+                          </Link>
+                          <p className="mt-1 text-xs">
+                            <span className="font-extrabold text-emerald-700 dark:text-emerald-400">
+                              {Math.round(meal.nutrition.calories)} kcal
+                            </span>
+                            <span className="text-slate-500 dark:text-slate-400">
+                              {' '}
+                              · Đạm {Math.round(meal.nutrition.protein)}g · Carb {Math.round(meal.nutrition.carbs)}g · Béo{' '}
+                              {Math.round(meal.nutrition.fat)}g
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <PlannedMealDetails meal={meal} />
+
+                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                        {draftDay || savedDay ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSwapping(meal.slot);
+                              setReplacement('');
+                              setError('');
+                            }}
+                            disabled={busy || options.busy || !!options.error}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline disabled:opacity-50 cursor-pointer"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>Đổi món khác</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(
+                                '/ai-chef?prompt=' +
+                                  encodeURIComponent(
+                                    `Hãy gợi ý cho tôi 2 món chay thay thế cho món "${meal.title}" (${Math.round(
+                                      meal.nutrition.calories
+                                    )} kcal).`
+                                  )
+                              )
+                            }
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+                          >
+                            <ChefHat className="w-3.5 h-3.5" />
+                            <span>Đổi món với AI</span>
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => onAddToShoppingList(meal.title)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold transition cursor-pointer"
+                          title="Tìm điểm bán nguyên liệu món này"
+                        >
+                          <ShoppingBag className="w-3.5 h-3.5" />
+                          <span>Tìm nguyên liệu</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* GROUP 2: MÓN PHỤ & MÓN DẶM (SIDE DISHES & SNACKS) */}
+            {sideAndSnackMealsShown.length > 0 && (
+              <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-teal-800 dark:text-teal-300 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" /> Món Phụ Ăn Kèm &amp; Món Dặm Dinh Dưỡng ({sideAndSnackMealsShown.length})
+                  </h4>
+                  <span className="text-[11px] text-slate-400">
+                    Bổ sung chất xơ, vitamin và năng lượng nhẹ giữa giờ
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  {sideAndSnackMealsShown.map((meal) => {
+                    const slotMeta = getMealSlotMeta(meal.slot);
+                    return (
+                      <div
+                        key={meal.slot + ':' + meal.recipeId}
+                        className={`p-5 rounded-2xl border bg-teal-50/20 dark:bg-slate-850 shadow-2xs space-y-3 ${
+                          draftDay ? 'border-amber-200 dark:border-amber-900' : 'border-teal-200/80 dark:border-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="w-24 sm:w-28 shrink-0 rounded-xl overflow-hidden">
+                            <RecipeImage src={meal.imageUrl} title={meal.title} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs mb-1.5">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${slotMeta.badgeClass}`}
+                              >
+                                {slotMeta.label}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                                {meal.portions} khẩu phần
+                              </span>
+                            </div>
+                            <Link
+                              to={`/recipe/${meal.recipeId}`}
+                              className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-2 hover:text-emerald-700 dark:hover:text-emerald-400"
+                            >
+                              {meal.title}
+                            </Link>
+                            <p className="mt-1 text-xs">
+                              <span className="font-extrabold text-emerald-700 dark:text-emerald-400">
+                                {Math.round(meal.nutrition.calories)} kcal
+                              </span>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                {' '}
+                                · Đạm {Math.round(meal.nutrition.protein)}g · Carb {Math.round(meal.nutrition.carbs)}g · Béo{' '}
+                                {Math.round(meal.nutrition.fat)}g
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <PlannedMealDetails meal={meal} />
+
+                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                          {draftDay || savedDay ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSwapping(meal.slot);
+                                setReplacement('');
+                                setError('');
+                              }}
+                              disabled={busy || options.busy || !!options.error}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline disabled:opacity-50 cursor-pointer"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                              <span>Đổi món phụ / món dặm khác</span>
+                            </button>
+                          ) : null}
+
+                          <button
+                            type="button"
+                            onClick={() => onAddToShoppingList(meal.title)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold transition cursor-pointer"
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5" />
+                            <span>Tìm nguyên liệu</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
+
+      {/* MODAL XÁC NHẬN TRƯỚC KHI LƯU THỰC ĐƠN VÀO LỊCH BIỂU */}
+      {showSaveConfirmModal && draft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl rounded-3xl border border-emerald-200 bg-white dark:bg-slate-900 p-6 sm:p-7 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                  <CalendarDays className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">
+                    Xác nhận lưu Thực đơn vào Lịch biểu cá nhân
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Khoảng thời gian: <strong>{shortDate(draft.plan.startDate)}</strong> đến{' '}
+                    <strong>{shortDate(draft.plan.endDate)}</strong> ({draft.plan.days.length} ngày)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSaveConfirmModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="my-4 space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">
+                  🎯 Mục tiêu: ~{Math.round(draft.plan.targets.dailyCaloriesTarget)} kcal/ngày
+                </span>
+                <span className="px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-bold">
+                  🍽️ Cấu trúc:{' '}
+                  {draft.plan.mealsPerDay <= 3
+                    ? `${draft.plan.mealsPerDay} Bữa chính/ngày`
+                    : `3 Bữa chính + ${draft.plan.mealsPerDay - 3} Món phụ & Món dặm/ngày`}
+                </span>
+              </div>
+
+              {overlapsSaved > 0 && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
+                  ⚠️ Kế hoạch này sẽ ghi đè thực đơn cũ của <strong>{overlapsSaved} ngày</strong> bị trùng trên lịch.
+                </div>
+              )}
+
+              <div className="max-h-64 overflow-y-auto space-y-2.5 pr-1">
+                {draft.plan.days.map((day) => (
+                  <div
+                    key={day.date}
+                    className="p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/50 text-xs"
+                  >
+                    <div className="flex items-center justify-between font-bold text-slate-900 dark:text-white mb-1.5">
+                      <span>
+                        📅 {new Date(day.date + 'T12:00:00').toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' })}
+                      </span>
+                      <span className="text-emerald-700 dark:text-emerald-400">
+                        {Math.round(day.totals.calories)} kcal · {Math.round(day.totals.protein)}g đạm
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {day.meals.map((m) => {
+                        const meta = getMealSlotMeta(m.slot);
+                        return (
+                          <span
+                            key={`${day.date}-${m.slot}`}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-300"
+                          >
+                            <strong className="text-emerald-700 dark:text-emerald-400">{meta.shortLabel}:</strong> {m.title}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowSaveConfirmModal(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+              >
+                Xem &amp; Đổi món tiếp
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void save()}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-black shadow-sm cursor-pointer"
+              >
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Xác nhận thêm vào Lịch biểu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <CommunityConfirm
         open={swapping !== null}
         title={savedDay && !draft ? 'Đổi món trong thực đơn đã lưu' : 'Đổi món trong bản nháp'}
         busy={busy}
         disabled={!replacement}
-        onCancel={() => { setSwapping(null); setError(''); }}
+        onCancel={() => {
+          setSwapping(null);
+          setError('');
+        }}
         onConfirm={() => void swap()}
       >
         <label className="cm-field">
-          Chọn công thức
-          <select aria-label="Món thay thế" value={replacement} onChange={event => setReplacement(event.target.value)}>
+          Chọn công thức thay thế ({swapping !== null ? getMealSlotMeta(swapping).shortLabel : ''})
+          <select aria-label="Món thay thế" value={replacement} onChange={(event) => setReplacement(event.target.value)}>
             <option value="">Chọn món phù hợp</option>
             {options.data
-              ?.filter(recipe => recipe.recipeId !== shown?.meals.find(meal => meal.slot === swapping)?.recipeId)
-              .map(recipe => (
+              ?.filter((recipe) => recipe.recipeId !== shown?.meals.find((meal) => meal.slot === swapping)?.recipeId)
+              .map((recipe) => (
                 <option key={recipe.recipeId} value={recipe.recipeId}>
                   {recipe.title} · {recipe.calories} kcal/khẩu phần
                 </option>
@@ -720,8 +1177,8 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
       >
         {deleting && (
           <p className="text-sm">
-            Xóa <strong>{deleting.period === 'WEEK' ? 'Thực đơn 7 ngày' : 'Thực đơn 1 tháng'}</strong> ({shortDate(deleting.startDate)} → {shortDate(deleting.endDate)})?
-            {' '}Các ngày của kế hoạch này sẽ bị gỡ khỏi lịch; nếu một kế hoạch lưu trước đó cũng có những ngày này thì lịch sẽ hiển thị lại kế hoạch đó. Không thể hoàn tác.
+            Xóa <strong>{deleting.period === 'WEEK' ? 'Thực đơn 7 ngày' : `Thực đơn ${deleting.totalDays} ngày`}</strong> ({shortDate(deleting.startDate)} → {shortDate(deleting.endDate)})?
+            {' '}Các ngày của kế hoạch này sẽ bị gỡ khỏi lịch. Không thể hoàn tác.
           </p>
         )}
         {deleteError && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{deleteError}</p>}

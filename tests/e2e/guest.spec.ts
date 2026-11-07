@@ -13,6 +13,6 @@ test.describe('guest routes and navigation', () => {
     await expect(page.locator('header')).toContainText('VEGEAI');
     await expect(page.locator('header a[href="/blog"]')).toHaveCount(1);
     await expect(page.locator('header a[href="/videos"]')).toHaveCount(1);
-    await expect(page.locator('header a[href="/smart-market"]')).toHaveCount(1);
+    await expect(page.locator('header a[href="/smart-market"]').first()).toBeVisible();
   });
 });

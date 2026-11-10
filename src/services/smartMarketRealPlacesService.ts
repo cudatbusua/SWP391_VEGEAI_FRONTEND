@@ -17,16 +17,51 @@ export function calculateHaversineDistanceKm(lat1: number, lon1: number, lat2: n
 }
 
 /**
- * Reverse geocodes a lat/lon coordinate into a human-readable Vietnamese address.
+ * Reverse geocodes a lat/lon coordinate into a human-readable Vietnamese address without raw coordinates.
  */
 export async function reverseGeocodeAddress(lat: number, lon: number): Promise<string> {
   try {
-    return await restaurantService.reverseGeocode({ lat, lon });
+    const backendAddr = await restaurantService.reverseGeocode({ lat, lon });
+    if (backendAddr && !/^\s*(vị trí gps|tọa độ gps|\d+\.\d+)/i.test(backendAddr)) {
+      return backendAddr.replace(/\s*\((?:GPS:?\s*)?-?\d+\.\d+\s*,\s*-?\d+\.\d+\)/gi, '').trim();
+    }
   } catch (err) {
-    // Graceful fallback based on known zones
-    console.debug('[GEOCODE] Reverse geocode error or timeout:', err);
+    console.debug('[GEOCODE] Backend reverse geocode unavailable, trying Nominatim:', err);
   }
-  return `Vị trí GPS (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=vi`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+    if (res.ok) {
+      const data = await res.json();
+      const addr = data?.address || {};
+      const parts = [
+        addr.road || addr.neighbourhood || addr.quarter,
+        addr.suburb || addr.village || addr.town,
+        addr.city_district || addr.district || addr.county || addr.city || addr.state,
+      ].filter(Boolean);
+      if (parts.length > 0) {
+        return Array.from(new Set(parts)).join(', ');
+      }
+      if (typeof data?.display_name === 'string' && data.display_name.trim()) {
+        return data.display_name
+          .split(',')
+          .slice(0, 3)
+          .map((s: string) => s.trim())
+          .filter((s: string) => s && !/^\d{5,6}$/.test(s))
+          .join(', ');
+      }
+    }
+  } catch {
+    // ignore network error and return clean label below
+  }
+
+  return 'Khu vực hiện tại của bạn';
 }
 
 /**

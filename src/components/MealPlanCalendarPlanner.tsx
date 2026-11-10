@@ -187,7 +187,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
   const options = useCommunityQuery(
     'calendar-plan-options:' + (draft?.id || savedDay?.planId || ''),
     (signal) => mealPlanService.options(draft?.id || savedDay?.planId || '', signal),
-    !!draft || !!savedDay
+    !!draft || (!!savedDay && !savedDay.needsReview)
   );
   const shown: { meals: PlannedMeal[]; totals: PlanNutrients; targets: NutritionTargets } | null = draftDay
     ? { meals: draftDay.meals, totals: draftDay.totals, targets: draft!.plan.targets }
@@ -302,6 +302,10 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
   };
 
   const swap = async (recipeId = replacement) => {
+    if (!draft && savedDay?.needsReview) {
+      setError('Hồ sơ dinh dưỡng đã thay đổi. Hãy tạo thực đơn mới để bảo đảm mục tiêu và dị ứng hiện tại.');
+      return;
+    }
     if ((!draft && !savedDay) || swapping === null || busy || !recipeId) return;
     setBusy(true);
     setError('');
@@ -760,6 +764,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
           </details>
         )}
 
+        {savedDay?.needsReview && !draft && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">Hồ sơ dinh dưỡng đã thay đổi. Kế hoạch đã lưu cần xem lại; hãy tạo thực đơn mới trước khi dùng hoặc đổi món.</p>}
         {error && swapping === null && (
           <div
             role="alert"

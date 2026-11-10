@@ -84,6 +84,24 @@ test('meal plan conflicts and provider failures remain visible without guest ret
   assert.equal(fixture.calls.length, 1);
 });
 
+test('daily intake reads and records actual portions only for signed-in customers', async () => {
+  const date = '2026-11-10';
+  const fixture = setup(() => reply({ date, meals: [], totals: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 } }));
+  await assert.rejects(fixture.mealPlans.intake(date), /đăng nhập/);
+  assert.equal(fixture.calls.length, 0);
+  fixture.api.setSession(auth(), true);
+  await fixture.mealPlans.intake(date);
+  await fixture.mealPlans.recordIntake(date, 1, 1.25);
+  await fixture.mealPlans.removeIntake(date, 1);
+  assert.deepEqual(fixture.calls.map(call => [call.url, call.method || 'GET']), [
+    ['/api/meal-plans/intake?date=2026-11-10', 'GET'],
+    ['/api/meal-plans/intake/2026-11-10/1', 'PUT'],
+    ['/api/meal-plans/intake/2026-11-10/1', 'DELETE'],
+  ]);
+  assert.deepEqual(JSON.parse(fixture.calls[1].body), { portions: 1.25 });
+  assert.ok(fixture.calls.every(call => call.headers.get('Authorization') === 'Bearer token-1'));
+});
+
 test('nearby places map backend coordinates and send radius in metres', async () => {
   const fixture = setup(() => reply([
     { placeId: 'far', name: 'Far', latitude: 10.02, longitude: 106, distanceKm: 2, category: 'RESTAURANT', isOpenNow: true },

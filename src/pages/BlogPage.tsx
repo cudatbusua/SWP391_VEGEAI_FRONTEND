@@ -145,6 +145,28 @@ export function BlogPage() {
     });
   };
 
+  // Architecture Comparison: 'standalone' (Phương án 1 - Khuyên dùng) vs 'hub' (Phương án 2 - All-in-One)
+  const [viewMode, setViewMode] = useState<'standalone' | 'hub'>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryMode = urlParams.get('mode');
+      if (queryMode === 'standalone' || queryMode === 'hub') return queryMode;
+      return (localStorage.getItem('vegeai_community_mode') as 'standalone' | 'hub') || 'standalone';
+    } catch {
+      return 'standalone';
+    }
+  });
+
+  const handleSelectViewMode = (mode: 'standalone' | 'hub') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('vegeai_community_mode', mode);
+      const url = new URL(window.location.href);
+      url.searchParams.set('mode', mode);
+      window.history.replaceState({}, '', url.toString());
+    } catch {}
+  };
+
   // Video Tab State
   const [videoData, setVideoData] = useState<PageResponse<CommunityVideo> | null>(null);
   const [videoBusy, setVideoBusy] = useState(false);
@@ -282,6 +304,60 @@ export function BlogPage() {
   return (
     <MainLayout>
       <div className="blog-shell max-w-[1120px] mx-auto px-4 py-6 sm:py-8 space-y-6">
+        {/* INTERACTIVE ARCHITECTURE COMPARISON SWITCHER */}
+        <div className="rounded-3xl border-2 border-emerald-500/40 bg-emerald-50/80 dark:bg-emerald-950/40 dark:border-emerald-500/30 p-4 shadow-xs">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-700 text-white font-black text-base shadow-xs">
+                ⚖️
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold text-slate-900 dark:text-white">So sánh trực quan 2 Phương án Kiến trúc</span>
+                  <span className="rounded-full bg-emerald-700 text-white px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">
+                    Chuyển đổi 1-Click
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                  {viewMode === 'standalone' ? (
+                    <>
+                      <strong>Phương án 1 (Khuyên dùng - Tách riêng):</strong> Blog chỉ tập trung bài viết/công thức, có 2 card dẫn lối sang <code>/videos</code> và <code>/questions</code>, không trùng lặp giao diện.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Phương án 2 (Hub All-in-One):</strong> Gom 3 tab (Bài đăng, Kho video, Hỏi đáp) chung trong 1 trang duy nhất, đã sửa nút thêm video trỏ chuẩn <code>/videos/new</code>.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-2xl bg-white dark:bg-slate-900 p-1.5 shadow-xs border border-slate-200 dark:border-slate-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleSelectViewMode('standalone')}
+                className={`cursor-pointer rounded-xl px-3.5 py-2 text-xs font-black transition ${
+                  viewMode === 'standalone'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Phương án 1 (Tách riêng trang)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectViewMode('hub')}
+                className={`cursor-pointer rounded-xl px-3.5 py-2 text-xs font-black transition ${
+                  viewMode === 'hub'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Phương án 2 (Hub All-in-One)
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Editorial Blog Header */}
         <header className="relative overflow-hidden rounded-[28px] bg-linear-to-br from-emerald-950 via-emerald-900 to-teal-700 px-6 py-8 text-white shadow-lg sm:px-9 sm:py-10">
           <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
@@ -313,56 +389,107 @@ export function BlogPage() {
           </div>
         </header>
 
-        {/* 3 CORE COMMUNITY HUB TABS */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-slate-100/90 dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700">
-          <div className="flex items-center gap-1.5 overflow-x-auto p-1">
-            <button
-              type="button"
-              onClick={() => setHubTab('posts')}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
-                hubTab === 'posts'
-                  ? 'bg-emerald-700 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
-              }`}
-            >
-              <BookOpen size={16} />
-              <span>1. Bài đăng cộng đồng</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setHubTab('videos')}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
-                hubTab === 'videos'
-                  ? 'bg-emerald-700 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
-              }`}
-            >
-              <Play size={16} />
-              <span>2. Kho video nấu ăn</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setHubTab('qa')}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
-                hubTab === 'qa'
-                  ? 'bg-emerald-700 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
-              }`}
-            >
-              <MessageSquare size={16} />
-              <span>3. Hỏi đáp chuyên gia (Q&A)</span>
-            </button>
-          </div>
+        {/* PHƯƠNG ÁN 1: NAVIGATION BRIDGES TO DEDICATED MODULES */}
+        {viewMode === 'standalone' && (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="p-4 sm:p-5 rounded-3xl bg-linear-to-r from-rose-950 via-rose-900 to-amber-950 border border-rose-800/40 text-white shadow-xs flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 text-[10px] font-extrabold uppercase tracking-wider text-rose-200">
+                  <Play size={11} fill="currentColor" /> Thư viện Video nấu chay
+                </span>
+                <h3 className="text-base font-extrabold text-white">Học nấu món chay trực quan qua video</h3>
+                <p className="text-xs text-rose-100/80 leading-relaxed">
+                  Trang chuyên biệt các thước phim nấu nướng, bộ lọc danh mục và công cụ AI trích xuất công thức từ video.
+                </p>
+              </div>
+              <div className="pt-3 flex items-center justify-between">
+                <Link
+                  to="/videos"
+                  className="inline-flex items-center gap-1.5 text-xs font-extrabold text-white bg-white/20 hover:bg-white/30 px-3.5 py-2 rounded-xl transition shadow-2xs"
+                >
+                  <span>Mở Thư viện Video riêng biệt</span>
+                  <ArrowUpRight size={14} />
+                </Link>
+                <span className="text-[11px] text-rose-200/70 font-semibold">{videoData?.totalElements || 2} video</span>
+              </div>
+            </div>
 
-          <div className="px-3 text-[11px] font-bold text-slate-500 dark:text-slate-400 hidden lg:block">
-            {hubTab === 'posts' && `📰 ${data?.totalElements || 0} bài đăng công khai`}
-            {hubTab === 'videos' && `🎬 ${videoData?.totalElements || 0} video hướng dẫn nấu chay`}
-            {hubTab === 'qa' && `💬 ${qaData?.totalElements || 0} câu hỏi & giải đáp`}
+            <div className="p-4 sm:p-5 rounded-3xl bg-linear-to-r from-teal-950 via-teal-900 to-emerald-950 border border-teal-800/40 text-white shadow-xs flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 text-[10px] font-extrabold uppercase tracking-wider text-teal-200">
+                  <MessageSquare size={11} /> Hỏi đáp chuyên gia & cộng đồng
+                </span>
+                <h3 className="text-base font-extrabold text-white">Góc giải đáp dinh dưỡng & ẩm thực</h3>
+                <p className="text-xs text-teal-100/80 leading-relaxed">
+                  Trang chuyên biệt để đặt câu hỏi về dinh dưỡng, kỹ thuật nấu chay và nhận giải đáp từ chuyên gia VEGEAI.
+                </p>
+              </div>
+              <div className="pt-3 flex items-center justify-between">
+                <Link
+                  to="/questions"
+                  className="inline-flex items-center gap-1.5 text-xs font-extrabold text-white bg-white/20 hover:bg-white/30 px-3.5 py-2 rounded-xl transition shadow-2xs"
+                >
+                  <span>Mở góc Hỏi đáp Q&A riêng biệt</span>
+                  <ArrowUpRight size={14} />
+                </Link>
+                <span className="text-[11px] text-teal-200/70 font-semibold">{qaData?.totalElements || 0} câu hỏi</span>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* PHƯƠNG ÁN 2: 3 CORE COMMUNITY HUB TABS */}
+        {viewMode === 'hub' && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-slate-100/90 dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-1.5 overflow-x-auto p-1">
+              <button
+                type="button"
+                onClick={() => setHubTab('posts')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
+                  hubTab === 'posts'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
+                }`}
+              >
+                <BookOpen size={16} />
+                <span>1. Bài đăng cộng đồng</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHubTab('videos')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
+                  hubTab === 'videos'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
+                }`}
+              >
+                <Play size={16} />
+                <span>2. Kho video nấu ăn</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHubTab('qa')}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
+                  hubTab === 'qa'
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
+                }`}
+              >
+                <MessageSquare size={16} />
+                <span>3. Hỏi đáp chuyên gia (Q&A)</span>
+              </button>
+            </div>
+
+            <div className="px-3 text-[11px] font-bold text-slate-500 dark:text-slate-400 hidden lg:block">
+              {hubTab === 'posts' && `📰 ${data?.totalElements || 0} bài đăng công khai`}
+              {hubTab === 'videos' && `🎬 ${videoData?.totalElements || 0} video hướng dẫn nấu chay`}
+              {hubTab === 'qa' && `💬 ${qaData?.totalElements || 0} câu hỏi & giải đáp`}
+            </div>
+          </div>
+        )}
 
         {/* TAB 1: BÀI ĐĂNG CỘNG ĐỒNG */}
-        {hubTab === 'posts' && (
+        {(viewMode === 'standalone' || hubTab === 'posts') && (
           <>
             {/* FACEBOOK-STYLE QUICK POST COMPOSER BOX */}
         <section className="rounded-3xl border border-emerald-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs space-y-4">
@@ -858,26 +985,40 @@ export function BlogPage() {
           </>
         )}
 
-        {/* TAB 2: KHO VIDEO NẤU ĂN CỘNG ĐỒNG */}
-        {hubTab === 'videos' && (
+        {/* TAB 2: KHO VIDEO NẤU ĂN CỘNG ĐỒNG (CHẾ ĐỘ HUB ALL-IN-ONE) */}
+        {viewMode === 'hub' && hubTab === 'videos' && (
           <div className="space-y-6">
             <div className="p-4 sm:p-6 rounded-3xl bg-linear-to-r from-rose-900 via-rose-800 to-amber-900 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-[11px] font-extrabold tracking-wider uppercase border border-white/20">
-                  <Play size={13} fill="currentColor" /> Kho Video Bếp Chay
+                  <Play size={13} fill="currentColor" /> Kho Video Bếp Chay (Tab Hub)
                 </span>
                 <h2 className="text-xl sm:text-2xl font-black mt-2">Học nấu món chay trực quan qua video</h2>
                 <p className="text-xs sm:text-sm text-rose-100 mt-1 max-w-xl">
                   Tuyển tập các thước phim nấu nướng, mẹo sơ chế và kỹ thuật bếp chay trực quan từ cộng đồng VEGEAI.
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <Link
-                  to={isAuthenticated ? '/blog/write' : '/login'}
-                  state={{ recipeCategory: 'KITCHEN', mediaTab: 'video' }}
-                  className="px-4 py-2.5 rounded-2xl bg-white text-rose-900 font-extrabold text-xs transition hover:bg-rose-50 shadow-xs flex items-center gap-1.5"
+                  to={isAuthenticated ? (user?.role === 'admin' ? '/admin/videos/new' : '/videos/new') : '/login'}
+                  state={{ from: '/videos/new' }}
+                  className="px-4 py-2.5 rounded-2xl bg-white text-rose-900 font-extrabold text-xs transition hover:bg-rose-50 shadow-xs flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Plus size={16} /> Đăng video mới
+                  <Plus size={16} /> Thêm video mới
+                </Link>
+                {isAuthenticated && (
+                  <Link
+                    to="/videos/mine"
+                    className="px-3.5 py-2.5 rounded-2xl bg-white/20 text-white hover:bg-white/30 font-extrabold text-xs transition shadow-xs flex items-center gap-1.5"
+                  >
+                    Video của tôi
+                  </Link>
+                )}
+                <Link
+                  to="/videos"
+                  className="px-3.5 py-2.5 rounded-2xl bg-white/20 text-white hover:bg-white/30 font-extrabold text-xs transition shadow-xs flex items-center gap-1.5"
+                >
+                  Mở Thư viện Video riêng biệt ↗
                 </Link>
               </div>
             </div>
@@ -961,8 +1102,8 @@ export function BlogPage() {
           </div>
         )}
 
-        {/* TAB 3: HỎI ĐÁP CHUYÊN GIA (Q&A) */}
-        {hubTab === 'qa' && (
+        {/* TAB 3: HỎI ĐÁP CHUYÊN GIA (Q&A) (CHẾ ĐỘ HUB ALL-IN-ONE) */}
+        {viewMode === 'hub' && hubTab === 'qa' && (
           <div className="space-y-6">
             {/* Ask Question Box */}
             <form onSubmit={handleAskQuestion} className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-slate-800 shadow-xs space-y-3">
@@ -985,7 +1126,24 @@ export function BlogPage() {
               />
               {qaError && <p role="alert" className="text-xs text-red-600 font-semibold">{qaError}</p>}
               {qaMessage && <p role="status" className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">{qaMessage}</p>}
-              <div className="flex items-center justify-end">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/questions"
+                    className="text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>Mở trang Hỏi đáp riêng biệt</span>
+                    <ArrowUpRight size={13} />
+                  </Link>
+                  {isAuthenticated && (
+                    <Link
+                      to="/questions/mine"
+                      className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:underline"
+                    >
+                      Câu hỏi của tôi
+                    </Link>
+                  )}
+                </div>
                 <button
                   type="submit"
                   disabled={submittingQuestion}

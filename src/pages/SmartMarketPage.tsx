@@ -946,6 +946,24 @@ export function SmartMarketPage() {
     sfx.playSuccess();
     setCheckoutSuccess(true);
 
+    // Lưu vĩnh viễn chuyến mua sắm vào hồ sơ người dùng để không bị mất
+    try {
+      const completedTrip = {
+        id: 'trip-' + Date.now(),
+        completedAt: new Date().toISOString(),
+        itemsCount: multiCart.length,
+        items: [...multiCart],
+        grandTotal,
+        syncedToFridge: autoSyncFridge,
+      };
+      const key = cartOwnerId ? ('vegeai_market_history_' + cartOwnerId) : 'vegeai_market_history';
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      localStorage.setItem(key, JSON.stringify([completedTrip, ...existing].slice(0, 50)));
+      localStorage.setItem('vegeai_market_history', JSON.stringify([completedTrip, ...existing].slice(0, 50)));
+    } catch (e) {
+      console.warn('[SMART-MARKET] Failed to save trip history:', e);
+    }
+
     if (autoSyncFridge && multiCart.length > 0) {
       let count = 0;
       for (const item of multiCart) {

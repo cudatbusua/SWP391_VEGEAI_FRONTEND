@@ -24,8 +24,7 @@ import {
   Lightbulb,
   Bookmark,
   TrendingUp,
-  Send,
-} from 'lucide-react';
+  Send,  X,} from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { blogService } from '../services/blogService';
 import { communityService } from '../services/communityService';
@@ -109,7 +108,58 @@ function parseMarketItemsFromStrings(rawIngredients: string[], recipeTitle: stri
   });
 }
 
+
+function ModerationInfoBadge({ label }: { label?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-flex items-center">
+      <button
+        type="button"
+        onClick={() => setOpen(prev => !prev)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition cursor-pointer shadow-2xs"
+        title="Quy trình kiểm duyệt 2 lớp: AI lọc trước, Admin duyệt sau"
+        aria-label="Thông tin quy trình kiểm duyệt bài đăng"
+      >
+        <span className="w-4 h-4 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-serif font-black italic">
+          i
+        </span>
+        {label && <span className="text-[11px] font-semibold">{label}</span>}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 shadow-2xl z-50 text-left text-xs space-y-2 pointer-events-auto">
+          <div className="flex items-center justify-between border-b border-emerald-100 dark:border-slate-800 pb-2">
+            <span className="font-extrabold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-emerald-600" />
+              Quy trình kiểm duyệt 2 lớp
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold">
+              AI-First
+            </span>
+          </div>
+          <div className="space-y-1.5 text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+            <div className="flex items-start gap-1.5">
+              <span className="text-emerald-600 font-bold shrink-0">1.</span>
+              <span><strong>AI sơ duyệt tự động:</strong> NLP quét từ khóa độc hại/quảng cáo rác, Vision phát hiện ảnh thịt hoặc nội dung vi phạm.</span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-emerald-600 font-bold shrink-0">2.</span>
+              <span><strong>Admin xác thực &amp; cấp Tích Xanh:</strong> Ban quản trị thẩm định dinh dưỡng trước khi xuất bản công khai.</span>
+            </div>
+          </div>
+          <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold italic border-t border-slate-100 dark:border-slate-800 pt-1.5">
+            ✓ Bài đăng công khai đã được xác thực an toàn, không có spam hay nội dung phản cảm.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BlogPage() {
+  const [activeModalPost, setActiveAiModalPost] = useState<BlogPost | null>(null);
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -303,7 +353,7 @@ export function BlogPage() {
 
   return (
     <MainLayout>
-      <div className="blog-shell max-w-[1120px] mx-auto px-4 py-6 sm:py-8 space-y-6">
+      <div className="blog-shell max-w-[1320px] mx-auto px-4 py-6 sm:py-8 space-y-6">
         {/* INTERACTIVE ARCHITECTURE COMPARISON SWITCHER */}
         <div className="rounded-3xl border-2 border-emerald-500/40 bg-emerald-50/80 dark:bg-emerald-950/40 dark:border-emerald-500/30 p-4 shadow-xs">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -372,6 +422,7 @@ export function BlogPage() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <ModerationInfoBadge label="Kiểm duyệt 2 lớp" />
             {user?.role === 'admin' && (
               <Link className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20" to="/admin/blog">
                 <ClipboardCheck size={16} /> Duyệt bài đăng
@@ -388,37 +439,6 @@ export function BlogPage() {
           </div>
           </div>
         </header>
-
-        {/* 2-STEP MODERATION PIPELINE BANNER */}
-        <div className="rounded-3xl border border-emerald-300/80 dark:border-emerald-800/80 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/60 dark:from-emerald-950/40 dark:via-slate-900 dark:to-teal-950/40 p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <CheckCircle2 size={20} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
-                  Quy Trình Kiểm Duyệt Bài Đăng 2 Lớp (AI-First &amp; Admin Verified)
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-200/70 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 font-extrabold">
-                  Tiêu chuẩn VEGEAI
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed max-w-2xl">
-                Mọi bài đăng cộng đồng đều trải qua <strong>Bước 1: AI kiểm duyệt sơ bộ</strong> (NLP quét từ khóa độc hại, Computer Vision phát hiện ảnh thịt/vi phạm), sau đó <strong>Bước 2: Admin thẩm định &amp; cấp Dấu Tích Xanh</strong> trước khi xuất bản.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 text-xs font-bold text-emerald-800 dark:text-emerald-300">
-            <span className="px-3 py-1.5 rounded-xl bg-white/80 dark:bg-slate-800 border border-emerald-200 dark:border-slate-700 shadow-2xs">
-              🤖 1. AI Sơ Khảo
-            </span>
-            <span>➔</span>
-            <span className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white shadow-2xs">
-              🛡️ 2. Admin Cấp Tích Xanh
-            </span>
-          </div>
-        </div>
 
         {/* PHƯƠNG ÁN 1: NAVIGATION BRIDGES TO DEDICATED MODULES */}
         {viewMode === 'standalone' && (
@@ -698,324 +718,314 @@ export function BlogPage() {
           </div>
         )}
 
-        {/* FACEBOOK-STYLE SOCIAL FEED CARDS WITH INTEGRATED CONTEXT-AWARE AI */}
+        
+        {/* 4x4 RESPONSIVE GRID LAYOUT FOR COMMUNITY BLOG POSTS */}
         {!error && data && data.items.length > 0 && (
-          <div className={'space-y-6 ' + (busy ? 'opacity-60' : '')}>
-            {[...data.items]
-              .sort((a, b) => {
-                if (sortBy === 'rating') {
-                  return (b.ratingAverage || 5) - (a.ratingAverage || 5);
-                }
-                if (sortBy === 'trending') {
-                  return ((b.ratingCount || 0) * 10 + (b.readingMinutes || 0)) - ((a.ratingCount || 0) * 10 + (a.readingMinutes || 0));
-                }
-                return 0;
-              })
-              .map((post, index) => {
-                const hasVideo = !!post.videoUrl;
-                const aiMode = resolvePostAiMode(post);
-                const tpl = BLOG_POST_TEMPLATES[post.category] || BLOG_POST_TEMPLATES.KITCHEN;
-                const recipeResult = feedRecipeResults[post.postId];
-                const knowledgeResult = feedKnowledgeResults[post.postId];
-                const isAnalyzingThis = analyzingPostId === post.postId;
+          <>
+            <div className={'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 ' + (busy ? 'opacity-60' : '')}>
+              {[...data.items]
+                .sort((a, b) => {
+                  if (sortBy === 'rating') {
+                    return (b.ratingAverage || 5) - (a.ratingAverage || 5);
+                  }
+                  if (sortBy === 'trending') {
+                    return ((b.ratingCount || 0) * 10 + (b.readingMinutes || 0)) - ((a.ratingCount || 0) * 10 + (a.readingMinutes || 0));
+                  }
+                  return 0;
+                })
+                .map((post) => {
+                  const hasVideo = !!post.videoUrl;
+                  const aiMode = resolvePostAiMode(post);
+                  const tpl = BLOG_POST_TEMPLATES[post.category] || BLOG_POST_TEMPLATES.KITCHEN;
+                  const isAnalyzingThis = analyzingPostId === post.postId;
+                  const hasAnalysis = !!(feedRecipeResults[post.postId] || feedKnowledgeResults[post.postId]);
 
-              return (
-                <article
-                  key={post.postId}
-                  className={`blog-magazine-card rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs overflow-hidden transition hover:shadow-md ${index === 0 ? 'blog-magazine-featured' : ''}`}
-                >
-                  {/* Post Author & Classification Header (Facebook Card Header) */}
-                  <div className="p-4 sm:px-6 sm:pt-5 flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black text-sm flex items-center justify-center shrink-0">
-                        {(post.authorName || 'V').charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-extrabold text-slate-900 dark:text-white">
-                            {post.authorName}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                            <CheckCircle2 size={11} className="text-emerald-600 dark:text-emerald-400" /> Admin Verified
-                          </span>
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800">
-                            {blogCategories[post.category] || tpl.badgeLabel}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
-                            🤖 AI Safe Check
-                          </span>
-                          {hasVideo && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-600 text-white">
-                              <Play size={10} fill="white" /> Có Video
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                          <span>{blogDate(post.publishedAt)}</span>
-                          <span>·</span>
-                          <span className="flex items-center gap-1"><Clock size={11} /> {post.readingMinutes} phút đọc</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900">
-                        <Star size={13} fill="#f59e0b" className="text-amber-500" />
-                        <span>{(post.ratingAverage || 5.0).toFixed(1)}</span>
-                        <span className="text-[11px] text-slate-400 font-normal">({post.ratingCount || 0})</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={e => toggleBookmark(post.postId, e)}
-                        className={`p-1.5 rounded-full border transition cursor-pointer ${
-                          savedPostIds.includes(post.postId)
-                            ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-emerald-600'
-                        }`}
-                        title={savedPostIds.includes(post.postId) ? 'Bỏ lưu bài viết' : 'Lưu bài viết này'}
-                      >
-                        <Bookmark size={14} fill={savedPostIds.includes(post.postId) ? 'currentColor' : 'none'} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Post Title & Description */}
-                  <div className="px-4 sm:px-6 py-3 space-y-1.5">
-                    <Link to={'/blog/' + post.postId} className="block group">
-                      <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition">
-                        {post.title}
-                      </h2>
-                    </Link>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                      {post.excerpt}
-                    </p>
-                  </div>
-
-                  {/* Post Image / Video Media */}
-                  <Link to={'/blog/' + post.postId} className="block px-4 sm:px-6">
-                    <div className="rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 max-h-[380px]">
-                      <BlogCover post={{ ...post, postId: post.postId }} />
-                    </div>
-                  </Link>
-
-                  {/* Context-Aware Integrated AI Action Bar */}
-                  <div className="p-4 sm:px-6 mt-2 bg-slate-50/70 dark:bg-slate-800/40 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleAnalyzePostOnFeed(post)}
-                        disabled={isAnalyzingThis}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-2xs cursor-pointer disabled:opacity-60"
-                      >
-                        {aiMode === 'RECIPE_STEPS' ? <ChefHat size={14} /> : <Brain size={14} />}
-                        <span>
-                          {isAnalyzingThis
-                            ? 'AI đang phân tích bài đăng...'
-                            : aiMode === 'RECIPE_STEPS'
-                              ? '✨ AI Phân tích Công thức & Bước nấu'
-                              : '🧠 AI Phân tích Kiến thức & Tư vấn'}
-                        </span>
-                      </button>
-
-                      <Link
-                        to="/ai-chef"
-                        state={{
-                          source: 'blog-feed',
-                          title: `Tư vấn: ${post.title}`,
-                          initialPrompt:
-                            aiMode === 'RECIPE_STEPS'
-                              ? `Tôi vừa xem bài đăng công thức "${post.title}" (${post.excerpt || ''}). Bếp trưởng hãy hướng dẫn chi tiết các bước nấu món này và gợi ý biến tấu phù hợp với thể trạng của tôi nhé!`
-                              : `Tôi vừa đọc bài đăng "${post.title}" (${post.excerpt || ''}). Hãy phân tích sâu hơn về chủ đề này và tư vấn cách áp dụng phù hợp với chế độ ăn chay của tôi nhé!`
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-emerald-50 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition"
-                      >
-                        <MessageSquare size={14} />
-                        <span>Chuyển sang Chatbot AI tư vấn tiếp</span>
-                      </Link>
-                    </div>
-
-                    <Link
-                      to={'/blog/' + post.postId}
-                      className="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-700 dark:text-emerald-400 hover:underline"
+                  return (
+                    <article
+                      key={post.postId}
+                      className="rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group"
                     >
-                      <span>Xem chi tiết &amp; Bình luận</span>
-                      <ArrowUpRight size={15} />
-                    </Link>
-                  </div>
+                      <div>
+                        {/* Post Cover & Floating Badges */}
+                        <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
+                          <Link to={'/blog/' + post.postId} className="block w-full h-full">
+                            <BlogCover post={{ ...post, postId: post.postId }} />
+                          </Link>
 
-                  {feedErrors[post.postId] && (
-                    <p role="alert" className="mx-4 sm:mx-6 mb-3 text-xs font-semibold text-red-600">{feedErrors[post.postId]}</p>
-                  )}
-                  {/* INLINE AI ANALYSIS OUTPUT FOR RECIPE POSTS (Shows Ingredients + Cooking Steps + Switch to Chatbot) */}
-                  {recipeResult && (
-                    <div className="mx-4 sm:mx-6 mb-5 p-5 rounded-2xl border-2 border-emerald-500/30 bg-emerald-50/40 dark:bg-slate-800/80 space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-emerald-200/60 dark:border-slate-700">
-                        <div>
-                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                            <Sparkles size={13} /> AI Recipe Copilot — Đã bóc tách công thức &amp; các bước nấu
-                          </span>
-                          <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mt-0.5">
-                            {recipeResult.title}
-                          </h3>
+                          {/* Category Tag on Top-Left */}
+                          <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 pointer-events-none">
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-emerald-900/85 backdrop-blur-md text-white border border-white/20 shadow-xs">
+                              {blogCategories[post.category] || tpl.badgeLabel}
+                            </span>
+                            {hasVideo && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600/90 backdrop-blur-md text-white flex items-center gap-1 shadow-xs">
+                                <Play size={10} fill="white" /> Video
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Bookmark Button on Top-Right */}
+                          <button
+                            type="button"
+                            onClick={e => toggleBookmark(post.postId, e)}
+                            className={`absolute top-2.5 right-2.5 p-1.5 rounded-full backdrop-blur-md border transition cursor-pointer shadow-xs ${
+                              savedPostIds.includes(post.postId)
+                                ? 'bg-emerald-600/90 border-emerald-400 text-white'
+                                : 'bg-white/80 hover:bg-white border-white/40 text-slate-700 dark:bg-slate-900/80 dark:text-slate-300'
+                            }`}
+                            title={savedPostIds.includes(post.postId) ? 'Bỏ lưu bài viết' : 'Lưu bài viết này'}
+                          >
+                            <Bookmark size={13} fill={savedPostIds.includes(post.postId) ? 'currentColor' : 'none'} />
+                          </button>
                         </div>
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                          <span>⏱ {recipeResult.cookTimeMinutes} phút</span>
-                          <span>·</span>
-                          <span>🔥 ~{recipeResult.estimatedCalories} kcal</span>
+
+                        {/* Author & Rating Row */}
+                        <div className="p-4 pb-2">
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black text-[11px] flex items-center justify-center shrink-0">
+                                {(post.authorName || 'V').charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-bold text-slate-800 dark:text-slate-200 truncate text-xs" title={post.authorName}>
+                                {post.authorName}
+                              </span>
+                              {/* Admin Verified Icon */}
+                              <span title="Đã qua kiểm duyệt 2 lớp (Admin Verified)" className="text-emerald-600 dark:text-emerald-400 shrink-0 inline-flex items-center">
+                                <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 shrink-0">
+                              <Star size={11} fill="#f59e0b" className="text-amber-500" />
+                              <span>{(post.ratingAverage || 5.0).toFixed(1)}</span>
+                            </div>
+                          </div>
+
+                          {/* Post Title & Excerpt */}
+                          <div className="mt-2.5 space-y-1">
+                            <Link to={'/blog/' + post.postId} className="block group/title">
+                              <h2 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-2 group-hover/title:text-emerald-600 dark:group-hover/title:text-emerald-400 transition leading-snug">
+                                {post.title}
+                              </h2>
+                            </Link>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                              {post.excerpt}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-2">
+                            <span>{blogDate(post.publishedAt)}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1"><Clock size={10} /> {post.readingMinutes} phút</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="grid md:grid-cols-12 gap-4">
-                        <div className="md:col-span-5 space-y-1.5">
-                          <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase">
-                            🥗 Nguyên liệu cần chuẩn bị ({recipeResult.ingredients.length}):
-                          </h4>
-                          <ul className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
-                            {recipeResult.ingredients.map((ing, i) => (
-                              <li key={i} className="flex items-start gap-1.5 p-1.5 rounded-lg bg-white dark:bg-slate-900">
-                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0 mt-0.5" />
-                                <span>{ing}</span>
-                              </li>
-                            ))}
-                          </ul>
+                      {/* Card Action Footer */}
+                      <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-800/80 mt-2">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveAiModalPost(post);
+                              if (!feedRecipeResults[post.postId] && !feedKnowledgeResults[post.postId]) {
+                                void handleAnalyzePostOnFeed(post);
+                              }
+                            }}
+                            disabled={isAnalyzingThis}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 text-emerald-800 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800 text-[11px] font-extrabold transition cursor-pointer shrink-0 disabled:opacity-60"
+                            title="Bấm để AI bóc tách công thức hoặc tóm tắt kiến thức"
+                          >
+                            {aiMode === 'RECIPE_STEPS' ? <ChefHat size={12} /> : <Brain size={12} />}
+                            <span>{isAnalyzingThis ? 'AI phân tích...' : hasAnalysis ? '✨ Xem AI tóm tắt' : '✨ AI Phân tích'}</span>
+                          </button>
+
+                          <Link
+                            to={'/blog/' + post.postId}
+                            className="inline-flex items-center gap-0.5 text-[11px] font-bold text-slate-600 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 transition"
+                          >
+                            <span>Xem bài</span>
+                            <ArrowUpRight size={12} />
+                          </Link>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+            </div>
+
+            {/* AI ANALYSIS MODAL DIALOG (Keeps 4x4 Grid completely intact) */}
+            {activeModalPost && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto"
+                onClick={() => setActiveAiModalPost(null)}
+              >
+                <div
+                  className="relative w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-800 p-6 shadow-2xl space-y-4 my-8"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setActiveAiModalPost(null)}
+                    className="absolute top-4 right-4 p-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition"
+                  >
+                    <X size={18} />
+                  </button>
+
+                  {/* Modal Header */}
+                  <div>
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                      <Sparkles size={14} /> AI Copilot — Phân tích bài đăng thông minh
+                    </span>
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white mt-1 pr-8">
+                      {activeModalPost.title}
+                    </h3>
+                  </div>
+
+                  {analyzingPostId === activeModalPost.postId && (
+                    <div className="py-12 text-center space-y-2">
+                      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400 animate-pulse">
+                        🤖 AI đang đọc hiểu bài đăng và bóc tách dữ liệu...
+                      </p>
+                    </div>
+                  )}
+
+                  {feedErrors[activeModalPost.postId] && (
+                    <p role="alert" className="p-3 rounded-xl bg-red-50 text-red-700 text-xs font-semibold">
+                      {feedErrors[activeModalPost.postId]}
+                    </p>
+                  )}
+
+                  {/* RECIPE ANALYSIS RESULT */}
+                  {feedRecipeResults[activeModalPost.postId] && (() => {
+                    const recipe = feedRecipeResults[activeModalPost.postId];
+                    return (
+                      <div className="space-y-4 text-xs">
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
+                          <span className="font-bold text-emerald-900 dark:text-emerald-200">⏱ Thời gian nấu: {recipe.cookTimeMinutes} phút</span>
+                          <span>•</span>
+                          <span className="font-bold text-emerald-900 dark:text-emerald-200">🔥 Ước tính: ~{recipe.estimatedCalories} kcal</span>
                         </div>
 
-                        <div className="md:col-span-7 space-y-1.5">
-                          <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase">
-                            👨‍🍳 Các bước nấu thực hiện:
+                        <div className="space-y-2">
+                          <h4 className="font-extrabold uppercase text-slate-800 dark:text-slate-200">
+                            🥗 Nguyên liệu cần chuẩn bị ({recipe.ingredients.length}):
                           </h4>
-                          <ol className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
-                            {recipeResult.instructions.map((step, i) => (
-                              <li key={i} className="flex gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-100 dark:border-slate-700">
+                          <div className="grid sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto">
+                            {recipe.ingredients.map((ing, idx) => (
+                              <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                                <span>{ing}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="font-extrabold uppercase text-slate-800 dark:text-slate-200">
+                            👨‍🍳 Hướng dẫn các bước nấu:
+                          </h4>
+                          <div className="space-y-2 max-h-56 overflow-y-auto">
+                            {recipe.instructions.map((step, idx) => (
+                              <div key={idx} className="flex gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                 <span className="w-5 h-5 rounded-full bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-                                  {i + 1}
+                                  {idx + 1}
                                 </span>
                                 <span className="leading-relaxed">{step}</span>
-                              </li>
+                              </div>
                             ))}
-                          </ol>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="pt-3 border-t border-emerald-200/60 dark:border-slate-700 flex flex-wrap items-center justify-end gap-2">
-                        <Link
-                          to="/smart-market"
-                          state={{
-                            planTitle: recipeResult.title,
-                            recipeSummary: {
-                              title: recipeResult.title,
-                              cookingTimeMinutes: recipeResult.cookTimeMinutes,
-                              caloriesEstimate: recipeResult.estimatedCalories,
+                        <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2">
+                          <Link
+                            to="/smart-market"
+                            state={{
+                              planTitle: recipe.title,
+                              recipeSummary: {
+                                title: recipe.title,
+                                cookingTimeMinutes: recipe.cookTimeMinutes,
+                                caloriesEstimate: recipe.estimatedCalories,
+                                source: 'blog-recipe',
+                              },
+                              importedItems: parseMarketItemsFromStrings(recipe.ingredients, recipe.title),
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-extrabold transition shadow-2xs"
+                          >
+                            <MapPin size={14} />
+                            <span>Tìm điểm bán nguyên liệu (GPS)</span>
+                          </Link>
+                          <Link
+                            to="/ai-chef"
+                            state={{
                               source: 'blog-recipe',
-                            },
-                            importedItems: parseMarketItemsFromStrings(recipeResult.ingredients, recipeResult.title),
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold transition shadow-2xs"
-                        >
-                          <MapPin size={14} />
-                          <span>Tìm điểm bán nguyên liệu gần tôi (GPS)</span>
-                        </Link>
-                        <Link
-                          to="/ai-chef"
-                          state={{
-                            source: 'blog-recipe',
-                            title: recipeResult.title,
-                            recipeContext: {
-                              title: recipeResult.title,
-                              cookingTimeMinutes: recipeResult.cookTimeMinutes,
-                              caloriesEstimate: recipeResult.estimatedCalories,
-                              ingredients: recipeResult.ingredients,
-                              instructions: recipeResult.instructions,
-                            },
-                            initialPrompt: `Tôi vừa dùng AI phân tích công thức "${recipeResult.title}" từ bài đăng cộng đồng (Nguyên liệu: ${recipeResult.ingredients.join(', ')}). Bếp trưởng hãy tư vấn thêm mẹo nấu món này ngon nhất hoặc cách điều chỉnh khẩu phần cho tôi nhé!`
-                          }}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-2xs"
-                        >
-                          <ChefHat size={14} />
-                          <span>Chuyển sang Chatbot AI Bếp Trưởng tư vấn tiếp</span>
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* INLINE AI ANALYSIS OUTPUT FOR KNOWLEDGE / GREEN LIVING / REVIEW POSTS */}
-                  {knowledgeResult && (
-                    <div className="mx-4 sm:mx-6 mb-5 p-5 rounded-2xl border-2 border-teal-500/30 bg-teal-50/40 dark:bg-slate-800/80 space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-teal-200/60 dark:border-slate-700">
-                        <div>
-                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-teal-800 dark:text-teal-300 flex items-center gap-1">
-                            <Brain size={13} /> AI Knowledge &amp; Lifestyle Copilot — Phân tích chuyên sâu từ bài đăng
-                          </span>
-                          <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mt-0.5">
-                            {knowledgeResult.headline}
-                          </h3>
+                              title: recipe.title,
+                              initialPrompt: `Tôi vừa dùng AI phân tích công thức "${recipe.title}" từ bài đăng blog. Bếp trưởng hãy tư vấn thêm mẹo nấu món này ngon nhất nhé!`
+                            }}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold transition shadow-2xs"
+                          >
+                            <ChefHat size={14} />
+                            <span>Hỏi tiếp AI Bếp Trưởng</span>
+                          </Link>
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 text-[11px] font-bold">
-                          {knowledgeResult.categoryBadge}
-                        </span>
                       </div>
+                    );
+                  })()}
 
-                      <div className="grid md:grid-cols-2 gap-4 text-xs">
-                        <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-teal-100 dark:border-slate-700 space-y-2">
-                          <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase flex items-center gap-1.5">
+                  {/* KNOWLEDGE ANALYSIS RESULT */}
+                  {feedKnowledgeResults[activeModalPost.postId] && (() => {
+                    const knowledge = feedKnowledgeResults[activeModalPost.postId];
+                    return (
+                      <div className="space-y-4 text-xs">
+                        <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200 font-bold">
+                          {knowledge.headline}
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="font-extrabold uppercase text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                             <Lightbulb size={14} className="text-amber-500" />
                             <span>Điểm cốt lõi từ bài viết:</span>
                           </h4>
-                          <ul className="space-y-1.5 text-slate-700 dark:text-slate-300">
-                            {knowledgeResult.keyTakeaways.map((point, idx) => (
-                              <li key={idx} className="flex items-start gap-1.5">
+                          <div className="space-y-1.5">
+                            {knowledge.keyTakeaways.map((point, idx) => (
+                              <div key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                                 <CheckCircle2 size={13} className="text-teal-600 shrink-0 mt-0.5" />
                                 <span>{point}</span>
-                              </li>
+                              </div>
                             ))}
-                          </ul>
+                          </div>
                         </div>
 
-                        <div className="p-3.5 rounded-xl bg-white dark:bg-slate-900 border border-teal-100 dark:border-slate-700 space-y-2">
-                          <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase flex items-center gap-1.5">
-                            <Sparkles size={14} className="text-emerald-600" />
-                            <span>Góc nhìn Khoa học &amp; Gợi ý áp dụng:</span>
+                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800 space-y-1.5">
+                          <h4 className="font-extrabold uppercase text-slate-800 dark:text-slate-200">
+                            Gợi ý áp dụng sống xanh:
                           </h4>
                           <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                            {knowledgeResult.scientificOrLifestyleInsight}
+                            {knowledge.scientificOrLifestyleInsight}
                           </p>
-                          <ul className="space-y-1 text-emerald-800 dark:text-emerald-300 font-semibold pt-1">
-                            {knowledgeResult.actionableSteps.map((act, idx) => (
-                              <li key={idx}>• {act}</li>
-                            ))}
-                          </ul>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                          <Link
+                            to="/ai-chef"
+                            state={{
+                              source: 'blog-knowledge',
+                              title: `Tư vấn: ${activeModalPost.title}`,
+                              initialPrompt: knowledge.suggestedFollowUpPrompt,
+                            }}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold transition shadow-2xs"
+                          >
+                            <ChefHat size={14} />
+                            <span>Chuyển sang Chatbot AI Bếp Trưởng tư vấn tiếp</span>
+                          </Link>
                         </div>
                       </div>
-
-                      <div className="pt-3 border-t border-teal-200/60 dark:border-slate-700 flex flex-wrap items-center justify-end gap-2">
-                        {post.category === 'EXPLORATION' && (
-                          <Link
-                            to="/smart-market"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold transition"
-                          >
-                            <MapPin size={14} />
-                            <span>Tìm quán chay &amp; cửa hàng gần tôi (GPS)</span>
-                          </Link>
-                        )}
-                        <Link
-                          to="/ai-chef"
-                          state={{
-                            source: 'blog-knowledge',
-                            title: `Tư vấn: ${post.title}`,
-                            initialPrompt: knowledgeResult.suggestedFollowUpPrompt,
-                          }}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-2xs"
-                        >
-                          <ChefHat size={14} />
-                          <span>Chuyển sang Chatbot AI để tư vấn &amp; hỗ trợ tiếp</span>
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
             <BlogPagination data={data} busy={busy} change={setPage} />

@@ -36,6 +36,55 @@ const covers = [
   { src: '/images/fresh-vegetables.png', label: 'Rau xanh' },
 ];
 
+
+function ModerationInfoBadge() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative inline-flex items-center">
+      <button
+        type="button"
+        onClick={() => setOpen(prev => !prev)}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition cursor-pointer shadow-2xs shrink-0"
+        title="Quy trình kiểm duyệt bài đăng 2 lớp"
+        aria-label="Thông tin quy trình kiểm duyệt bài đăng"
+      >
+        <span className="w-4 h-4 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-serif font-black italic">
+          i
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 bottom-full mb-2 w-72 sm:w-80 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 shadow-2xl z-50 text-left text-xs space-y-2 pointer-events-auto">
+          <div className="flex items-center justify-between border-b border-emerald-100 dark:border-slate-800 pb-2">
+            <span className="font-extrabold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+              <CheckCircle2 size={14} className="text-emerald-600" />
+              Quy trình kiểm duyệt 2 lớp
+            </span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold">
+              AI-First
+            </span>
+          </div>
+          <div className="space-y-1.5 text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+            <div className="flex items-start gap-1.5">
+              <span className="text-emerald-600 font-bold shrink-0">1.</span>
+              <span><strong>AI sơ duyệt tự động:</strong> NLP quét từ khóa độc hại/spam, Vision kiểm tra ảnh &amp; video thuần chay.</span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-emerald-600 font-bold shrink-0">2.</span>
+              <span><strong>Admin xác thực &amp; cấp Tích Xanh:</strong> Ban quản trị thẩm định dinh dưỡng trước khi xuất bản công khai.</span>
+            </div>
+          </div>
+          <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold italic border-t border-slate-100 dark:border-slate-800 pt-1.5">
+            ✓ Giúp bài đăng luôn đạt chuẩn an toàn, khoa học và văn minh.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BlogEditorPage() {
   const { id } = useParams();
   const location = useLocation();
@@ -774,10 +823,13 @@ export function BlogEditorPage() {
                     {busy ? 'Đang xử lý...' : post?.status === 'PUBLISHED' ? 'Lưu thay đổi' : 'Lưu bản nháp'}
                   </button>
                   {post?.status !== 'PUBLISHED' && (
-                    <button name="intent" value="submit" type="submit" className="blog-button" disabled={busy}>
-                      <Send size={16} />
-                      {isAdmin ? 'Xuất bản ngay' : 'Đăng bài (Gửi duyệt)'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button name="intent" value="submit" type="submit" className="blog-button flex-1" disabled={busy}>
+                        <Send size={16} />
+                        {isAdmin ? 'Xuất bản ngay' : 'Đăng bài (Gửi duyệt)'}
+                      </button>
+                      <ModerationInfoBadge />
+                    </div>
                   )}
                 </div>
 

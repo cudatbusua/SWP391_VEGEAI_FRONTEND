@@ -1009,16 +1009,16 @@ export function SmartMarketPage() {
             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
               <Link to="/dashboard" className="hover:underline">Trang chủ</Link>
               <span>/</span>
-              <span>Đi chợ & Mua sắm thông minh</span>
+              <span>Định vị Quán chay &amp; Điểm bán (GPS)</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-              <span>Khám phá nguyên liệu chay</span>
+              <span>Định Vị Quán Chay &amp; Điểm Bán GPS</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 font-bold">
-                Không thanh toán trực tuyến
+                Bản Đồ GPS Radar
               </span>
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-              Tham khảo nguyên liệu và cửa hàng chay, rồi lưu món cần mua vào danh sách cá nhân. VEGEAI không nhận đặt hàng, giao hàng hoặc thanh toán.
+              Khám phá quán ăn chay, nhà hàng dưỡng sinh và các cửa hàng cung cấp nguyên liệu thuần chay (đậu hũ non, tempeh, men B12, đồ khô hữu cơ) gần bạn nhất trên bản đồ thông minh.
             </p>
           </div>
 
@@ -1033,7 +1033,7 @@ export function SmartMarketPage() {
               }`}
             >
               <Store className="w-4 h-4 text-emerald-600" />
-              <span>Quán Chay & Siêu Thị Gần Bạn</span>
+              <span>Bản Đồ Quán Chay &amp; Điểm Bán GPS</span>
             </button>
 
             {isAuthenticated && <button
@@ -1107,13 +1107,213 @@ export function SmartMarketPage() {
               <span>{locationMessage}</span>
             </div>
           )}
+
+          {!isAddressConfirmed && (
+            <form onSubmit={handleManualAddressSubmit} className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Hoặc nhập địa chỉ/quận để định vị (ví dụ: Quận 1, TP.HCM)..."
+                value={manualAddressInput}
+                onChange={e => setManualAddressInput(e.target.value)}
+                className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-white"
+              />
+              <button
+                type="submit"
+                disabled={!manualAddressInput.trim()}
+                className="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:opacity-90 disabled:opacity-40 transition cursor-pointer shrink-0"
+              >
+                Xác nhận
+              </button>
+            </form>
+          )}
         </div>
 
-        {/* VIEW 1: MAP & SHOPEE-FOOD/MART STORE ORDERING */}
+        {/* VIEW 1: MAP & GPS VEGAN SPOTS DISCOVERY */}
         {mainView === 'map' && (
           <div className="space-y-6">
 
-            {/* BÁCH HÓA XANH PROMOTIONAL BANNER: RAU LÁ QUỐC DÂN 5.000Đ */}
+            {/* SECTION 1: MAP ON TOP (BẢN ĐỒ THÔNG MINH NẰM Ở TRÊN CÙNG) */}
+            <div id="map-section" className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/80 dark:border-slate-800">
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <MapPin className="w-6 h-6 text-emerald-600" />
+                    Bản Đồ Định Vị Quán Chay &amp; Điểm Bán Thực Phẩm (GPS)
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                    {isAddressConfirmed
+                      ? 'Chọn trực tiếp một địa điểm trên bản đồ tương tác để xem chi tiết kệ hàng và định vị đường đi.'
+                      : 'Vui lòng bấm Định vị GPS để quét các quán ăn chay và cửa hàng nguyên liệu thực tế gần bạn nhất.'}
+                  </p>
+                </div>
+                {selectedStore && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs font-bold border border-emerald-300 dark:border-emerald-800">
+                    <Sparkles className="w-3.5 h-3.5" /> Đang chọn: {selectedStore.name} ({selectedStore.distanceKm} km)
+                  </span>
+                )}
+              </div>
+
+              {/* Full-Width Interactive Map */}
+              <div className="w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 overflow-hidden shadow-sm h-[480px] flex flex-col relative">
+                <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/90 z-10">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Bản Đồ Radar GPS — Quán Ăn Chay &amp; Điểm Bán Nguyên Liệu (Source of Truth)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/20">
+                      {loadingStores ? 'Đang quét GPS...' : `${filteredStores.length} Địa điểm sẵn sàng`}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex-1 w-full relative">
+                  <SmartMarketMap
+                    stores={filteredStores}
+                    selectedStore={selectedStore}
+                    userLocation={userLoc}
+                    onSelect={(s) => {
+                      sfx.playTap();
+                      setSelectedStore(s);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 2: BỘ LỌC TÌM KIẾM & BÁN KÍNH GPS (NGAY DƯỚI BẢN ĐỒ) */}
+            <div id="store-list" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-3.5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                {/* Search Box */}
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm quán chay, tiệm nguyên liệu, Bách Hóa Xanh, đậu hũ non, tempeh..."
+                    value={storeSearch}
+                    onChange={e => setStoreSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Radius Filter */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Bán kính GPS:</span>
+                  {[
+                    { label: 'Tất cả', radius: 'ALL' },
+                    { label: '< 3km', radius: '3KM' },
+                    { label: '< 5km', radius: '5KM' }
+                  ].map(r => (
+                    <button
+                      key={r.radius}
+                      type="button"
+                      onClick={() => { sfx.playTap(); setStoreDistanceRadius(r.radius as any); }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        storeDistanceRadius === r.radius
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Category Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                {[
+                  { id: 'ALL', label: 'Tất cả địa điểm' },
+                  { id: 'VEGAN_STORE', label: '🌱 Quán Ăn Chay & Nhà Hàng' },
+                  { id: 'SUPERMARKET', label: '🛒 Cửa Hàng Bán Nguyên Liệu & Siêu Thị' },
+                  { id: 'CONVENIENCE', label: '🏪 Tiệm Bách Hóa Tiện Lợi' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => { sfx.playTap(); setStoreCategoryFilter(tab.id); }}
+                    className={`py-1.5 px-3.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      storeCategoryFilter === tab.id
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+                <span className="text-xs text-slate-400 ml-auto font-medium">
+                  {filteredStores.length} địa điểm phù hợp
+                </span>
+              </div>
+            </div>
+
+            {/* SECTION 3: DANH SÁCH ĐỊA ĐIỂM DẠNG LƯỚI 3 CỘT (STORES & RESTAURANTS GRID) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredStores.map(store => {
+                const isSelected = selectedStore?.id === store.id;
+                const isPromoted = store.category === 'VEGAN_STORE' || store.rating >= 4.8;
+                return (
+                  <div
+                    key={store.id}
+                    onClick={() => { sfx.playTap(); setSelectedStore(store); }}
+                    className={`p-4 rounded-2xl border transition cursor-pointer text-left relative overflow-hidden flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-900 shadow-md'
+                        : 'bg-white dark:bg-[#182230] border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-600 hover:bg-slate-50/80 dark:hover:bg-[#1e2a3b] shadow-xs'
+                    }`}
+                  >
+                    {isPromoted && (
+                      <div className="absolute top-0 right-0 bg-gradient-to-l from-emerald-600 to-teal-600 text-white text-[9.5px] font-extrabold px-2.5 py-0.5 rounded-bl-lg shadow-2xs flex items-center gap-1">
+                        <Flame className="w-2.5 h-2.5" /> Quán Yêu Thích
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-start justify-between gap-2 pr-12">
+                        <div>
+                          <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 mb-1.5">
+                            {store.categoryLabel}
+                          </span>
+                          <h4 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-1">
+                            {store.name}
+                          </h4>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 flex items-start gap-1.5 leading-relaxed">
+                        <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400 mt-0.5" />
+                        <span className="line-clamp-2">{store.address}</span>
+                      </p>
+
+                      {store.notes && (
+                        <p className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium mt-1.5 line-clamp-1">
+                          🌿 {store.notes}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400">
+                        <Navigation className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Cách {store.distanceKm} km · 🛵 {store.duration}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" /> {store.hours}
+                        </span>
+                        <div className="flex items-center gap-1 text-amber-500 font-bold">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span>{store.rating} ({store.reviewsCount})</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* SECTION 4: BÁCH HÓA XANH PROMOTIONAL BANNER & COMBOS */}
             <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white p-5 sm:p-6 shadow-md border border-emerald-600/40 space-y-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
                 <div className="space-y-1">
@@ -1248,187 +1448,6 @@ export function SmartMarketPage() {
                   </div>
                 ))}
               </div>
-            </div>
-            {/* SECTION 2: BẢN ĐỒ & QUÁN CHAY GẦN BẠN */}
-            <div id="map-section" className="pt-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/80 dark:border-slate-800 mb-5">
-                <div>
-                  <h2 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                    <MapPin className="w-5 h-5 text-emerald-600" />
-                    Bản Đồ Quán Chay &amp; Điểm Bán Thực Phẩm Lân Cận
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {isAddressConfirmed
-                      ? 'Chọn địa điểm trên bản đồ tương tác để xem chi tiết kệ hàng và đặt giao hỏa tốc.'
-                      : 'Vui lòng cập nhật địa chỉ để quét các quán chay & siêu thị thực tế gần bạn nhất.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {true ? (
-              <>
-<div className="grid lg:grid-cols-12 gap-6 items-start">
-
-              {/* Left Column: Stores List (ShopeeFood Style Cards) */}
-              <div className="lg:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs h-[680px] flex flex-col">
-                <div className="mb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Store className="w-4 h-4 text-emerald-600" />
-                      Quán Chay & Siêu Thị Gần Bạn
-                    </h3>
-                    <span className="text-[11px] font-bold text-slate-400">
-                      {loadingStores ? 'Đang cập nhật...' : `${filteredStores.length} địa điểm thực tế`}
-                    </span>
-                  </div>
-
-                  {/* Search box */}
-                  <div className="relative mb-3">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Tìm quán chay, Bách Hóa Xanh, WinMart, An Duyên Chay..."
-                      value={storeSearch}
-                      onChange={e => setStoreSearch(e.target.value)}
-                      className="w-full pl-9 pr-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-white"
-                    />
-                  </div>
-
-                  {/* Category Filter Tabs */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold mb-2.5">
-                    {[
-                      { id: 'ALL', label: 'Tất cả' },
-                      { id: 'VEGAN_STORE', label: '🌱 Quán Chay' },
-                      { id: 'SUPERMARKET', label: '🛒 Siêu Thị' },
-                      { id: 'CONVENIENCE', label: '🏪 Tiện Lợi' }
-                    ].map(tab => (
-                      <button
-                        key={tab.id}
-                        onClick={() => { sfx.playTap(); setStoreCategoryFilter(tab.id); }}
-                        className={`py-1.5 px-1 rounded-lg text-center transition cursor-pointer text-[10px] sm:text-[11px] truncate ${
-                          storeCategoryFilter === tab.id
-                            ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-2xs font-bold'
-                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Distance Radius Filter (GPS) */}
-                  {isAddressConfirmed && (
-                    <div className="flex items-center gap-1.5 text-xs pb-1 mb-1">
-                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 shrink-0">Bán kính:</span>
-                      {[
-                        { label: 'Tất cả', radius: 'ALL' },
-                        { label: 'Gần nhất (< 3km)', radius: '3KM' },
-                        { label: 'Trong 5km', radius: '5KM' }
-                      ].map(r => (
-                        <button
-                          key={r.radius}
-                          type="button"
-                          onClick={() => { sfx.playTap(); setStoreDistanceRadius(r.radius as any); }}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                            storeDistanceRadius === r.radius
-                              ? 'bg-emerald-600 text-white shadow-2xs'
-                              : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
-                          }`}
-                        >
-                          {r.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Stores Scrollable List */}
-                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                  {filteredStores.map(store => {
-                    const isSelected = selectedStore?.id === store.id;
-                    const isPromoted = store.category === 'VEGAN_STORE' || store.rating >= 4.8;
-
-                    return (
-                      <div
-                        key={store.id}
-                        onClick={() => { sfx.playTap(); setSelectedStore(store); }}
-                        className={`p-3.5 rounded-xl border transition cursor-pointer text-left relative overflow-hidden ${
-                          isSelected
-                            ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-900 shadow-xs'
-                            : 'bg-white dark:bg-[#182230] border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-600 hover:bg-slate-50 dark:hover:bg-[#1e2a3b]'
-                        }`}
-                      >
-                        {/* Promoted Ribbon */}
-                        {isPromoted && (
-                          <div className="absolute top-0 right-0 bg-gradient-to-l from-emerald-600 to-teal-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-bl-lg shadow-2xs flex items-center gap-1">
-                            <Flame className="w-2.5 h-2.5" /> Quán Yêu Thích
-                          </div>
-                        )}
-
-                        <div className="flex items-start justify-between gap-2 pr-16">
-                          <div>
-                            <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
-                              {store.name}
-                            </h4>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200/70 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                                {store.categoryLabel}
-                              </span>
-                              <span className="text-[11px] font-bold text-amber-500 flex items-center gap-0.5">
-                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                {store.rating} ({store.reviewsCount})
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                          <span className="truncate">{store.address}</span>
-                        </p>
-
-                        <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-                          <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                            <Navigation className="w-3 h-3 text-emerald-600" />
-                            Cách {store.distanceKm} km · 🛵 {store.duration}
-                          </span>
-                          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> {store.hours}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Right Column: Interactive Map */}
-              <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs h-[680px] flex flex-col">
-                <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      Bản Đồ Vị Trí Cửa Hàng Thực Tế (Source of Truth)
-                    </span>
-                  </div>
-                  {selectedStore && (
-                    <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 truncate max-w-xs">
-                      {selectedStore.name} ({selectedStore.distanceKm} km)
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex-1 w-full relative">
-                  <SmartMarketMap
-                    stores={filteredStores}
-                    selectedStore={selectedStore}
-                    userLocation={userLoc}
-                    onSelect={(s) => setSelectedStore(s)}
-                  />
-                </div>
-              </div>
-
             </div>
 
             {/* SHOPEE FOOD / SHOPEE MART ORDERING SECTION (SELECTED STORE MENU) */}
@@ -1575,60 +1594,6 @@ export function SmartMarketPage() {
                   )}
                 </div>
 
-              </div>
-            )}
-
-              </>
-            ) : (
-              <div id="location-section" className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-8 sm:p-12 text-center max-w-2xl mx-auto shadow-xs space-y-6 animate-in fade-in duration-300">
-                <div className="w-16 h-16 rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center mx-auto shadow-2xs">
-                  <MapPin className="w-8 h-8 text-emerald-600" />
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
-                    Vui lòng cập nhật địa chỉ để tiếp tục
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto leading-relaxed">
-                    VEGEAI sẽ tự động quét các quán chay, siêu thị nông sản và cửa hàng thực phẩm thực tế gần bạn nhất dựa trên vị trí chính xác.
-                  </p>
-                </div>
-
-                <div className="space-y-4 max-w-md mx-auto">
-                  <button
-                    type="button"
-                    onClick={handleRequestLocation}
-                    disabled={locationStatus === 'requesting'}
-                    className="w-full py-3.5 px-5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-sm transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Navigation className="w-4 h-4" />
-                    <span>{locationStatus === 'requesting' ? 'Đang định vị GPS vệ tinh...' : '📍 Định vị GPS vị trí hiện tại của tôi'}</span>
-                  </button>
-
-                  <div className="flex items-center gap-3 text-xs text-slate-400">
-                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                    <span>hoặc nhập địa chỉ của bạn để tìm kiếm</span>
-                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                  </div>
-
-                  {/* Manual street address input */}
-                  <form onSubmit={handleManualAddressSubmit} className="flex items-center gap-2 pt-2">
-                    <input
-                      type="text"
-                      placeholder="Nhập địa chỉ giao hàng của bạn..."
-                      value={manualAddressInput}
-                      onChange={e => setManualAddressInput(e.target.value)}
-                      className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!manualAddressInput.trim()}
-                      className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold hover:opacity-90 disabled:opacity-40 transition cursor-pointer shrink-0"
-                    >
-                      Xác nhận
-                    </button>
-                  </form>
-                </div>
               </div>
             )}
 

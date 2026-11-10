@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, CirclePlay, MapPin, Menu, MessageCircle, Moon, PenLine, ScanLine, Sun, UtensilsCrossed, X } from 'lucide-react';
+import { BookOpen, CirclePlay, Menu, MessageCircle, Moon, PenLine, ScanLine, Sun, UtensilsCrossed, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../store/ThemeContext';
 import '../styles/navigation.css';
@@ -39,25 +39,25 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     pathname.startsWith('/questions');
   const isNutritionActive =
     (pathname === '/settings' && location.search.includes('tab=calendar'));
-  const isAiChefActive = pathname === '/ai-chef' || pathname === '/fridge-scan';
-  const isPantryActive =
-    pathname === '/fridge' ||
-    pathname === '/smart-market' ||
-    pathname === '/restaurants';
+  const isAiChefActive = pathname === '/ai-chef';
+  const isFridgeActive = pathname === '/fridge' || pathname === '/fridge-scan';
+  const isSmartMarketActive = pathname === '/smart-market' || pathname === '/restaurants';
 
   const memberNavItems: { key: string; label: string; path: string; isActive: boolean }[] = [
     { key: 'dashboard', label: 'Tổng quan', path: '/dashboard', isActive: isDashboardActive },
     { key: 'discover', label: 'Khám phá & Cộng đồng', path: '/explore', isActive: isDiscoverActive },
     { key: 'ai-chef', label: 'AI Bếp trưởng', path: '/ai-chef', isActive: isAiChefActive },
-    { key: 'pantry', label: 'Kho Tủ Lạnh & Điểm Bán', path: '/fridge', isActive: isPantryActive },
+    { key: 'fridge', label: 'Tủ Lạnh Thông Minh', path: '/fridge-scan', isActive: isFridgeActive },
+    { key: 'market', label: 'Định Vị Quán Chay & Điểm Bán (GPS)', path: '/smart-market', isActive: isSmartMarketActive },
     { key: 'calendar', label: 'Lịch biểu & Thực đơn', path: '/settings?tab=calendar', isActive: isNutritionActive },
     { key: 'profile', label: 'Hồ sơ & Thể trạng', path: '/settings?tab=profile', isActive: pathname === '/settings' && location.search.includes('tab=profile') },
   ];
 
   const guestNavItems: { label: string; path: string; isActive: boolean }[] = [
     { label: 'Khám phá & Cộng đồng', path: '/explore', isActive: isDiscoverActive && pathname !== '/restaurants' },
+    { label: 'Tủ Lạnh Thông Minh (Vision)', path: '/fridge-scan', isActive: isFridgeActive },
+    { label: 'Định Vị Quán Chay & Điểm Bán (GPS)', path: '/smart-market', isActive: isSmartMarketActive },
     { label: 'AI Bếp trưởng (Dùng thử)', path: '/ai-chef', isActive: pathname === '/ai-chef' },
-    { label: 'Định vị Quán chay & Điểm bán', path: '/smart-market', isActive: pathname === '/smart-market' || pathname === '/restaurants' },
   ];
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
@@ -197,11 +197,11 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         {!isAuthenticated && isDiscoverActive && (
           <div className="vegeai-context-subnav">
             <div className="vegeai-context-row">
-              <span className="vegeai-context-label">Khám phá:</span>
-              <Link to="/explore" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><UtensilsCrossed size={14} /> Công thức</Link>
-              <Link to="/blog" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/blog') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><BookOpen size={14} /> Blog</Link>
-              <Link to="/videos" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/videos') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><CirclePlay size={14} /> Video</Link>
-              <Link to="/smart-market#map-section" className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold text-slate-600 transition hover:text-emerald-700 dark:text-slate-400"><MapPin size={14} /> Bản đồ quán chay</Link>
+              <span className="vegeai-context-label">Khám phá & Cộng đồng:</span>
+              <Link to="/explore" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><UtensilsCrossed size={14} /> Công thức nấu ăn</Link>
+              <Link to="/blog" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/blog') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><BookOpen size={14} /> Blog dinh dưỡng</Link>
+              <Link to="/videos" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/videos') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><CirclePlay size={14} /> Video nấu chay</Link>
+              <Link to="/questions" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/questions') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><MessageCircle size={14} /> Hỏi đáp (Q&A)</Link>
             </div>
           </div>
         )}
@@ -222,7 +222,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                           : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'
                       }`}
                     >
-                      <UtensilsCrossed size={15} /> Công thức
+                      <UtensilsCrossed size={15} /> Công thức nấu ăn
                     </Link>
                     <Link
                       to="/blog"
@@ -232,7 +232,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                           : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'
                       }`}
                     >
-                      <BookOpen size={15} /> Blog
+                      <BookOpen size={15} /> Blog dinh dưỡng
                     </Link>
                     <Link
                       to="/videos"
@@ -242,7 +242,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                           : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'
                       }`}
                     >
-                      <CirclePlay size={15} /> Video
+                      <CirclePlay size={15} /> Video nấu chay
                     </Link>
                     <span className="mx-1 h-5 w-px shrink-0 bg-slate-300 dark:bg-slate-700" />
                     <Link
@@ -253,13 +253,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                           : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'
                       }`}
                     >
-                      <MessageCircle size={15} /> Hỏi đáp
-                    </Link>
-                    <Link
-                      to="/smart-market"
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold text-slate-600 transition hover:text-emerald-700 dark:text-slate-400"
-                    >
-                      <MapPin size={15} /> Bản đồ quán chay
+                      <MessageCircle size={15} /> Hỏi đáp (Q&A)
                     </Link>
                   </div>
                   <Link
@@ -311,25 +305,34 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                     aria-current={pathname === '/ai-chef' ? 'page' : undefined}
                     className="vegeai-ai-subnav-link"
                   >
-                    <MessageCircle size={16} aria-hidden="true" /> Trò chuyện với AI
+                    <MessageCircle size={16} aria-hidden="true" /> Trò chuyện với AI Bếp Trưởng
                   </Link>
                   <Link
                     to="/fridge-scan"
-                    aria-current={pathname === '/fridge-scan' ? 'page' : undefined}
                     className="vegeai-ai-subnav-link"
                   >
-                    <ScanLine size={16} aria-hidden="true" /> Quét ảnh tủ lạnh
+                    <ScanLine size={16} aria-hidden="true" /> Chuyển sang quét tủ lạnh
                   </Link>
                 </nav>
               </div>
             )}
 
-            {isPantryActive && (
+            {isFridgeActive && (
               <div className="vegeai-context-subnav">
                 <div className="vegeai-context-row">
                   <span className="vegeai-context-label">
-                    Kho Tủ Lạnh & Điểm Bán:
+                    Tủ Lạnh Thông Minh:
                   </span>
+                  <Link
+                    to="/fridge-scan"
+                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      pathname === '/fridge-scan'
+                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
+                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                    }`}
+                  >
+                    📸 Quét Ảnh & Đo Độ Tươi (Freshness Vision)
+                  </Link>
                   {isAuthenticated && (
                     <Link
                       to="/fridge"
@@ -339,35 +342,35 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                           : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                       }`}
                     >
-                      🧊 Kho Tủ Lạnh & Hạn sử dụng
+                      🧊 Kho Tủ Lạnh & Hạn Sử Dụng (Zero Waste)
                     </Link>
                   )}
-                  <Link
-                    to="/fridge-scan"
-                    className="px-3 py-1 rounded-lg transition shrink-0 hover:text-emerald-700 dark:hover:text-emerald-400"
-                  >
-                    📸 Quét Ảnh Thêm Vào Tủ Lạnh
-                  </Link>
+                </div>
+              </div>
+            )}
+
+            {isSmartMarketActive && (
+              <div className="vegeai-context-subnav">
+                <div className="vegeai-context-row">
+                  <span className="vegeai-context-label">
+                    Định Vị Quán Chay &amp; Điểm Bán (GPS):
+                  </span>
                   <Link
                     to="/smart-market"
                     className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname === '/smart-market'
+                      pathname === '/smart-market' || pathname === '/restaurants'
                         ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
                         : 'hover:text-emerald-700 dark:hover:text-emerald-400'
                     }`}
                   >
-                    📍 Định vị Quán chay &amp; Điểm bán (GPS)
+                    🗺️ Bản Đồ GPS Toàn Thành Phố (Bản Đồ Nằm Trên)
                   </Link>
-                  <Link
-                    to="/restaurants"
-                    className={`px-3 py-1 rounded-lg transition shrink-0 ${
-                      pathname === '/restaurants'
-                        ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                        : 'hover:text-emerald-700 dark:hover:text-emerald-400'
-                    }`}
+                  <a
+                    href="#store-list"
+                    className="px-3 py-1 rounded-lg transition shrink-0 hover:text-emerald-700 dark:hover:text-emerald-400"
                   >
-                    🥗 Bản đồ Quán chay
-                  </Link>
+                    🌱 Quán Chay &amp; Cửa Hàng Bán Nguyên Liệu
+                  </a>
                 </div>
               </div>
             )}

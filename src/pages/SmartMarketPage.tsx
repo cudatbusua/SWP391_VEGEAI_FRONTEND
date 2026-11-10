@@ -1198,11 +1198,11 @@ export function SmartMarketPage() {
                         <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/80">Combo nguyên liệu</span>
                       </div>
 
-                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
                         {combo.name}
                       </h4>
 
-                      <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 mt-1 leading-relaxed">
+                      <p className="text-[11px] text-slate-600 dark:text-slate-200 line-clamp-2 mt-1 leading-relaxed">
                         {combo.tagline}
                       </p>
 
@@ -1211,11 +1211,11 @@ export function SmartMarketPage() {
                           <span className="font-bold text-emerald-700 dark:text-emerald-400">
                             🌿 {combo.ingredients.length} nguyên liệu tươi
                           </span>
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-300 font-semibold">
                             {combo.prepTime} · {combo.calories}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200/60 dark:border-slate-700/60">
+                        <div className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700">
                           <div className="flex items-center -space-x-1 shrink-0">
                             {combo.ingredients.map(ing => (
                               <span
@@ -1227,7 +1227,7 @@ export function SmartMarketPage() {
                               </span>
                             ))}
                           </div>
-                          <span className="text-[10px] text-slate-700 dark:text-slate-300 font-medium truncate">
+                          <span className="text-[10px] text-slate-700 dark:text-slate-200 font-medium truncate">
                             {combo.ingredients.map(i => i.name).slice(0, 2).join(', ')}...
                           </span>
                         </div>
@@ -1383,17 +1383,17 @@ export function SmartMarketPage() {
                           </div>
                         </div>
 
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 flex items-center gap-1.5">
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 flex items-center gap-1.5">
                           <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                           <span className="truncate">{store.address}</span>
                         </p>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400 mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
                           <span className="font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                             <Navigation className="w-3 h-3 text-emerald-600" />
                             Cách {store.distanceKm} km · 🛵 {store.duration}
                           </span>
-                          <span className="text-slate-400 flex items-center gap-1">
+                          <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
                             <Clock className="w-3 h-3" /> {store.hours}
                           </span>
                         </div>

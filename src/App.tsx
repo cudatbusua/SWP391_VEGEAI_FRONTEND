@@ -97,10 +97,10 @@ export const App: React.FC = () => {
           <Route path="/admin/blog" element={<AdminFeatureBoundary><AdminBlogPage /></AdminFeatureBoundary>} />
           <Route path="/admin/blog/:id" element={<AdminFeatureBoundary><BlogPostStatusPage adminMode /></AdminFeatureBoundary>} />
           <Route path="/restaurants" element={<RestaurantsPage />} />
-          <Route path="/questions" element={<QuestionsPage />} />
+          <Route path="/questions" element={<PersonalFeatureBoundary><QuestionsPage /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine" element={<PersonalFeatureBoundary><QuestionsPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine/:id" element={<PersonalFeatureBoundary><QuestionDetailPage mine /></PersonalFeatureBoundary>} />
-          <Route path="/questions/:id" element={<QuestionDetailPage />} />
+          <Route path="/questions/:id" element={<PersonalFeatureBoundary><QuestionDetailPage /></PersonalFeatureBoundary>} />
           <Route path="/videos" element={<VideosPage />} />
           <Route path="/videos/saved" element={<PersonalFeatureBoundary><VideosPage saved /></PersonalFeatureBoundary>} />
           <Route path="/videos/mine" element={<PersonalFeatureBoundary><MyVideosPage /></PersonalFeatureBoundary>} />

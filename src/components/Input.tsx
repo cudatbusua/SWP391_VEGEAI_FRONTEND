@@ -67,7 +67,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           {(showPasswordToggle || isPassword) && (
             <button
               type="button"
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              aria-label={showPassword ? 'Ẩn nội dung' : 'Hiện nội dung'}
               title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               aria-pressed={showPassword}
               onClick={() => setShowPassword(!showPassword)}

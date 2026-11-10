@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, CirclePlay, MapPin, Menu, MessageCircle, Moon, PenLine, Sun, UtensilsCrossed, X } from 'lucide-react';
+import { BookOpen, CirclePlay, MapPin, Menu, MessageCircle, Moon, PenLine, ScanLine, Sun, UtensilsCrossed, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../store/ThemeContext';
 import '../styles/navigation.css';
@@ -39,10 +39,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     pathname.startsWith('/questions');
   const isNutritionActive =
     (pathname === '/settings' && location.search.includes('tab=calendar'));
-  const isAiChefActive = pathname === '/ai-chef';
+  const isAiChefActive = pathname === '/ai-chef' || pathname === '/fridge-scan';
   const isPantryActive =
     pathname === '/fridge' ||
-    pathname === '/fridge-scan' ||
     pathname === '/smart-market' ||
     pathname === '/restaurants';
 
@@ -167,7 +166,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         {/* Primary Desktop Nav Strip (5 Core Groups) */}
         <nav
           aria-label="Điều hướng chính"
-          className={`site-navigation hidden lg:flex max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 border-t border-[#e6e5de] dark:border-[#212c3b] ${
+          className={`site-navigation vegeai-primary-nav hidden lg:flex max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 border-t border-[#e6e5de] dark:border-[#212c3b] ${
             mobileMenu ? 'is-collapsed' : ''
           }`}
         >
@@ -177,11 +176,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                   key={item.key}
                   to={item.path}
                   aria-current={item.isActive ? 'page' : undefined}
-                  className={`shrink-0 py-3 text-xs sm:text-sm transition-colors hover:text-emerald-700 dark:hover:text-emerald-400 ${
-                    item.isActive
-                      ? 'text-emerald-800 dark:text-emerald-400 font-extrabold border-b-2 border-emerald-700 dark:border-emerald-400'
-                      : 'text-slate-600 dark:text-slate-400 font-semibold'
-                  }`}
+                  className="vegeai-primary-link shrink-0"
                 >
                   {item.label}
                 </Link>
@@ -191,11 +186,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
                   key={item.path}
                   to={item.path}
                   aria-current={item.isActive ? 'page' : undefined}
-                  className={`shrink-0 py-3 text-xs sm:text-sm transition-colors hover:text-emerald-700 dark:hover:text-emerald-400 ${
-                    item.isActive
-                      ? 'text-emerald-800 dark:text-emerald-400 font-extrabold border-b-2 border-emerald-700 dark:border-emerald-400'
-                      : 'text-slate-600 dark:text-slate-400 font-semibold'
-                  }`}
+                  className="vegeai-primary-link shrink-0"
                 >
                   {item.label}
                 </Link>
@@ -204,9 +195,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
         {/* Sub-Navigation Strip (Contextual secondary tabs per functional group) */}
         {!isAuthenticated && isDiscoverActive && (
-          <div className="border-t border-[#e6e5de] bg-[#f5f4ef] px-4 py-1.5 text-xs dark:border-[#212c3b] dark:bg-[#161f2b] sm:px-6 lg:px-8">
-            <div className="mx-auto flex max-w-[1440px] items-center gap-3 overflow-x-auto">
-              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-400">Khám phá:</span>
+          <div className="vegeai-context-subnav">
+            <div className="vegeai-context-row">
+              <span className="vegeai-context-label">Khám phá:</span>
               <Link to="/explore" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><UtensilsCrossed size={14} /> Công thức</Link>
               <Link to="/blog" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/blog') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><BookOpen size={14} /> Blog</Link>
               <Link to="/videos" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/videos') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><CirclePlay size={14} /> Video</Link>
@@ -217,10 +208,12 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         {isAuthenticated && (
           <>
             {isDiscoverActive && (
-              <div className="border-t border-[#e6e5de] bg-[#f5f4ef] px-4 py-1.5 text-xs dark:border-[#212c3b] dark:bg-[#161f2b] sm:px-6 lg:px-8">
-                <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 overflow-x-auto">
-                  <div className="flex items-center gap-1">
-                    <span className="mr-2 shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-400">Khám phá:</span>
+              <div className="vegeai-context-subnav">
+                <div className="vegeai-context-row">
+                  <div className="vegeai-context-links">
+                    <span className="vegeai-context-label">
+                      Khám phá & Cộng đồng:
+                    </span>
                     <Link
                       to="/explore"
                       className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${
@@ -280,9 +273,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             )}
 
             {isNutritionActive && (
-              <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
-                <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
-                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
+              <div className="vegeai-context-subnav">
+                <div className="vegeai-context-row">
+                  <span className="vegeai-context-label">
                     Lịch biểu & Thực đơn:
                   </span>
                   <Link
@@ -311,25 +304,30 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
 
             {isAiChefActive && (
-              <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
-                <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
-                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
-                    AI Bếp trưởng:
-                  </span>
+              <div className="vegeai-ai-subnav">
+                <nav aria-label="Công cụ AI Bếp trưởng" className="vegeai-ai-subnav-inner">
                   <Link
                     to="/ai-chef"
-                    className="px-3 py-1 rounded-lg transition shrink-0 bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold"
+                    aria-current={pathname === '/ai-chef' ? 'page' : undefined}
+                    className="vegeai-ai-subnav-link"
                   >
-                    🤖 Trò chuyện &amp; Tư vấn thực đơn cùng AI Bếp Trưởng
+                    <MessageCircle size={16} aria-hidden="true" /> Trò chuyện với AI
                   </Link>
-                </div>
+                  <Link
+                    to="/fridge-scan"
+                    aria-current={pathname === '/fridge-scan' ? 'page' : undefined}
+                    className="vegeai-ai-subnav-link"
+                  >
+                    <ScanLine size={16} aria-hidden="true" /> Quét ảnh tủ lạnh
+                  </Link>
+                </nav>
               </div>
             )}
 
             {isPantryActive && (
-              <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
-                <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
-                  <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
+              <div className="vegeai-context-subnav">
+                <div className="vegeai-context-row">
+                  <span className="vegeai-context-label">
                     Kho Tủ Lạnh & Điểm Bán:
                   </span>
                   {isAuthenticated && (

@@ -28,6 +28,7 @@ import { recipeService } from '../services/recipeService';
 import { nutritionService } from '../services/nutritionService';
 import { fridgeService } from '../services/fridgeService';
 import { mealPlanService } from '../services/mealPlanService';
+import { DailyIntakeCard } from '../components/DailyIntakeCard';
 import { ApiError, errorMessage } from '../services/apiClient';
 import { RecipeCard } from '../components/RecipeCard';
 import { HealthActivityRings } from '../components/HealthActivityRings';
@@ -36,7 +37,7 @@ import { dietLabels, displayAllergies } from '../utils/nutritionProfile';
 import { sfx } from '../utils/soundEffects';
 import type { RecipeSummary } from '../types/recipe';
 import type { FridgeItem, FridgeSummary, NutritionProfile } from '../types/api';
-import type { MealPlan } from '../types/mealPlan';
+import type { MealCalendarDay } from '../types/mealPlan';
 import type { ChatSession } from './AiChatPage';
 
 function getTimeGreeting() {
@@ -94,7 +95,7 @@ export const DashboardPage: React.FC = () => {
   const [nutrition, setNutrition] = useState<NutritionProfile | null>(null);
   const [fridge, setFridge] = useState<FridgeSummary | null>(null);
   const [expiringItems, setExpiringItems] = useState<FridgeItem[]>([]);
-  const [activePlan, setActivePlan] = useState<MealPlan | null>(null);
+  const [todayCalendarDay, setTodayCalendarDay] = useState<MealCalendarDay | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
   const [attempt, setAttempt] = useState(0);
@@ -213,9 +214,9 @@ export const DashboardPage: React.FC = () => {
         nutritionService.getProfile(controller.signal),
         fridgeService.summary(),
         fridgeService.expiringSoon(4),
-        mealPlanService.list(0, controller.signal),
         recipeService.filter({ page: 0, size: 3, sortBy: 'protein', sortDirection: 'desc' }, controller.signal),
-      ]).then(async ([profileResult, fridgeResult, expiringResult, plansResult, recipeResult]) => {
+        mealPlanService.calendar(new Date().toLocaleDateString('en-CA'), new Date().toLocaleDateString('en-CA'), controller.signal),
+      ]).then(([profileResult, fridgeResult, expiringResult, recipeResult, calendarResult]) => {
         if (controller.signal.aborted) return;
         const nextErrors: string[] = [];
 
@@ -240,19 +241,7 @@ export const DashboardPage: React.FC = () => {
         } else {
           nextErrors.push(errorMessage(recipeResult.reason));
         }
-
-        // If user has saved meal plans, load the latest one
-        if (plansResult.status === 'fulfilled' && plansResult.value.items.length > 0) {
-          try {
-            const latestPlanSummary = plansResult.value.items[0];
-            const fullPlan = await mealPlanService.get(latestPlanSummary.id, controller.signal);
-            if (!controller.signal.aborted) {
-              setActivePlan(fullPlan);
-            }
-          } catch {
-            // ignore plan load error
-          }
-        }
+        if (calendarResult.status === 'fulfilled') setTodayCalendarDay(calendarResult.value[0] ?? null);
 
         setErrors(nextErrors);
         setLoadingData(false);
@@ -307,8 +296,8 @@ export const DashboardPage: React.FC = () => {
 
   // Today's meal from active meal plan
   const todayStr = new Date().toLocaleDateString('en-CA');
-  const todayPlanDay = activePlan?.plan.days.find(d => d.date === todayStr) || activePlan?.plan.days[0];
-  const nextMeal = todayPlanDay?.meals[0];
+  const todayPlanDay = todayCalendarDay;
+  const nextMeal = todayPlanDay?.needsReview ? null : todayPlanDay?.meals[0];
 
   const uncheckedShoppingCount = shoppingItems.filter(i => !i.checked).length;
   const isPantryEmpty = (fridge?.totalActiveItems ?? 0) === 0;
@@ -434,6 +423,8 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {isAuthenticated && <DailyIntakeCard date={todayStr} day={todayCalendarDay} targets={nutrition?.targets} />}
 
         {/* Missing biometrics guide banner for members */}
         {isAuthenticated && (!nutrition || !nutrition.heightCm || !nutrition.weightKg) && (

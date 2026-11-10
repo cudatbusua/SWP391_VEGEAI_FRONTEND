@@ -1,6 +1,6 @@
 import { apiRequest } from './apiClient';
 import type { ApiResponse, PageResponse } from '../types/api';
-import type { GenerateMealPlan, MealCalendarDay, MealPlan, MealPlanSummary, Region, Season, SeasonalRegionalResponse } from '../types/mealPlan';
+import type { DailyIntake, GenerateMealPlan, MealCalendarDay, MealPlan, MealPlanSummary, Region, Season, SeasonalRegionalResponse } from '../types/mealPlan';
 import type { RecipeSummary } from '../types/recipe';
 function data<T>(response: ApiResponse<T>): T {
   if (response.data == null) throw new Error('Máy chủ chưa trả về dữ liệu kế hoạch.');
@@ -12,6 +12,9 @@ export const mealPlanService = {
   async get(planId: string, signal?: AbortSignal) { return data(await apiRequest<MealPlan>('/meal-plans/' + id(planId), { signal })); },
   async list(page = 0, signal?: AbortSignal) { return data(await apiRequest<PageResponse<MealPlanSummary>>('/meal-plans?page=' + page + '&size=5', { signal })); },
   async calendar(from: string, to: string, signal?: AbortSignal) { return data(await apiRequest<MealCalendarDay[]>('/meal-plans/calendar?from=' + from + '&to=' + to, { signal })); },
+  async intake(date: string, signal?: AbortSignal) { return data(await apiRequest<DailyIntake>('/meal-plans/intake?date=' + encodeURIComponent(date), { signal })); },
+  async recordIntake(date: string, slot: number, portions: number) { return data(await apiRequest<DailyIntake>('/meal-plans/intake/' + encodeURIComponent(date) + '/' + slot, { method: 'PUT', body: { portions } })); },
+  async removeIntake(date: string, slot: number) { return data(await apiRequest<DailyIntake>('/meal-plans/intake/' + encodeURIComponent(date) + '/' + slot, { method: 'DELETE' })); },
   async options(planId: string, signal?: AbortSignal) { return data(await apiRequest<RecipeSummary[]>('/meal-plans/' + id(planId) + '/options', { signal })); },
   async swap(planId: string, day: number, slot: number, recipeId: string) { return data(await apiRequest<MealPlan>('/meal-plans/' + id(planId) + '/days/' + day + '/meals/' + slot, { method: 'PUT', body: { recipeId } })); },
   async save(planId: string) { return data(await apiRequest<MealPlan>('/meal-plans/' + id(planId) + '/save', { method: 'POST' })); },

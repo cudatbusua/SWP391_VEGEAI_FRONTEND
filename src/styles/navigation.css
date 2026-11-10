@@ -23,3 +23,85 @@ html.dark .site-navigation > a[aria-current="page"] {
   color: #34d399;
   border-bottom-color: #10b981;
 }
+
+/* Main tabs: clear selection without squeezing the labels against an underline. */
+.site-navigation.vegeai-primary-nav { gap: 6px; padding-top: 8px; padding-bottom: 8px; scrollbar-width: none; }
+.site-navigation.vegeai-primary-nav::-webkit-scrollbar, .vegeai-ai-subnav-inner::-webkit-scrollbar { display: none; }
+.site-navigation.vegeai-primary-nav > .vegeai-primary-link {
+  min-height: 42px; padding: 10px 15px; border: 0; border-radius: 12px;
+  color: #536273; font-size: 14px; font-weight: 650; line-height: 1.4;
+  transition: background-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.site-navigation.vegeai-primary-nav > .vegeai-primary-link:hover { background: #f1f7f3; color: #006b4d; }
+.site-navigation.vegeai-primary-nav > .vegeai-primary-link[aria-current="page"] {
+  background: #e8f6ee; color: #006b4d; box-shadow: inset 0 0 0 1px #c5e9d4; font-weight: 750;
+}
+.vegeai-ai-subnav { background: #f7f9f6; border-top: 1px solid #e5ede7; border-bottom: 1px solid #e5ede7; }
+.vegeai-ai-subnav-inner {
+  display: flex; align-items: center; gap: 8px; max-width: 1280px; margin: auto;
+  padding: 9px 32px; overflow-x: auto; scrollbar-width: none;
+}
+.vegeai-ai-subnav-link {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 38px; flex: none;
+  padding: 8px 13px; border: 1px solid transparent; border-radius: 10px;
+  color: #536273; font-size: 13px; font-weight: 650; white-space: nowrap;
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease;
+}
+.vegeai-ai-subnav-link:hover { color: #006b4d; background: #edf5ef; }
+.vegeai-ai-subnav-link[aria-current="page"] {
+  color: #006b4d; background: #fff; border-color: #d7e9dc;
+  box-shadow: 0 2px 8px rgba(28, 78, 53, .07);
+}
+.vegeai-context-subnav { background: #f7f9f6; border-top: 1px solid #e5ede7; border-bottom: 1px solid #e5ede7; }
+.vegeai-context-row {
+  display: flex; align-items: center; gap: 10px; max-width: 1280px; min-height: 58px;
+  margin: auto; padding: 8px 32px; overflow-x: auto; scrollbar-width: none;
+}
+.vegeai-context-row::-webkit-scrollbar { display: none; }
+.vegeai-context-links { display: flex; align-items: center; gap: 8px; flex: none; }
+.vegeai-context-label { display: none; }
+.vegeai-context-subnav a {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 38px;
+  flex: none; padding: 8px 13px; border: 1px solid transparent; border-radius: 10px;
+  color: #536273; font-size: 13px; font-weight: 650; line-height: 1.4; white-space: nowrap;
+  transition: background-color .18s ease, color .18s ease, border-color .18s ease;
+}
+.vegeai-context-subnav a:hover { color: #006b4d; background: #edf5ef; }
+.vegeai-context-subnav a.bg-white {
+  color: #006b4d; background: #fff; border-color: #d7e9dc;
+  box-shadow: 0 2px 8px rgba(28, 78, 53, .07);
+}
+.vegeai-context-subnav a[href="/blog/write"] {
+  margin-left: auto; color: #fff; background: #00845d; border-color: #00845d;
+}
+.vegeai-context-subnav a[href="/blog/write"]:hover { color: #fff; background: #006c4c; }
+html.dark .site-navigation.vegeai-primary-nav > .vegeai-primary-link { color: #aab8c6; border: 0; }
+html.dark .site-navigation.vegeai-primary-nav > .vegeai-primary-link:hover { background: #1b302d; color: #6ee7b7; }
+html.dark .site-navigation.vegeai-primary-nav > .vegeai-primary-link[aria-current="page"] {
+  background: #143d34; color: #6ee7b7; box-shadow: inset 0 0 0 1px #285e4a;
+}
+html.dark .vegeai-ai-subnav { background: #101b21; border-color: #26363a; }
+html.dark .vegeai-ai-subnav-link { color: #aab8c6; }
+html.dark .vegeai-ai-subnav-link:hover { color: #6ee7b7; background: #1b302d; }
+html.dark .vegeai-ai-subnav-link[aria-current="page"] { color: #6ee7b7; background: #172a29; border-color: #285e4a; }
+html.dark .vegeai-context-subnav { background: #101b21; border-color: #26363a; }
+html.dark .vegeai-context-subnav a { color: #aab8c6; }
+html.dark .vegeai-context-subnav a:hover { color: #6ee7b7; background: #1b302d; }
+html.dark .vegeai-context-subnav a.bg-white { color: #6ee7b7; background: #172a29; border-color: #285e4a; }
+html.dark .vegeai-context-subnav a[href="/blog/write"] { color: #fff; background: #00845d; border-color: #00845d; }
+html.dark .vegeai-context-subnav a[href="/blog/write"]:hover { background: #006c4c; }
+@media (max-width: 1023px) {
+  .site-navigation.vegeai-primary-nav { display: none; }
+}
+@media (min-width: 640px) and (max-width: 1199px) {
+  .site-navigation.vegeai-primary-nav { gap: 2px; padding-left: 16px; padding-right: 16px; }
+  .site-navigation.vegeai-primary-nav > .vegeai-primary-link { padding-left: 9px; padding-right: 9px; font-size: 13px; }
+  .vegeai-ai-subnav-inner { padding-left: 16px; padding-right: 16px; }
+  .vegeai-context-row { padding-left: 16px; padding-right: 16px; }
+}
+@media (max-width: 639px) {
+  .site-navigation.vegeai-primary-nav { gap: 4px; padding: 7px 16px; }
+  .site-navigation.vegeai-primary-nav > .vegeai-primary-link { min-height: 39px; padding: 9px 12px; font-size: 13px; }
+  .vegeai-ai-subnav-inner { padding: 8px 16px; }
+  .vegeai-context-row { padding: 8px 16px; }
+}

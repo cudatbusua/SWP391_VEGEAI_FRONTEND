@@ -353,24 +353,34 @@ export function SmartMarketPage() {
     };
   }, [cartHydratedFor, cartOwnerId, isAuthenticated, multiCart]);
 
-  // "Danh sách cần mua" mirrors the account cart: items added here or on another device appear in the
-  // list; the bought/checked state stays per-browser so it does not leak between shoppers.
+  // "Danh sách cần mua" mirrors the account cart. Cart identity/quantity comes from the server-backed
+  // cart, while the bought/checked state remains local to this browser.
   useEffect(() => {
-    if (!isAuthenticated || cartHydratedFor !== cartOwnerId || multiCart.length === 0) return;
+    if (!isAuthenticated || cartHydratedFor !== cartOwnerId) return;
     updateItems(prev => {
-      const known = new Set(prev.map(item => item.name.toLowerCase().trim()));
-      const missing: SmartMarketItem[] = multiCart
-        .filter(item => !known.has(item.name.toLowerCase().trim()))
-        .map(item => ({
-          id: `cart-${item.id}`,
-          name: item.name,
-          amount: `${item.count} ${item.unit}`.trim(),
-          category: 'produce',
-          categoryLabel: item.storeCategory === 'VEGAN_STORE' ? 'Cửa hàng chay' : 'Giỏ nguyên liệu',
-          mealNote: item.storeName || 'Từ giỏ nguyên liệu',
-          checked: false
-        }));
-      return missing.length ? [...prev, ...missing] : prev;
+      const claimedLegacyIds = new Set<string>();
+      const synced = multiCart.map(cartItem => {
+        const id = `cart-${cartItem.id}`;
+        const exact = prev.find(item => item.id === id);
+        // Migrate entries created by the older combo/catalog handlers without duplicating them.
+        const legacy = exact ? undefined : prev.find(item =>
+          !item.id.startsWith('cart-') &&
+          !claimedLegacyIds.has(item.id) &&
+          item.name.trim().toLowerCase() === cartItem.name.trim().toLowerCase()
+        );
+        if (legacy) claimedLegacyIds.add(legacy.id);
+        return {
+          id,
+          name: cartItem.name,
+          amount: `${cartItem.count} ${cartItem.unit}`.trim(),
+          category: exact?.category ?? legacy?.category ?? 'produce',
+          categoryLabel: cartItem.storeCategory === 'VEGAN_STORE' ? 'Cửa hàng chay' : 'Giỏ nguyên liệu',
+          mealNote: cartItem.storeName || 'Từ giỏ nguyên liệu',
+          checked: exact?.checked ?? legacy?.checked ?? false
+        } satisfies SmartMarketItem;
+      });
+      // The checklist is a projection of the cart, not a second inventory.
+      return synced;
     });
   }, [cartHydratedFor, cartOwnerId, isAuthenticated, multiCart]);
 
@@ -419,26 +429,6 @@ export function SmartMarketPage() {
         return next;
     });
 
-    updateItems(prev => {
-      const next = prev.map(item => combo.ingredients.some(ingredient => ingredient.name.toLowerCase() === item.name.toLowerCase())
-        ? { ...item, checked: true }
-        : item);
-      combo.ingredients.forEach(ing => {
-        if (!next.some(it => it.name.toLowerCase() === ing.name.toLowerCase())) {
-          next.unshift({
-            id: `sm-combo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            name: ing.name,
-            amount: ing.amount,
-            category: 'produce',
-            categoryLabel: 'Rau củ & Quả tươi',
-            mealNote: `Combo món: ${combo.name}`,
-            checked: true
-          });
-        }
-      });
-      return next;
-    });
-
     setCartAddToast(`Đã thêm trọn combo "${combo.name}" (${combo.ingredients.length} nguyên liệu) vào giỏ!`);
     setTimeout(() => setCartAddToast(''), 4500);
   };
@@ -468,21 +458,6 @@ export function SmartMarketPage() {
           storeCategory: targetStore.category,
           count: 1
         }];
-    });
-
-    updateItems(prev => {
-      if (!prev.some(it => it.name.toLowerCase() === veg.name.toLowerCase())) {
-        return [{
-          id: `sm-vg-${Date.now()}`,
-          name: veg.name,
-          amount: '1 gói 500g',
-          category: 'produce',
-          categoryLabel: 'Rau củ & Quả tươi',
-          mealNote: 'Rau lá VietGAP',
-          checked: true
-        }, ...prev];
-      }
-      return prev.map(item => item.name.toLowerCase() === veg.name.toLowerCase() ? { ...item, checked: true } : item);
     });
 
     setCartAddToast(`Đã thêm "${veg.name}" vào giỏ!`);
@@ -584,17 +559,33 @@ export function SmartMarketPage() {
   // Import from Weekly Meal Plan
   useEffect(() => {
     const state = location.state as { importedItems?: SmartMarketItem[]; planTitle?: string } | null;
-    if (state?.importedItems && state.importedItems.length > 0) {
+    if (cartHydratedFor === cartOwnerId && state?.importedItems && state.importedItems.length > 0) {
       const incoming = state.importedItems;
-      updateItems(prev => {
-        const existingNames = new Set(prev.map(i => i.name.toLowerCase().trim()));
-        const uniqueIncoming = incoming.filter(i => !existingNames.has(i.name.toLowerCase().trim()));
-        return [...uniqueIncoming, ...prev];
+      cartDirtyBeforeHydration.current = true;
+      setMultiCart(prev => {
+        const existingNames = new Set(prev.map(item => item.name.toLowerCase().trim()));
+        const imported = incoming
+          .filter(item => !existingNames.has(item.name.toLowerCase().trim()))
+          .map((item, index): MultiStoreCartItem => ({
+            id: `${MARKET_REFERENCE_STORE.id}___meal-plan-${Date.now()}-${index}`,
+            catalogItemId: `meal-plan-${index}`,
+            name: item.name,
+            price: 0,
+            priceFormatted: 'Chưa có giá',
+            unit: item.amount || 'phần',
+            imageEmoji: '🛒',
+            storeId: MARKET_REFERENCE_STORE.id,
+            storeName: MARKET_REFERENCE_STORE.name,
+            storeAddress: MARKET_REFERENCE_STORE.address,
+            storeCategory: MARKET_REFERENCE_STORE.category,
+            count: 1
+          }));
+        return [...prev, ...imported];
       });
       setImportNotice(`Đã tự động bổ sung ${incoming.length} nguyên liệu từ ${state.planTitle || 'lịch ăn'} vào danh sách đi chợ!`);
       window.history.replaceState({}, document.title);
     }
-  }, [location.state]);
+  }, [cartHydratedFor, cartOwnerId, location.state]);
 
   // Request explicit GPS location
   const handleRequestLocation = () => {
@@ -697,13 +688,14 @@ export function SmartMarketPage() {
     setManualAddressInput('');
   };
 
-const handleToggle = (id: string) => {
+  const handleToggle = (id: string) => {
     sfx.playTap();
     updateItems(prev => prev.map(item => item.id === id ? { ...item, checked: !item.checked } : item));
   };
 
   const handleDelete = (id: string) => {
-    updateItems(prev => prev.filter(item => item.id !== id));
+    const cartId = id.startsWith('cart-') ? id.slice(5) : id;
+    setMultiCart(prev => prev.filter(item => item.id !== cartId));
   };
 
   const handleMarkAll = (checkAll: boolean) => {
@@ -719,7 +711,20 @@ const handleToggle = (id: string) => {
 
   const handleReset = () => {
     if (window.confirm('Khôi phục danh sách đi chợ về danh mục mẫu chuẩn?')) {
-      updateItems(() => INITIAL_SMART_MARKET_ITEMS);
+      setMultiCart(INITIAL_SMART_MARKET_ITEMS.map((item, index) => ({
+        id: `${MARKET_REFERENCE_STORE.id}___sample-${index}`,
+        catalogItemId: `sample-${index}`,
+        name: item.name,
+        price: 0,
+        priceFormatted: 'Chưa có giá',
+        unit: item.amount,
+        imageEmoji: '🛒',
+        storeId: MARKET_REFERENCE_STORE.id,
+        storeName: MARKET_REFERENCE_STORE.name,
+        storeAddress: MARKET_REFERENCE_STORE.address,
+        storeCategory: MARKET_REFERENCE_STORE.category,
+        count: 1
+      })));
     }
   };
 
@@ -783,17 +788,23 @@ const handleToggle = (id: string) => {
       spices: 'Gia vị bếp chay'
     };
 
-    const newItem: SmartMarketItem = {
-      id: 'custom-' + Date.now(),
+    const timestamp = Date.now();
+    const newItem: MultiStoreCartItem = {
+      id: `${MARKET_REFERENCE_STORE.id}___custom-${timestamp}`,
+      catalogItemId: `custom-${timestamp}`,
       name: newName.trim(),
-      amount: newAmount.trim() || '1 phần',
-      category: newCategory,
-      categoryLabel: categoryLabels[newCategory] || 'Khác',
-      mealNote: newMealNote.trim() || 'Nguyên liệu tự thêm',
-      checked: true
+      price: 0,
+      priceFormatted: 'Chưa có giá',
+      unit: newAmount.trim() || 'phần',
+      imageEmoji: '🛒',
+      storeId: MARKET_REFERENCE_STORE.id,
+      storeName: newMealNote.trim() || categoryLabels[newCategory] || MARKET_REFERENCE_STORE.name,
+      storeAddress: MARKET_REFERENCE_STORE.address,
+      storeCategory: MARKET_REFERENCE_STORE.category,
+      count: 1
     };
 
-    updateItems(prev => [newItem, ...prev]);
+    setMultiCart(prev => [newItem, ...prev]);
     sfx.playSuccess();
     setNewName('');
     setNewAmount('');
@@ -804,7 +815,6 @@ const handleToggle = (id: string) => {
   // Calculations for checklist
   const totalCount = items.length;
   const boughtCount = items.filter(i => i.checked).length;
-  const selectedPurchaseItems = useMemo(() => items.filter(item => item.checked), [items]);
   const unboughtCount = totalCount - boughtCount;
   const progressPercent = totalCount > 0 ? Math.round((boughtCount / totalCount) * 100) : 0;
 
@@ -835,8 +845,6 @@ const handleToggle = (id: string) => {
     cartDirtyBeforeHydration.current = true;
     sfx.playTap();
     const cartItemId = `${store.id}___${item.id}`;
-    const currentCount = multiCart.find(candidate => candidate.id === cartItemId)?.count || 0;
-    const nextCount = Math.max(0, currentCount + delta);
 
     setMultiCart(prev => {
       const existing = prev.find(i => i.id === cartItemId);
@@ -866,25 +874,6 @@ const handleToggle = (id: string) => {
       return prev;
     });
 
-    updateItems(previous => {
-      const shoppingItemId = `cart-${cartItemId}`;
-      if (nextCount === 0) return previous.filter(candidate => candidate.id !== shoppingItemId);
-      const existing = previous.find(candidate => candidate.id === shoppingItemId);
-      if (existing) {
-        return previous.map(candidate => candidate.id === shoppingItemId
-          ? { ...candidate, amount: `${nextCount} ${item.unit}`, checked: true }
-          : candidate);
-      }
-      return [{
-        id: shoppingItemId,
-        name: item.name,
-        amount: `${nextCount} ${item.unit}`,
-        category: 'produce',
-        categoryLabel: 'Nguyên liệu đã chọn',
-        mealNote: store.name,
-        checked: true,
-      }, ...previous];
-    });
   };
 
   // Group Multi-Store Cart into separate order packages
@@ -1685,19 +1674,19 @@ const handleToggle = (id: string) => {
                 </button>
               </div>
 
-              {selectedPurchaseItems.length === 0 ? (
+              {multiCart.length === 0 ? (
                 <div className="py-10 text-center text-sm text-slate-500">Chưa có nguyên liệu nào trong giỏ.</div>
               ) : (
                 <div className="space-y-2">
-                  {selectedPurchaseItems.map(item => (
+                  {multiCart.map(item => (
                       <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-3.5 bg-slate-50 dark:bg-slate-800/70">
                         <div className="min-w-0">
                           <div className="font-bold text-sm text-slate-900 dark:text-white truncate">{item.name}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{item.amount}{item.categoryLabel ? ` · ${item.categoryLabel}` : ''}</div>
-                          {item.mealNote && <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1 truncate">{item.mealNote}</div>}
+                          <div className="text-xs text-slate-500 mt-0.5">{item.count} {item.unit}</div>
+                          <div className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1 truncate">{item.storeName}</div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
-                          <button type="button" onClick={() => { handleDelete(item.id); setMultiCart(previous => previous.filter(candidate => candidate.name.trim().toLowerCase() !== item.name.trim().toLowerCase())); }} title="Xóa món này" className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer">
+                          <button type="button" onClick={() => setMultiCart(previous => previous.filter(candidate => candidate.id !== item.id))} title="Xóa món này" className="p-2 rounded-xl text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -1708,7 +1697,7 @@ const handleToggle = (id: string) => {
 
               <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-4">
                 <div className="flex justify-between font-extrabold text-slate-900 dark:text-white">
-                  <span>{totalCartCount} món trong giỏ</span>
+                  <span>{totalCartCount} sản phẩm · {multiCart.length} loại nguyên liệu</span>
                 </div>
                 <p className="text-xs text-emerald-800/80 dark:text-emerald-300 mt-1">VEGEAI chỉ hỗ trợ quản lý giỏ nguyên liệu và danh sách cần mua; không đặt hàng, giao hàng hoặc thanh toán.</p>
               </div>

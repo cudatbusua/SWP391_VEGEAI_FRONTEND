@@ -227,6 +227,43 @@ export function AiChatPage() {
     setResumedAfterLogin(true);
   }, [isAuthLoading, user?.id]);
 
+  // Handle cross-navigation from Blog/Community ("Hỏi sâu hơn với AI Chef")
+  useEffect(() => {
+    const state = location.state as {
+      source?: string;
+      title?: string;
+      initialPrompt?: string;
+      recipeContext?: any;
+    } | null;
+
+    if (!state?.initialPrompt) return;
+
+    const newSessionId = `handoff-${Date.now()}`;
+    const sessionTitle = state.title || 'Tư vấn món ăn từ bài đăng';
+    const newSession: ChatSession = {
+      id: newSessionId,
+      title: sessionTitle.length > 35 ? sessionTitle.slice(0, 32) + '...' : sessionTitle,
+      category: 'ai-chef',
+      messages: [
+        {
+          sender: 'ai',
+          text: `Chào bạn! Tôi đã nắm được thông tin về "${state.title || 'bài đăng công thức'}". Hãy cho tôi biết bạn muốn tìm hiểu sâu hơn về bước nấu nào, cần thay thế nguyên liệu hay muốn cân đối dinh dưỡng theo thể trạng của bạn nhé!`,
+          time: formatTime(Date.now()),
+        }
+      ],
+      updatedAt: Date.now(),
+    };
+
+    setSessions(prev => [newSession, ...prev]);
+    setActiveSessionId(newSessionId);
+    setInput(state.initialPrompt);
+
+    // Clean up state so refresh doesn't trigger duplicate session
+    try {
+      window.history.replaceState({}, document.title);
+    } catch {}
+  }, [location.state]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!user?.id) {
       e.target.value = '';

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Save, Send, Eye, FilePenLine, Image, Video, Sparkles, Wand2, CheckCircle2, Loader2, Upload, X } from 'lucide-react';
+import { ArrowLeft, Save, Send, Eye, FilePenLine, Image, Video, Sparkles, Wand2, CheckCircle2, Loader2, Upload, X, Trash2, Plus, Utensils, FileText, Clock, Lightbulb } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { BlogAccess, BlogBadge, BlogBody, BlogCover, BlogError } from '../components/BlogUi';
 import { useAuth } from '../hooks/useAuth';
@@ -11,6 +11,15 @@ import { videoSource } from '../utils/communityVideo';
 import type { BlogCategory, BlogInput, BlogPost, PostClassificationTemplate } from '../types/blog';
 import { blogCategories, BLOG_POST_TEMPLATES } from '../types/blog';
 import '../styles/blog.css';
+
+interface RecipeStepItem {
+  id: string;
+  stepNumber: number;
+  title: string;
+  instruction: string;
+  durationMinutes?: number;
+  tip?: string;
+}
 
 const initial: BlogInput = {
   title: '',
@@ -44,6 +53,81 @@ export function BlogEditorPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reload, setReload] = useState(0);
+
+  // Post format switcher: 'RECIPE' (Step-by-step dynamic blocks) vs 'ARTICLE' (Standard text)
+  const [editorMode, setEditorMode] = useState<'ARTICLE' | 'RECIPE'>(() => {
+    return form.category === 'KITCHEN' ? 'RECIPE' : 'ARTICLE';
+  });
+  const [servings, setServings] = useState('2-3 người');
+  const [cookTime, setCookTime] = useState('25');
+  const [ingredientsText, setIngredientsText] = useState(
+    '- 200g Nấm đùi gà (rửa sạch, cắt lát mỏng)\n- 2 miếng Đậu hũ trắng (chiên vàng đều)\n- 1 củ Cà rốt (thái sợi vừa ăn)\n- 2 thìa canh Nước tương tamari\n- 1 thìa cà phê Dầu mè nguyên chất & tiêu đen'
+  );
+  const [steps, setSteps] = useState<RecipeStepItem[]>([
+    {
+      id: 'step-1',
+      stepNumber: 1,
+      title: 'Sơ chế & Chuẩn bị nguyên liệu',
+      instruction: 'Nấm đùi gà ngâm nước muối loãng 5 phút rồi rửa sạch, để ráo và cắt lát mỏng. Đậu hũ cắt miếng vừa ăn và chiên vàng giòn.',
+      durationMinutes: 10,
+      tip: 'Ngâm nấm với muối loãng giúp nấm giòn ngọt tự nhiên và giữ màu trắng sáng.',
+    },
+    {
+      id: 'step-2',
+      stepNumber: 2,
+      title: 'Xào & Thấm vị nước sốt',
+      instruction: 'Làm nóng chảo với chút dầu mè, phi thơm hành boa-rô rồi cho nấm vào xào nhanh trên lửa lớn. Thêm cà rốt và đậu hũ vào, nêm nước tương tamari và tiêu đen.',
+      durationMinutes: 10,
+      tip: 'Xào lửa lớn trong 3 phút đầu để nấm giữ độ mọng nước, không bị dai.',
+    },
+    {
+      id: 'step-3',
+      stepNumber: 3,
+      title: 'Hoàn thiện & Thưởng thức',
+      instruction: 'Tắt bếp, rắc tiêu đen xay và thêm vài nhánh ngò rí lên trên. Dọn ra đĩa ăn kèm cơm nóng hoặc bún gạo lứt.',
+      durationMinutes: 5,
+      tip: 'Dùng ngay khi còn nóng để cảm nhận trọn vẹn hương vị tươi ngon.',
+    },
+  ]);
+
+  const handleAddStep = () => {
+    const nextNum = steps.length + 1;
+    setSteps(prev => [
+      ...prev,
+      {
+        id: `step-${Date.now()}-${nextNum}`,
+        stepNumber: nextNum,
+        title: `Bước ${nextNum}: Thực hiện tiếp theo`,
+        instruction: '',
+        durationMinutes: 5,
+        tip: '',
+      }
+    ]);
+    setDirty(true);
+  };
+
+  const handleRemoveStep = (stepId: string) => {
+    if (steps.length <= 1) return;
+    setSteps(prev => {
+      const filtered = prev.filter(s => s.id !== stepId);
+      return filtered.map((s, idx) => ({ ...s, stepNumber: idx + 1 }));
+    });
+    setDirty(true);
+  };
+
+  const handleStepChange = (stepId: string, field: keyof RecipeStepItem, value: any) => {
+    setSteps(prev => prev.map(s => s.id === stepId ? { ...s, [field]: value } : s));
+    setDirty(true);
+  };
+
+  const generateRecipeMarkdown = (
+    sServings: string,
+    sCookTime: string,
+    sIngredients: string,
+    sSteps: RecipeStepItem[]
+  ) => {
+    return `> Khẩu phần: ${sServings.trim() || '2-3 người'} | Thời gian nấu: ${sCookTime.trim() || '25'} phút\n\n### Danh sách nguyên liệu:\n${sIngredients.trim()}\n\n### Hướng dẫn thực hiện:\n${sSteps.map(s => `${s.stepNumber}. **${s.title.trim() || `Bước ${s.stepNumber}`}**${s.durationMinutes ? ` (${s.durationMinutes} phút)` : ''}: ${s.instruction.trim()}${s.tip?.trim() ? `\n   *Mẹo:* ${s.tip.trim()}` : ''}`).join('\n\n')}`;
+  };
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -151,7 +235,11 @@ export function BlogEditorPage() {
       return;
     }
     const submitting = (event.nativeEvent as SubmitEvent).submitter?.getAttribute('value') === 'submit';
-    if ((submitting || post?.status === 'PUBLISHED') && (form.title.trim().length < 5 || form.content.trim().length < 80)) {
+    let finalContent = form.content;
+    if (editorMode === 'RECIPE') {
+      finalContent = generateRecipeMarkdown(servings, cookTime, ingredientsText, steps);
+    }
+    if ((submitting || post?.status === 'PUBLISHED') && (form.title.trim().length < 5 || finalContent.trim().length < 80)) {
       setError('Tiêu đề cần ít nhất 5 ký tự và nội dung ít nhất 80 ký tự trước khi gửi bài.');
       return;
     }
@@ -160,10 +248,10 @@ export function BlogEditorPage() {
     setMessage('');
     try {
       const saved = post?.status === 'PUBLISHED' && !isAdmin
-        ? await blogService.requestPublishedEdit(post.postId, { ...form, version: post.version })
-        : await blogService.save({ ...form, version: post?.version }, post?.postId || id);
+        ? await blogService.requestPublishedEdit(post.postId, { ...form, content: finalContent, version: post.version })
+        : await blogService.save({ ...form, content: finalContent, version: post?.version }, post?.postId || id);
       setPost(saved);
-      setForm(previous => ({ ...previous, version: saved.version }));
+      setForm(previous => ({ ...previous, content: finalContent, version: saved.version }));
       setDirty(false);
       if (submitting) {
         await blogService.submit(saved.postId, saved.version);
@@ -297,7 +385,17 @@ export function BlogEditorPage() {
                   <button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>
                     <FilePenLine size={16} /> Soạn bài ({activeTemplate.shortLabel})
                   </button>
-                  <button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>
+                  <button
+                    type="button"
+                    aria-pressed={preview}
+                    onClick={() => {
+                      if (editorMode === 'RECIPE') {
+                        const md = generateRecipeMarkdown(servings, cookTime, ingredientsText, steps);
+                        setForm(p => ({ ...p, content: md }));
+                      }
+                      setPreview(true);
+                    }}
+                  >
                     <Eye size={16} /> Xem trước hiển thị
                   </button>
                 </div>
@@ -309,6 +407,43 @@ export function BlogEditorPage() {
                   </div>
                 )}
 
+                {/* FORMAT TOGGLE: RECIPE (DYNAMIC STEPS) VS ARTICLE (STANDARD BLOG) */}
+                {!preview && (
+                  <div className="mb-4 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">Chọn định dạng soạn thảo:</span>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Chọn chế độ từng bước nếu bạn chia sẻ công thức món ăn.</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditorMode('RECIPE');
+                          setForm(p => ({ ...p, category: 'KITCHEN' }));
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
+                          editorMode === 'RECIPE'
+                            ? 'bg-emerald-700 text-white shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700'
+                        }`}
+                      >
+                        <Utensils size={13} /> Công thức nấu ăn (Từng bước)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditorMode('ARTICLE')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
+                          editorMode === 'ARTICLE'
+                            ? 'bg-emerald-700 text-white shadow-2xs'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700'
+                        }`}
+                      >
+                        <FileText size={13} /> Blog chia sẻ thông thường
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <fieldset disabled={busy} className={preview ? 'blog-editor-fields is-hidden' : 'blog-editor-fields'}>
                   <label>
                     Tiêu đề bài đăng
@@ -317,7 +452,7 @@ export function BlogEditorPage() {
                       maxLength={150}
                       value={form.title}
                       onChange={event => change('title', event.target.value)}
-                      placeholder={activeTemplate.titlePlaceholder}
+                      placeholder={editorMode === 'RECIPE' ? 'Ví dụ: Đậu Hũ Kho Nấm Rơm Đậm Vị Cơm Nhà' : activeTemplate.titlePlaceholder}
                     />
                   </label>
                   <label>
@@ -328,21 +463,157 @@ export function BlogEditorPage() {
                       maxLength={400}
                       value={form.excerpt}
                       onChange={event => change('excerpt', event.target.value)}
-                      placeholder={activeTemplate.excerptPlaceholder}
+                      placeholder={editorMode === 'RECIPE' ? 'Mô tả ngắn về hương vị món ăn, độ khó hoặc lưu ý chính...' : activeTemplate.excerptPlaceholder}
                     />
                   </label>
-                  <label>
-                    Nội dung chi tiết
-                    <textarea
-                      aria-label="Nội dung"
-                      rows={17}
-                      maxLength={50000}
-                      value={form.content}
-                      onChange={event => change('content', event.target.value)}
-                      placeholder="Chia sẻ công thức, kiến thức dinh dưỡng hoặc câu chuyện sống chay của bạn..."
-                    />
-                  </label>
-                  <span className="blog-character-count">{form.content.length.toLocaleString('vi-VN')} / 50.000 ký tự</span>
+                  {editorMode === 'RECIPE' ? (
+                    <div className="space-y-4 pt-1">
+                      {/* Servings & Cook Time */}
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <label>
+                          Khẩu phần ăn
+                          <input
+                            value={servings}
+                            onChange={e => { setServings(e.target.value); setDirty(true); }}
+                            placeholder="Ví dụ: 2-3 người hoặc 4 phần"
+                          />
+                        </label>
+                        <label>
+                          Thời gian nấu (phút)
+                          <input
+                            type="number"
+                            value={cookTime}
+                            onChange={e => { setCookTime(e.target.value); setDirty(true); }}
+                            placeholder="Ví dụ: 25"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Ingredients */}
+                      <label>
+                        Danh sách nguyên liệu (Mỗi dòng một nguyên liệu)
+                        <textarea
+                          rows={4}
+                          value={ingredientsText}
+                          onChange={e => { setIngredientsText(e.target.value); setDirty(true); }}
+                          placeholder="- 200g Nấm đùi gà&#10;- 2 miếng Đậu hũ&#10;- 1 củ Cà rốt..."
+                        />
+                      </label>
+
+                      {/* Dynamic Steps */}
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between">
+                          <label className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <Clock size={16} className="text-emerald-600" />
+                            <span>Các bước thực hiện ({steps.length} bước)</span>
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleAddStep}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition cursor-pointer shadow-2xs"
+                          >
+                            <Plus size={15} /> Thêm bước mới
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {steps.map((st, idx) => (
+                            <div
+                              key={st.id}
+                              className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-6 h-6 rounded-full bg-emerald-700 text-white text-xs font-bold flex items-center justify-center">
+                                    {idx + 1}
+                                  </span>
+                                  <span className="font-bold text-xs text-slate-800 dark:text-slate-200">
+                                    Bước {idx + 1}
+                                  </span>
+                                </div>
+                                {steps.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveStep(st.id)}
+                                    className="text-slate-400 hover:text-red-600 transition p-1 cursor-pointer"
+                                    title="Xoá bước này"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="grid sm:grid-cols-3 gap-2.5">
+                                <div className="sm:col-span-2">
+                                  <input
+                                    value={st.title}
+                                    onChange={e => handleStepChange(st.id, 'title', e.target.value)}
+                                    placeholder="Tên bước (vd: Sơ chế nấm & đậu hũ)"
+                                    className="w-full text-xs font-semibold"
+                                  />
+                                </div>
+                                <div>
+                                  <input
+                                    type="number"
+                                    value={st.durationMinutes || ''}
+                                    onChange={e => handleStepChange(st.id, 'durationMinutes', Number(e.target.value) || 0)}
+                                    placeholder="Thời gian (phút)"
+                                    className="w-full text-xs"
+                                  />
+                                </div>
+                              </div>
+
+                              <textarea
+                                rows={3}
+                                value={st.instruction}
+                                onChange={e => handleStepChange(st.id, 'instruction', e.target.value)}
+                                placeholder="Mô tả chi tiết cách làm trong bước này..."
+                                className="w-full text-xs"
+                              />
+
+                              <div className="flex items-center gap-2">
+                                <Lightbulb size={14} className="text-amber-500 shrink-0" />
+                                <input
+                                  value={st.tip || ''}
+                                  onChange={e => handleStepChange(st.id, 'tip', e.target.value)}
+                                  placeholder="Mẹo nhỏ từ đầu bếp (không bắt buộc)"
+                                  className="w-full text-xs text-slate-600 dark:text-slate-300"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleAddStep}
+                          className="w-full py-2.5 rounded-2xl border-2 border-dashed border-emerald-400/80 dark:border-emerald-700/80 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-50 text-emerald-800 dark:text-emerald-300 text-xs font-extrabold flex items-center justify-center gap-2 transition cursor-pointer"
+                        >
+                          <Plus size={16} /> [+] Thêm bước tiếp theo ({steps.length + 1})
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label>
+                        Nội dung chi tiết (Theo cấu trúc chuẩn giúp AI phân tích chính xác nhất)
+                        <textarea
+                          aria-label="Nội dung"
+                          rows={17}
+                          maxLength={50000}
+                          value={form.content}
+                          onChange={event => change('content', event.target.value)}
+                          placeholder="Chia sẻ bài viết, kiến thức dinh dưỡng hoặc câu chuyện sống chay của bạn..."
+                        />
+                      </label>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1">
+                        <span className="blog-character-count">{form.content.length.toLocaleString('vi-VN')} / 50.000 ký tự</span>
+                        <span className="text-xs text-emerald-800 dark:text-emerald-300 font-medium bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200/80 dark:border-emerald-800/80 inline-flex items-center gap-1.5">
+                          💡 <strong>Mẹo:</strong> Gõ <code>1. Sơ chế...</code>, <code>2. Nấu...</code> — hệ thống sẽ tự động chuyển thành các <strong>Box Bước 1, Bước 2</strong> đẹp mắt.
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </fieldset>
 
                 {preview && (

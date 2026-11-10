@@ -246,7 +246,7 @@ export function BlogBody({ content }: { content: string }) {
 export function BlogError({ message, retry }: { message: string; retry?: () => void }) {
   return <div role="alert" className="blog-error"><p>{message}</p>{retry && <button onClick={retry}><RefreshCw size={15} /> Tải lại</button>}</div>;
 }
-export function BlogPagination({ data, busy, change }: { data: PageResponse<BlogPost> | null; busy: boolean; change: (page: number) => void }) {
+export function BlogPagination<T = any>({ data, busy, change }: { data: PageResponse<T> | null; busy: boolean; change: (page: number) => void }) {
   if (!data || data.totalPages <= 1) return null;
   return <nav className="blog-pagination" aria-label="Phân trang bài viết"><button title="Trang trước" aria-label="Trang trước" disabled={busy || data.first} onClick={() => change(data.page - 1)}><ChevronLeft size={18} /></button><span>{data.page + 1} / {data.totalPages}</span><button title="Trang sau" aria-label="Trang sau" disabled={busy || data.last} onClick={() => change(data.page + 1)}><ChevronRight size={18} /></button></nav>;
 }

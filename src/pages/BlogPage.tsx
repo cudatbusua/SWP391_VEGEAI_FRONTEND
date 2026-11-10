@@ -22,9 +22,13 @@ import {
   MapPin,
   Brain,
   Lightbulb,
+  Bookmark,
+  TrendingUp,
+  Send,
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { blogService } from '../services/blogService';
+import { communityService } from '../services/communityService';
 import { errorMessage } from '../services/apiClient';
 import { BlogBody, BlogCover, BlogError, BlogPagination, blogDate } from '../components/BlogUi';
 import { ContentInteractions } from '../components/ContentInteractions';
@@ -35,6 +39,7 @@ import { blogCategories, BLOG_POST_TEMPLATES, resolvePostAiMode } from '../types
 import type { BlogCategory, BlogPost } from '../types/blog';
 import type { GeneratedRecipeAiResponse, PageResponse } from '../types/api';
 import type { SmartMarketItem } from '../data/smartMarketData';
+import type { CommunityVideo, Question } from '../types/community';
 import '../styles/blog.css';
 
 interface KnowledgeAiAnalysisResult {
@@ -115,6 +120,46 @@ export function BlogPage() {
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
 
+  // 3 Core Community Hubs: 'posts' | 'videos' | 'qa'
+  const [hubTab, setHubTab] = useState<'posts' | 'videos' | 'qa'>('posts');
+  const [sortBy, setSortBy] = useState<'newest' | 'rating' | 'trending'>('newest');
+
+  // Bookmarks
+  const [savedPostIds, setSavedPostIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('vegeai_saved_posts') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const toggleBookmark = (postId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSavedPostIds(prev => {
+      const next = prev.includes(postId) ? prev.filter(i => i !== postId) : [...prev, postId];
+      try {
+        localStorage.setItem('vegeai_saved_posts', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Video Tab State
+  const [videoData, setVideoData] = useState<PageResponse<CommunityVideo> | null>(null);
+  const [videoBusy, setVideoBusy] = useState(false);
+  const [videoError, setVideoError] = useState('');
+  const [videoPage, setVideoPage] = useState(0);
+
+  // Q&A Tab State
+  const [qaData, setQaData] = useState<PageResponse<Question> | null>(null);
+  const [qaBusy, setQaBusy] = useState(false);
+  const [qaError, setQaError] = useState('');
+  const [qaPage, setQaPage] = useState(0);
+  const [newQuestionText, setNewQuestionText] = useState('');
+  const [submittingQuestion, setSubmittingQuestion] = useState(false);
+  const [qaMessage, setQaMessage] = useState('');
+
   // Facebook-style quick composer state
   const [quickTitle, setQuickTitle] = useState('');
   const [quickCategory, setQuickCategory] = useState<BlogCategory>('KITCHEN');
@@ -137,6 +182,59 @@ export function BlogPage() {
     }, 200);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [search, category, page, reload]);
+
+  // Load Community Videos when on 'videos' tab
+  useEffect(() => {
+    if (hubTab !== 'videos') return;
+    const controller = new AbortController();
+    setVideoBusy(true);
+    setVideoError('');
+    communityService.videos({ page: videoPage, keyword: search }, controller.signal)
+      .then(res => { if (!controller.signal.aborted) setVideoData(res); })
+      .catch(err => { if (!controller.signal.aborted) setVideoError(errorMessage(err)); })
+      .finally(() => { if (!controller.signal.aborted) setVideoBusy(false); });
+    return () => controller.abort();
+  }, [hubTab, videoPage, search, reload]);
+
+  // Load Community Questions when on 'qa' tab
+  useEffect(() => {
+    if (hubTab !== 'qa') return;
+    const controller = new AbortController();
+    setQaBusy(true);
+    setQaError('');
+    communityService.questions({ page: qaPage, keyword: search }, controller.signal)
+      .then(res => { if (!controller.signal.aborted) setQaData(res); })
+      .catch(err => { if (!controller.signal.aborted) setQaError(errorMessage(err)); })
+      .finally(() => { if (!controller.signal.aborted) setQaBusy(false); });
+    return () => controller.abort();
+  }, [hubTab, qaPage, search, reload]);
+
+  const handleAskQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: '/blog' } });
+      return;
+    }
+    if (!newQuestionText.trim() || newQuestionText.trim().length < 8) {
+      setQaError('Nội dung câu hỏi cần ít nhất 8 ký tự.');
+      return;
+    }
+    setSubmittingQuestion(true);
+    setQaError('');
+    setQaMessage('');
+    try {
+      await communityService.ask(newQuestionText.trim());
+      setNewQuestionText('');
+      setQaMessage('✨ Đã gửi câu hỏi lên cộng đồng thành công! Chuyên gia & cộng đồng sẽ phản hồi bạn.');
+      const res = await communityService.questions({ page: 0, keyword: search });
+      setQaData(res);
+      setQaPage(0);
+    } catch (err) {
+      setQaError(errorMessage(err));
+    } finally {
+      setSubmittingQuestion(false);
+    }
+  };
 
   const handleAnalyzePostOnFeed = async (post: BlogPost) => {
     const mode = resolvePostAiMode(post);
@@ -215,8 +313,59 @@ export function BlogPage() {
           </div>
         </header>
 
-        {/* FACEBOOK-STYLE QUICK POST COMPOSER BOX */}
-        <section className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+        {/* 3 CORE COMMUNITY HUB TABS */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-2 bg-slate-100/90 dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-1.5 overflow-x-auto p-1">
+            <button
+              type="button"
+              onClick={() => setHubTab('posts')}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
+                hubTab === 'posts'
+                  ? 'bg-emerald-700 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
+              }`}
+            >
+              <BookOpen size={16} />
+              <span>1. Bài đăng cộng đồng</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHubTab('videos')}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
+                hubTab === 'videos'
+                  ? 'bg-emerald-700 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
+              }`}
+            >
+              <Play size={16} />
+              <span>2. Kho video nấu ăn</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHubTab('qa')}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer shrink-0 ${
+                hubTab === 'qa'
+                  ? 'bg-emerald-700 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/60 dark:hover:bg-slate-700/60'
+              }`}
+            >
+              <MessageSquare size={16} />
+              <span>3. Hỏi đáp chuyên gia (Q&A)</span>
+            </button>
+          </div>
+
+          <div className="px-3 text-[11px] font-bold text-slate-500 dark:text-slate-400 hidden lg:block">
+            {hubTab === 'posts' && `📰 ${data?.totalElements || 0} bài đăng công khai`}
+            {hubTab === 'videos' && `🎬 ${videoData?.totalElements || 0} video hướng dẫn nấu chay`}
+            {hubTab === 'qa' && `💬 ${qaData?.totalElements || 0} câu hỏi & giải đáp`}
+          </div>
+        </div>
+
+        {/* TAB 1: BÀI ĐĂNG CỘNG ĐỒNG */}
+        {hubTab === 'posts' && (
+          <>
+            {/* FACEBOOK-STYLE QUICK POST COMPOSER BOX */}
+        <section className="rounded-3xl border border-emerald-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-emerald-700 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-2xs">
               {isAuthenticated ? (user?.name || user?.username || 'U').charAt(0).toUpperCase() : '🌱'}
@@ -335,6 +484,47 @@ export function BlogPage() {
               </span>
             </div>
           )}
+
+          {/* POSTS SORT CONTROLS & BOOKMARK COUNTER */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs pt-1">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 font-bold">Sắp xếp theo:</span>
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setSortBy('newest')}
+                  className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
+                    sortBy === 'newest' ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Mới nhất
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('rating')}
+                  className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                    sortBy === 'rating' ? 'bg-white dark:bg-slate-700 text-amber-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <Star size={13} fill="#f59e0b" className="text-amber-500" /> Đánh giá cao nhất
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSortBy('trending')}
+                  className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer flex items-center gap-1 ${
+                    sortBy === 'trending' ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <TrendingUp size={13} /> Thịnh hành
+                </button>
+              </div>
+            </div>
+            {savedPostIds.length > 0 && (
+              <span className="text-emerald-700 dark:text-emerald-400 font-bold inline-flex items-center gap-1.5">
+                <Bookmark size={13} fill="currentColor" /> Bạn đã lưu {savedPostIds.length} bài viết
+              </span>
+            )}
+          </div>
         </div>
 
         {error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}
@@ -352,14 +542,24 @@ export function BlogPage() {
 
         {/* FACEBOOK-STYLE SOCIAL FEED CARDS WITH INTEGRATED CONTEXT-AWARE AI */}
         {!error && data && data.items.length > 0 && (
-          <div className={'blog-magazine-grid ' + (busy ? 'opacity-60' : '')}>
-            {data.items.map((post, index) => {
-              const hasVideo = !!post.videoUrl;
-              const aiMode = resolvePostAiMode(post);
-              const tpl = BLOG_POST_TEMPLATES[post.category] || BLOG_POST_TEMPLATES.KITCHEN;
-              const recipeResult = feedRecipeResults[post.postId];
-              const knowledgeResult = feedKnowledgeResults[post.postId];
-              const isAnalyzingThis = analyzingPostId === post.postId;
+          <div className={'space-y-6 ' + (busy ? 'opacity-60' : '')}>
+            {[...data.items]
+              .sort((a, b) => {
+                if (sortBy === 'rating') {
+                  return (b.ratingAverage || 5) - (a.ratingAverage || 5);
+                }
+                if (sortBy === 'trending') {
+                  return ((b.ratingCount || 0) * 10 + (b.readingMinutes || 0)) - ((a.ratingCount || 0) * 10 + (a.readingMinutes || 0));
+                }
+                return 0;
+              })
+              .map((post, index) => {
+                const hasVideo = !!post.videoUrl;
+                const aiMode = resolvePostAiMode(post);
+                const tpl = BLOG_POST_TEMPLATES[post.category] || BLOG_POST_TEMPLATES.KITCHEN;
+                const recipeResult = feedRecipeResults[post.postId];
+                const knowledgeResult = feedKnowledgeResults[post.postId];
+                const isAnalyzingThis = analyzingPostId === post.postId;
 
               return (
                 <article
@@ -394,10 +594,24 @@ export function BlogPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900">
-                      <Star size={13} fill="#f59e0b" className="text-amber-500" />
-                      <span>{(post.ratingAverage || 5.0).toFixed(1)}</span>
-                      <span className="text-[11px] text-slate-400 font-normal">({post.ratingCount || 0})</span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-200/60 dark:border-amber-900">
+                        <Star size={13} fill="#f59e0b" className="text-amber-500" />
+                        <span>{(post.ratingAverage || 5.0).toFixed(1)}</span>
+                        <span className="text-[11px] text-slate-400 font-normal">({post.ratingCount || 0})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={e => toggleBookmark(post.postId, e)}
+                        className={`p-1.5 rounded-full border transition cursor-pointer ${
+                          savedPostIds.includes(post.postId)
+                            ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-emerald-600'
+                        }`}
+                        title={savedPostIds.includes(post.postId) ? 'Bỏ lưu bài viết' : 'Lưu bài viết này'}
+                      >
+                        <Bookmark size={14} fill={savedPostIds.includes(post.postId) ? 'currentColor' : 'none'} />
+                      </button>
                     </div>
                   </div>
 
@@ -640,7 +854,212 @@ export function BlogPage() {
           </div>
         )}
 
-        <BlogPagination data={data} busy={busy} change={setPage} />
+            <BlogPagination data={data} busy={busy} change={setPage} />
+          </>
+        )}
+
+        {/* TAB 2: KHO VIDEO NẤU ĂN CỘNG ĐỒNG */}
+        {hubTab === 'videos' && (
+          <div className="space-y-6">
+            <div className="p-4 sm:p-6 rounded-3xl bg-linear-to-r from-rose-900 via-rose-800 to-amber-900 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-[11px] font-extrabold tracking-wider uppercase border border-white/20">
+                  <Play size={13} fill="currentColor" /> Kho Video Bếp Chay
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black mt-2">Học nấu món chay trực quan qua video</h2>
+                <p className="text-xs sm:text-sm text-rose-100 mt-1 max-w-xl">
+                  Tuyển tập các thước phim nấu nướng, mẹo sơ chế và kỹ thuật bếp chay trực quan từ cộng đồng VEGEAI.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  to={isAuthenticated ? '/blog/write' : '/login'}
+                  state={{ recipeCategory: 'KITCHEN', mediaTab: 'video' }}
+                  className="px-4 py-2.5 rounded-2xl bg-white text-rose-900 font-extrabold text-xs transition hover:bg-rose-50 shadow-xs flex items-center gap-1.5"
+                >
+                  <Plus size={16} /> Đăng video mới
+                </Link>
+              </div>
+            </div>
+
+            {videoBusy && !videoData && <p role="status" className="blog-empty">Đang tải kho video...</p>}
+            {videoError && <BlogError message={videoError} retry={() => setReload(v => v + 1)} />}
+
+            {!videoBusy && !videoError && (!videoData || videoData.items.length === 0) && (
+              <div className="blog-empty">
+                <Play size={36} />
+                <h2>Chưa có video nào trong danh mục này</h2>
+                <p>Hãy là người đầu tiên đăng tải video công thức nấu món chay của bạn!</p>
+              </div>
+            )}
+
+            {videoData && videoData.items.length > 0 && (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {videoData.items.map(v => {
+                  const srcObj = videoSource(v.videoUrl);
+                  return (
+                    <article
+                      key={v.id}
+                      className="rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="aspect-video w-full bg-slate-900 relative group overflow-hidden">
+                          {srcObj && srcObj.kind === 'embed' ? (
+                            <iframe
+                              src={srcObj.src}
+                              className="w-full h-full border-0 pointer-events-none"
+                              title={v.title}
+                            />
+                          ) : (
+                            <img
+                              src={v.thumbnailUrl || '/images/vietnamese-vegan-table.png'}
+                              alt={v.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                            />
+                          )}
+                          <Link
+                            to={'/videos/' + v.id}
+                            className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-90 group-hover:opacity-100 transition"
+                          >
+                            <div className="w-12 h-12 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition">
+                              <Play size={22} fill="white" className="ml-0.5" />
+                            </div>
+                          </Link>
+                          {v.durationSeconds && (
+                            <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/75 text-white text-[11px] font-bold">
+                              {Math.floor(v.durationSeconds / 60)}:{(v.durationSeconds % 60).toString().padStart(2, '0')}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="p-4 space-y-2">
+                          <Link to={'/videos/' + v.id} className="block group">
+                            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white group-hover:text-rose-600 transition line-clamp-2">
+                              {v.title}
+                            </h3>
+                          </Link>
+                          {v.description && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                              {v.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="p-4 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                        <span>Đăng bởi {v.createdBy || 'Cộng đồng'}</span>
+                        <Link to={'/videos/' + v.id} className="font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1">
+                          Xem video <ArrowUpRight size={13} />
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+            <BlogPagination data={videoData} busy={videoBusy} change={setVideoPage} />
+          </div>
+        )}
+
+        {/* TAB 3: HỎI ĐÁP CHUYÊN GIA (Q&A) */}
+        {hubTab === 'qa' && (
+          <div className="space-y-6">
+            {/* Ask Question Box */}
+            <form onSubmit={handleAskQuestion} className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-slate-800 shadow-xs space-y-3">
+              <div className="flex items-center gap-2">
+                <MessageSquare size={18} className="text-emerald-700 dark:text-emerald-400" />
+                <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
+                  Đặt câu hỏi cho Bếp trưởng &amp; Chuyên gia Dinh dưỡng VEGEAI
+                </h3>
+              </div>
+              <textarea
+                rows={3}
+                value={newQuestionText}
+                onChange={e => { setNewQuestionText(e.target.value); setQaError(''); setQaMessage(''); }}
+                placeholder={
+                  isAuthenticated
+                    ? 'Bạn có thắc mắc gì về cân đối dinh dưỡng, thay thế đạm thực vật, hay mẹo nêm nếm món chay? Nhập câu hỏi tại đây...'
+                    : 'Đăng nhập để gửi câu hỏi trực tiếp đến chuyên gia dinh dưỡng và cộng đồng...'
+                }
+                className="w-full p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              {qaError && <p role="alert" className="text-xs text-red-600 font-semibold">{qaError}</p>}
+              {qaMessage && <p role="status" className="text-xs text-emerald-700 dark:text-emerald-400 font-bold">{qaMessage}</p>}
+              <div className="flex items-center justify-end">
+                <button
+                  type="submit"
+                  disabled={submittingQuestion}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-2xs cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
+                >
+                  <Send size={14} />
+                  <span>{submittingQuestion ? 'Đang gửi câu hỏi...' : 'Gửi câu hỏi'}</span>
+                </button>
+              </div>
+            </form>
+
+            {qaBusy && !qaData && <p role="status" className="blog-empty">Đang tải danh sách câu hỏi...</p>}
+            {qaError && !submittingQuestion && <BlogError message={qaError} retry={() => setReload(v => v + 1)} />}
+
+            {qaData && qaData.items.length === 0 && (
+              <div className="blog-empty">
+                <MessageSquare size={36} />
+                <h2>Chưa có câu hỏi nào</h2>
+                <p>Hãy là người đầu tiên đặt câu hỏi để nhận tư vấn từ chuyên gia dinh dưỡng!</p>
+              </div>
+            )}
+
+            {qaData && qaData.items.length > 0 && (
+              <div className="space-y-4">
+                {qaData.items.map(q => (
+                  <article
+                    key={q.id}
+                    className="p-5 rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs space-y-3.5"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 font-black text-xs flex items-center justify-center shrink-0">
+                          {(q.authorName || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <span className="text-xs font-extrabold text-slate-900 dark:text-white block">
+                            {q.authorName}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {blogDate(q.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        q.answer
+                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                          : 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                      }`}>
+                        {q.answer ? '✓ Đã giải đáp' : 'Đang chờ giải đáp'}
+                      </span>
+                    </div>
+
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">
+                      {q.content}
+                    </p>
+
+                    {q.answer && (
+                      <div className="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-extrabold text-emerald-900 dark:text-emerald-300">
+                          <ChefHat size={15} />
+                          <span>Giải đáp từ Chuyên gia {q.answeredBy || 'Bếp trưởng VEGEAI'}:</span>
+                        </div>
+                        <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                          {q.answer}
+                        </p>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+            <BlogPagination data={qaData} busy={qaBusy} change={setQaPage} />
+          </div>
+        )}
       </div>
     </MainLayout>
   );
@@ -802,6 +1221,22 @@ export function BlogDetailPage() {
                             : '🧠 AI Phân tích Bài đăng ngay'}
                     </span>
                   </button>
+
+                  <Link
+                    to="/ai-chef"
+                    state={{
+                      source: 'blog-post',
+                      title: `Tư vấn: ${post.title}`,
+                      initialPrompt:
+                        aiMode === 'RECIPE_STEPS'
+                          ? `Tôi đang xem công thức "${post.title}" (${post.excerpt || ''}). Bếp trưởng hãy hướng dẫn chi tiết các bước nấu món này và gợi ý biến tấu nguyên liệu phù hợp với thể trạng của tôi nhé!`
+                          : `Tôi đang đọc bài viết "${post.title}" (${post.excerpt || ''}). Bếp trưởng hãy tư vấn sâu hơn về chủ đề này nhé!`
+                    }}
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-emerald-50 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition shadow-2xs"
+                  >
+                    <ChefHat size={15} />
+                    <span>Hỏi sâu hơn với AI Chef</span>
+                  </Link>
                 </div>
               </div>
 

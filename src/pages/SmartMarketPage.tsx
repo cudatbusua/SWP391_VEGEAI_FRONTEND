@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom';
 import {
   ShoppingBag,
-  Utensils,
   CheckCircle2,
   Circle,
   Plus,
@@ -409,61 +408,6 @@ export function SmartMarketPage() {
     });
   }, [selectedStore, catalogSubcategory]);
 
-  const handleAddComboToCart = (combo: MealCombo) => {
-    if (!requireCartLogin()) return;
-    cartDirtyBeforeHydration.current = true;
-    sfx.playSuccess();
-    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0] || MARKET_REFERENCE_STORE;
-    setMultiCart(prev => {
-        let next = [...prev];
-        combo.ingredients.forEach(ing => {
-          const cartItemId = `${targetStore.id}___combo_${ing.name.toLowerCase().replace(/\s+/g, '_')}`;
-          const existing = next.find(i => i.id === cartItemId);
-          if (existing) next = next.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
-          else next.push({
-            id: cartItemId, catalogItemId: `combo_${ing.name}`, name: ing.name,
-            price: ing.price, priceFormatted: `${ing.price.toLocaleString('vi-VN')} đ`, unit: ing.unit,
-            imageEmoji: ing.emoji, storeId: targetStore.id, storeName: targetStore.name,
-            storeAddress: targetStore.address, storeCategory: targetStore.category, count: 1
-          });
-        });
-        return next;
-    });
-
-    setCartAddToast(`Đã thêm trọn combo "${combo.name}" (${combo.ingredients.length} nguyên liệu) vào giỏ!`);
-    setTimeout(() => setCartAddToast(''), 4500);
-  };
-
-  const handleAddVietgapVeggie = (veg: typeof VIETGAP_5K_VEGGIES[0]) => {
-    if (!requireCartLogin()) return;
-    cartDirtyBeforeHydration.current = true;
-    sfx.playSuccess();
-    const targetStore = selectedStore || stores.find(s => s.name.includes('Bách Hóa Xanh') || s.category === 'SUPERMARKET') || stores[0] || MARKET_REFERENCE_STORE;
-    const cartItemId = `${targetStore.id}___vg_${veg.name.toLowerCase().replace(/\s+/g, '_')}`;
-    setMultiCart(prev => {
-        const existing = prev.find(i => i.id === cartItemId);
-        if (existing) {
-          return prev.map(i => i.id === cartItemId ? { ...i, count: i.count + 1 } : i);
-        }
-        return [...prev, {
-          id: cartItemId,
-          catalogItemId: `vg_${veg.name}`,
-          name: veg.name,
-          price: veg.price,
-          priceFormatted: '5.000 đ',
-          unit: 'gói 500g',
-          imageEmoji: veg.emoji,
-          storeId: targetStore.id,
-          storeName: targetStore.name,
-          storeAddress: targetStore.address,
-          storeCategory: targetStore.category,
-          count: 1
-        }];
-    });
-
-    setCartAddToast(`Đã thêm "${veg.name}" vào giỏ!`);
-    setTimeout(() => setCartAddToast(''), 3500);
-  };
   const [deliveryNote, setDeliveryNote] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<'VEGE15' | 'FREESHIP' | null>('VEGE15');
   const [autoSyncFridge, setAutoSyncFridge] = useState(true);
@@ -1326,146 +1270,24 @@ export function SmartMarketPage() {
                         </div>
                       </div>
                     </div>
+
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between gap-2">
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(store.address + ', ' + store.name)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 hover:underline cursor-pointer"
+                        title="Mở Google Maps chỉ đường trực tiếp tới đây"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Chỉ đường Google Maps ↗</span>
+                      </a>
+                      <span className="text-[10px] text-slate-400 font-medium">Bấm để xem kệ hàng</span>
+                    </div>
                   </div>
                 );
               })}
-            </div>
-
-            {/* SECTION 4: BÁCH HÓA XANH PROMOTIONAL BANNER & COMBOS */}
-            <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-emerald-800 via-teal-800 to-emerald-900 text-white p-5 sm:p-6 shadow-md border border-emerald-600/40 space-y-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-3 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider shadow-2xs">
-                      🌿 Rau Lá Quốc Dân · Chọn nhanh
-                    </span>
-                    <span className="text-xs text-emerald-200 font-semibold flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5" /> Chuẩn VietGAP tươi sớm nay
-                    </span>
-                  </div>
-                  <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-                    Bách Hóa Xanh Chay — Rau Củ Tươi Mỗi Ngày
-                  </h3>
-                  <p className="text-xs sm:text-sm text-emerald-100/90 leading-relaxed max-w-2xl">
-                    Chọn nhanh rau lá VietGAP và thêm trực tiếp vào giỏ nguyên liệu cá nhân.
-                  </p>
-                </div>
-              </div>
-
-              {/* 5k Veggies 5-column balanced grid */}
-              <div className="pt-3 border-t border-white/15">
-                <div className="text-[11px] font-bold text-emerald-200 mb-2.5 uppercase tracking-wider flex items-center gap-1.5">
-                  <span>🥬</span>
-                  <span>Chọn nhanh rau lá VietGAP (bấm + để thêm thẳng vào giỏ):</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  {VIETGAP_5K_VEGGIES.map(veg => (
-                    <button
-                      key={veg.name}
-                      type="button"
-                      onClick={() => handleAddVietgapVeggie(veg)}
-                      className="group flex items-center justify-between p-2.5 rounded-xl bg-white/10 hover:bg-white text-white hover:text-emerald-950 border border-white/15 hover:border-white transition shadow-2xs cursor-pointer text-left"
-                      title={`Bấm để thêm ${veg.name} vào giỏ`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xl shrink-0">{veg.emoji}</span>
-                        <div className="min-w-0">
-                          <div className="text-[11px] font-bold truncate">{veg.name.replace(/\s*\(500g\)/i, '')}</div>
-                          <div className="text-[10px] font-semibold text-emerald-100 group-hover:text-emerald-700">500g · VietGAP</div>
-                        </div>
-                      </div>
-                      <span className="w-5 h-5 rounded-full bg-emerald-500 group-hover:bg-emerald-700 text-white flex items-center justify-center font-bold text-xs shrink-0 ml-1">
-                        +
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* BÁCH HÓA XANH: HÔM NAY ĂN GÌ? - MUA NGUYÊN LIỆU THEO MÓN */}
-            <div className="bg-white dark:bg-[#121922] rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 uppercase">
-                      Bách Hóa Xanh Online
-                    </span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">· Chuẩn bị bữa ăn gia đình tiện lợi</span>
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-slate-100 mt-1 flex items-center gap-2">
-                    <Utensils className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                    Hôm Nay Ăn Gì? — Mua Trọn Combo Nguyên Liệu Theo Món
-                  </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                    1-Click thêm đầy đủ nguyên liệu tươi ngon đã sơ chế sẵn vào giỏ đi chợ và danh sách cần mua.
-                  </p>
-                </div>
-              </div>
-
-              {/* 4 Combo Cards Grid */}
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {MEAL_COMBOS.map(combo => (
-                  <div
-                    key={combo.id}
-                    className="flex flex-col justify-between p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 bg-slate-50 dark:bg-[#182230] hover:bg-white dark:hover:bg-[#1f2c3e] transition shadow-xs group"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-3xl p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50 shadow-2xs">{combo.emoji}</span>
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/80">Combo nguyên liệu</span>
-                      </div>
-
-                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
-                        {combo.name}
-                      </h4>
-
-                      <p className="text-[11px] text-slate-600 dark:text-slate-200 line-clamp-2 mt-1 leading-relaxed">
-                        {combo.tagline}
-                      </p>
-
-                      <div className="mt-3 pt-2.5 border-t border-slate-200/80 dark:border-slate-800 space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                            🌿 {combo.ingredients.length} nguyên liệu tươi
-                          </span>
-                          <span className="text-[10px] text-slate-500 dark:text-slate-300 font-semibold">
-                            {combo.prepTime} · {combo.calories}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700">
-                          <div className="flex items-center -space-x-1 shrink-0">
-                            {combo.ingredients.map(ing => (
-                              <span
-                                key={ing.name}
-                                title={`${ing.name} (${ing.amount})`}
-                                className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-[10px] shadow-2xs"
-                              >
-                                {ing.emoji}
-                              </span>
-                            ))}
-                          </div>
-                          <span className="text-[10px] text-slate-700 dark:text-slate-200 font-medium truncate">
-                            {combo.ingredients.map(i => i.name).slice(0, 2).join(', ')}...
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleAddComboToCart(combo)}
-                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
-                        title={`Thêm combo ${combo.name} vào giỏ`}
-                      >
-                        <ShoppingCart className="w-3.5 h-3.5" />
-                        <span>Thêm vào giỏ</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
             {/* SHOPEE FOOD / SHOPEE MART ORDERING SECTION (SELECTED STORE MENU) */}
@@ -1507,6 +1329,17 @@ export function SmartMarketPage() {
                     </p>
                   </div>
 
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedStore.address + ', ' + selectedStore.name)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs transition shadow-xs cursor-pointer self-start sm:self-auto shrink-0"
+                    title="Mở ứng dụng Google Maps dẫn đường"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    <span>Mở Google Maps chỉ đường</span>
+                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                  </a>
                 </div>
 
                 {/* Catalog items grid (ShopeeFood / Mart style) */}

@@ -18,7 +18,8 @@ import {
   Apple,
   Zap,
   Check,
-  RotateCcw
+  RotateCcw,
+  BookMarked,
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
@@ -28,6 +29,7 @@ import { userService } from '../services/userService';
 import { nutritionService } from '../services/nutritionService';
 import { MealPlanCalendarPlanner } from '../components/MealPlanCalendarPlanner';
 import { SeasonalRegionalMealsView } from '../components/SeasonalRegionalMealsView';
+import { CookbookTab } from '../components/CookbookTab';
 import { sfx } from '../utils/soundEffects';
 import { HealthActivityRings } from '../components/HealthActivityRings';
 import { WearableGoogleFitTracker } from '../components/WearableGoogleFitTracker';
@@ -200,18 +202,35 @@ export const AccountSettingsPage: React.FC = () => {
 
       const updated = await userService.updateProfile(payload);
       setProfile(updated);
-      if (nutrition) {
-        if (dailyCalorieTarget === '' && nutrition.targets.customCalorieTarget) {
+
+      const effectiveGender = (gender === 'MALE' || gender === 'FEMALE')
+        ? gender
+        : (nutrition?.gender || (updated.gender === 'MALE' || updated.gender === 'FEMALE' ? updated.gender : undefined));
+      const effectiveDob = updated.dateOfBirth || dateOfBirth || nutrition?.dateOfBirth;
+      const effectiveHeight = updated.heightCm ?? (heightCm !== '' ? Number(heightCm) : nutrition?.heightCm);
+      const effectiveWeight = updated.weightKg ?? (weightKg !== '' ? Number(weightKg) : nutrition?.weightKg);
+
+      if (effectiveGender && effectiveDob && effectiveHeight && effectiveWeight) {
+        try {
           await nutritionService.saveProfile({
-            gender: nutrition.gender,
-            dateOfBirth: updated.dateOfBirth || nutrition.dateOfBirth,
-            heightCm: updated.heightCm || nutrition.heightCm,
-            weightKg: updated.weightKg || nutrition.weightKg,
-            activityLevel: nutrition.activityLevel,
-            goal: nutrition.goal,
-            customDailyCalories: null,
+            gender: effectiveGender,
+            dateOfBirth: effectiveDob,
+            heightCm: effectiveHeight,
+            weightKg: effectiveWeight,
+            activityLevel: nutrition?.activityLevel || 'MODERATE',
+            goal: nutrition?.goal || 'MAINTAIN',
+            phoneNumber: updated.phoneNumber || undefined,
+            dietaryPreferences: dietaryPreferences || undefined,
+            allergies: selectedAllergies.join(',') || undefined,
+            customDailyCalories: dailyCalorieTarget !== '' ? Number(dailyCalorieTarget) : null,
           });
+          const fresh = await nutritionService.getProfile();
+          setNutrition(fresh);
+          setDailyCalorieTarget(fresh.targets.customCalorieTarget ? fresh.targets.dailyCaloriesTarget : '');
+        } catch (err) {
+          console.warn('Could not sync nutrition profile:', err);
         }
+      } else if (nutrition) {
         const fresh = await nutritionService.getProfile();
         setNutrition(fresh);
         setDailyCalorieTarget(fresh.targets.customCalorieTarget ? fresh.targets.dailyCaloriesTarget : '');
@@ -490,6 +509,50 @@ export const AccountSettingsPage: React.FC = () => {
           </div>
         )}
 
+        {/* Navigation Tabs Bar for Account & Wellness Hub (Profile, Cookbook, Settings) */}
+        {currentTab !== 'calendar' && (
+          <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => handleSelectTab('profile')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+                currentTab === 'profile'
+                  ? 'bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <User className="w-4 h-4 text-emerald-600" />
+              <span>Hồ sơ &amp; Thể trạng</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectTab('cookbook')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+                currentTab === 'cookbook'
+                  ? 'bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <BookMarked className="w-4 h-4 text-emerald-600" />
+              <span>Sổ tay món ăn (Cookbook)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectTab('settings')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+                ['settings', 'security', 'preferences'].includes(currentTab)
+                  ? 'bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Cài đặt &amp; Bảo mật</span>
+            </button>
+          </div>
+        )}
+
         {/* 1. USER IDENTITY HEADER BANNER: only belongs to the profile view */}
         {currentTab === 'profile' && (
         <section className="relative overflow-hidden rounded-3xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-6 sm:p-8">
@@ -497,19 +560,29 @@ export const AccountSettingsPage: React.FC = () => {
             
             {/* Avatar & Identifiers */}
             <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-              <div className="relative">
-                <div className="w-24 h-24 overflow-hidden rounded-full bg-linear-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white flex items-center justify-center font-extrabold text-3xl shadow-lg ring-4 ring-emerald-100 dark:ring-emerald-950/60">
-                  {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" onError={() => setAvatar('')} /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
+              <div className="flex flex-col items-center gap-2 shrink-0">
+                <div className="relative">
+                  <div className="w-24 h-24 overflow-hidden rounded-full bg-linear-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white flex items-center justify-center font-extrabold text-3xl shadow-lg ring-4 ring-emerald-100 dark:ring-emerald-950/60">
+                    {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" onError={() => setAvatar('')} /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
+                  </div>
+                  <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" title="Đang trực tuyến" />
                 </div>
-                <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" title="Đang trực tuyến" />
-                <label className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap cursor-pointer text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                  Đổi avatar
-                  <input type="file" accept="image/png,image/jpeg" className="sr-only" onChange={async event => {
+                <label className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 cursor-pointer text-[11px] font-bold text-emerald-800 dark:text-emerald-300 transition shadow-2xs">
+                  📷 Đổi ảnh đại diện
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={async event => {
                     const file = event.target.files?.[0];
+                    event.currentTarget.value = '';
                     if (!file) return;
                     if (file.size > 2 * 1024 * 1024) { setProfileError('Avatar không được vượt quá 2 MB.'); return; }
-                    try { const updated = await userService.updateAvatar(file); setProfile(updated); setAvatar(updated.avatarUrl || ''); setProfileSuccess('Đã cập nhật avatar.'); }
-                    catch (reason) { setProfileError(errorMessage(reason)); }
+                    setProfileError('');
+                    try {
+                      const updated = await userService.updateAvatar(file);
+                      setProfile(updated);
+                      setAvatar(updated.avatarUrl || '');
+                      setProfileSuccess('Đã cập nhật ảnh đại diện thành công.');
+                    } catch (reason) {
+                      setProfileError(errorMessage(reason));
+                    }
                   }} />
                 </label>
               </div>
@@ -1329,6 +1402,17 @@ export const AccountSettingsPage: React.FC = () => {
         />
 
                   </div>
+        )}
+
+        {/* TAB: PERSONAL COOKBOOK (SỔ TAY MÓN ĂN) */}
+        {currentTab === 'cookbook' && (
+          <CookbookTab
+            onScheduleRecipe={(title, calories) => {
+              handleSelectTab('calendar');
+              setCartAddToast(`Đã chọn món "${title}" (${calories} kcal). Chọn ngày trên Lịch để xếp bữa ăn!`);
+              setTimeout(() => setCartAddToast(null), 4000);
+            }}
+          />
         )}
 
         {/* TAB 2: CALENDAR & 30-DAY MEAL SCHEDULE */}

@@ -1,4 +1,4 @@
-import type { AiChatMessage, AiChatResponse, FridgeScanResponse, GeneratedRecipeAiResponse } from '../types/api';
+import type { AiChatMessage, AiChatResponse, FridgeScanResponse, GeneratedRecipeAiResponse, GenerateRecipeAiRequest } from '../types/api';
 import { apiRequest } from './apiClient';
 
 export const aiService = {
@@ -34,6 +34,16 @@ export const aiService = {
       timeoutMs: 90000,
     });
     if (!response.data) throw new Error('AI chưa trả về công thức từ video.');
+    return response.data;
+  },
+
+  async generateRecipe(req: GenerateRecipeAiRequest): Promise<GeneratedRecipeAiResponse> {
+    const response = await apiRequest<GeneratedRecipeAiResponse>('/ai/generate-recipe', {
+      method: 'POST',
+      body: req,
+      timeoutMs: 90000,
+    });
+    if (!response.data) throw new Error('AI chưa trả về công thức theo yêu cầu.');
     return response.data;
   },
 };

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, CalendarDays, ChevronDown, LogOut, Settings } from 'lucide-react';
+import { Activity, CalendarDays, ChevronDown, LogOut, Settings, BookMarked } from 'lucide-react';
 import type { User as AuthUser } from '../types/auth';
 
 interface UserMenuProps {
@@ -75,6 +75,9 @@ export function UserMenu({ user, loggingOut, onLogout }: UserMenuProps) {
 
           <Link to="/settings?tab=profile" role="menuitem" className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition">
             <Activity className="w-4 h-4 text-emerald-600 shrink-0" /><div><span className="block font-semibold">Hồ sơ & Chỉ số sức khỏe</span><span className="block text-[11px] text-slate-400">Thông tin cá nhân, thể trạng và BMI</span></div>
+          </Link>
+          <Link to="/settings?tab=cookbook" role="menuitem" className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition">
+            <BookMarked className="w-4 h-4 text-emerald-600 shrink-0" /><div><span className="block font-semibold">Sổ tay món ăn (Cookbook)</span><span className="block text-[11px] text-slate-400">Các món đã lưu từ cộng đồng &amp; AI</span></div>
           </Link>
           <Link to="/settings?tab=calendar" role="menuitem" className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition">
             <CalendarDays className="w-4 h-4 text-emerald-600 shrink-0" /><div><span className="block font-semibold">Lịch biểu & Thực đơn</span><span className="block text-[11px] text-slate-400">Lịch ăn và kế hoạch bữa ăn</span></div>

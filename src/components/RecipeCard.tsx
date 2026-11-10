@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Clock, Flame, BadgeCheck, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Clock, Flame, BadgeCheck, Sparkles, Star } from 'lucide-react';
 import { RecipeImage } from './RecipeImage';
+import { contentInteractionService } from '../services/contentInteractionService';
 import type { RecipeSummary } from '../types/recipe';
 
 interface RecipeCardProps {
@@ -10,10 +11,15 @@ interface RecipeCardProps {
 }
 
 export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, className = '' }) => {
+  const [rating, setRating] = useState<{ averageStars: number | null; ratingCount: number } | null>(null);
   const tags = recipe.tags ?? [];
   const label = tags.find(tag => tag.group === 'DIETARY_TYPE')?.name || 'Món chay';
   const difficulty = { EASY: 'Dễ nấu', MEDIUM: 'Vừa sức', HARD: 'Kỳ công' }[recipe.difficulty] || 'Dễ nấu';
   const goalTag = tags.find(tag => tag.group === 'NUTRITION_GOAL')?.name;
+
+  useEffect(() => {
+    contentInteractionService.loadRating('RECIPE', recipe.recipeId).then(setRating).catch(() => {});
+  }, [recipe.recipeId]);
 
   return (
     <Link
@@ -46,7 +52,16 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, className = '' }
       <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between gap-3">
         <div>
           <div className="flex items-center justify-between text-xs font-semibold text-stone-500 dark:text-slate-400 mb-1.5">
-            <span>{difficulty}</span>
+            <div className="flex items-center gap-2">
+              <span>{difficulty}</span>
+              {rating && rating.ratingCount > 0 && (
+                <span className="flex items-center gap-1 font-bold text-amber-600 dark:text-amber-400">
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                  {rating.averageStars?.toFixed(1)}
+                  <span className="text-[10px] text-stone-400 font-normal">({rating.ratingCount})</span>
+                </span>
+              )}
+            </div>
             {recipe.cookTimeMinutes != null && (
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-stone-400" />

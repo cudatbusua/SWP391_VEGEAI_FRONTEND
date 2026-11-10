@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import type { BlogPost, BlogStatus } from '../types/blog';
 import { blogStatuses } from '../types/blog';
 import type { PageResponse } from '../types/api';
+import { RecipeStepBox } from './RecipeStepBox';
 
 export function BlogAccess({ children, admin = false }: { children: ReactNode; admin?: boolean }) {
   const { isLoading, isAuthenticated, user, sessionError, retrySession } = useAuth();
@@ -49,9 +50,135 @@ export function BlogCover({ post }: { post: Pick<BlogPost, 'coverImage' | 'title
     if (!event.currentTarget.src.endsWith('/images/vietnamese-vegan-table.png')) event.currentTarget.src = '/images/vietnamese-vegan-table.png';
   }} /></div>;
 }
+function parseInlineMarkdown(text: string): ReactNode {
+  const parts: ReactNode[] = [];
+  let remaining = text;
+  let keyIdx = 0;
+
+  while (remaining.length > 0) {
+    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    const italicMatch = remaining.match(/(?<!\*)\*([^*]+?)\*(?!\*)/);
+
+    let match: RegExpMatchArray | null = null;
+    let type: 'bold' | 'italic' = 'bold';
+
+    if (boldMatch && italicMatch) {
+      if ((boldMatch.index ?? Infinity) <= (italicMatch.index ?? Infinity)) {
+        match = boldMatch;
+        type = 'bold';
+      } else {
+        match = italicMatch;
+        type = 'italic';
+      }
+    } else if (boldMatch) {
+      match = boldMatch;
+      type = 'bold';
+    } else if (italicMatch) {
+      match = italicMatch;
+      type = 'italic';
+    }
+
+    if (match && match.index !== undefined) {
+      if (match.index > 0) parts.push(remaining.slice(0, match.index));
+      if (type === 'bold') {
+        parts.push(<strong key={keyIdx++} className="font-extrabold text-slate-900 dark:text-white">{match[1]}</strong>);
+      } else {
+        parts.push(<em key={keyIdx++} className="italic text-slate-600 dark:text-slate-300">{match[1]}</em>);
+      }
+      remaining = remaining.slice(match.index + match[0].length);
+    } else {
+      parts.push(remaining);
+      break;
+    }
+  }
+
+  return parts.length === 1 ? parts[0] : <>{parts}</>;
+}
+
+export function cleanStepPrefix(text: string): string {
+  return text
+    .replace(/^\s*(?:\*\*)?(?:(?:Bước|bước|Step|step)\s*\d+[\s:.-]*|\d+[\.\)\-:])(?:\*\*)?[\s:.-]*\s*/i, '')
+    .trim();
+}
+
 export function BlogBody({ content }: { content: string }) {
   if (!/<\/?[a-z][\s\S]*>/i.test(content) || typeof DOMParser === 'undefined') {
-    return <div className="blog-body">{content.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
+    const lines = content.split('\n');
+    const nodes: ReactNode[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        i++;
+        continue;
+      }
+
+      // Check Heading: #, ##, ###
+      if (trimmed.startsWith('### ')) {
+        nodes.push(<h3 key={i} className="text-base font-extrabold text-slate-900 dark:text-white mt-4 mb-2">{parseInlineMarkdown(trimmed.slice(4))}</h3>);
+        i++;
+        continue;
+      }
+      if (trimmed.startsWith('## ')) {
+        nodes.push(<h2 key={i} className="text-lg sm:text-xl font-black text-slate-900 dark:text-white mt-6 mb-3 flex items-center gap-2">{parseInlineMarkdown(trimmed.slice(3))}</h2>);
+        i++;
+        continue;
+      }
+      if (trimmed.startsWith('# ')) {
+        nodes.push(<h1 key={i} className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-6 mb-3">{parseInlineMarkdown(trimmed.slice(2))}</h1>);
+        i++;
+        continue;
+      }
+
+      // Check Step line: "1.", "1)", "Bước 1:", "Bước 1 -"
+      const stepMatch = trimmed.match(/^(?:(?:Bước|bước|Step|step)\s*(\d+)[\s:.-]*|(\d+)[\.\)\-:]\s*)(.*)$/i);
+      if (stepMatch) {
+        const stepNum = Number(stepMatch[1] || stepMatch[2]) || 1;
+        nodes.push(
+          <RecipeStepBox
+            key={i}
+            stepNumber={stepNum}
+            content={trimmed}
+            className="my-3"
+          />
+        );
+        i++;
+        continue;
+      }
+
+      // Check Bullet List item: "-", "*", "•"
+      const bulletMatch = trimmed.match(/^[-*•]\s+(.*)$/);
+      if (bulletMatch) {
+        nodes.push(
+          <div key={i} className="flex items-start gap-2.5 my-1.5 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0" />
+            <span className="leading-relaxed">{parseInlineMarkdown(bulletMatch[1])}</span>
+          </div>
+        );
+        i++;
+        continue;
+      }
+
+      // Check Blockquote: ">"
+      if (trimmed.startsWith('>')) {
+        nodes.push(
+          <blockquote key={i} className="my-3 pl-4 py-2 border-l-4 border-emerald-500 bg-emerald-50/40 dark:bg-slate-800/40 rounded-r-xl text-xs sm:text-sm italic text-slate-700 dark:text-slate-300">
+            {parseInlineMarkdown(trimmed.replace(/^>\s*/, ''))}
+          </blockquote>
+        );
+        i++;
+        continue;
+      }
+
+      // Default paragraph
+      nodes.push(<p key={i} className="my-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">{parseInlineMarkdown(trimmed)}</p>);
+      i++;
+    }
+
+    return <div className="blog-body space-y-1">{nodes}</div>;
   }
 
   const document = new DOMParser().parseFromString(content, 'text/html');
@@ -68,8 +195,21 @@ export function BlogBody({ content }: { content: string }) {
       case 'H2': return <h2 key={key}>{children}</h2>;
       case 'H3': return <h3 key={key}>{children}</h3>;
       case 'H4': return <h4 key={key}>{children}</h4>;
-      case 'UL': return <ul key={key}>{children}</ul>;
-      case 'OL': return <ol key={key}>{children}</ol>;
+      case 'UL': return <ul key={key} className="space-y-1.5 my-3 pl-2">{children}</ul>;
+      case 'OL': {
+        return (
+          <div key={key} className="space-y-3 my-4">
+            {Array.from(node.children).map((li, liIdx) => (
+              <RecipeStepBox
+                key={`${key}-step-${liIdx}`}
+                stepNumber={liIdx + 1}
+                content={li.textContent || ''}
+                className="my-2.5"
+              />
+            ))}
+          </div>
+        );
+      }
       case 'LI': return <li key={key}>{children}</li>;
       case 'STRONG': case 'B': return <strong key={key}>{children}</strong>;
       case 'EM': case 'I': return <em key={key}>{children}</em>;

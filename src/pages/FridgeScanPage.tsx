@@ -320,6 +320,42 @@ function ScanReview(props: ScanReviewProps) {
 
   return (
     <>
+      {/* Banner AI Summary */}
+      {result.summary && (
+        <div className="mb-4 rounded-2xl border border-emerald-200/90 bg-linear-to-r from-emerald-50 to-teal-50/80 p-4 text-emerald-950 shadow-xs">
+          <div className="flex items-start gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white font-bold shadow-2xs">
+              <Sparkles size={16} />
+            </span>
+            <div>
+              <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800">
+                Tóm tắt kết quả phân tích AI Vision
+              </h3>
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
+                {result.summary}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Banner AI Warnings & Safety Notes */}
+      {result.warnings && result.warnings.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-amber-200/90 bg-amber-50/90 p-4 text-amber-950 shadow-xs space-y-2">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-800">
+            <AlertCircle size={15} className="text-amber-600 shrink-0" />
+            <span>Cảnh báo an toàn &amp; Dị ứng từ AI ({result.warnings.length})</span>
+          </div>
+          <ul className="space-y-1 pl-5 list-disc text-xs text-amber-900 leading-normal">
+            {result.warnings.map((w, idx) => (
+              <li key={idx} className={w.includes('DỊ ỨNG') ? 'font-bold text-rose-700' : ''}>
+                {w}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Banner notification for Unreliable Images */}
       {unreliableCount > 0 && (
         <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 shadow-xs">
@@ -510,13 +546,40 @@ function ScanReview(props: ScanReviewProps) {
                       {ingredientIllustration(item.name)}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-bold text-slate-800">{item.name}</p>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <p className="truncate text-xs font-bold text-slate-800">{item.name}</p>
+                        {item.shelfLifeEstimate && (
+                          <span className="inline-flex items-center gap-0.5 font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[9px]">
+                            ⏳ {item.shelfLifeEstimate}
+                          </span>
+                        )}
+                        {item.isPreviouslyTracked && (
+                          <span className="inline-flex items-center gap-0.5 font-semibold text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded text-[9px]">
+                            🔄 Đã có trong tủ {item.previousDaysInFridge ?? 0} ngày
+                          </span>
+                        )}
+                        {item.rejectionReason && (
+                          <span className="inline-flex items-center gap-0.5 font-semibold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded text-[9px]">
+                            🚫 {item.rejectionReason}
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-0.5 text-[10px] text-slate-500">
                         {item.isVegetarian ? '🌱 Thuần chay' : '⚠️ Cần kiểm tra'} · {freshness[item.freshness] ?? item.freshness}
                         {item.confidence != null
                           ? ` · AI ${Math.round(item.confidence <= 1 ? item.confidence * 100 : item.confidence)}%`
                           : ''}
                       </p>
+                      {item.visualSigns && (
+                        <p className="text-[10px] text-slate-500 italic mt-0.5 line-clamp-1" title={item.visualSigns}>
+                          👁️ {item.visualSigns}
+                        </p>
+                      )}
+                      {item.storageTip && (
+                        <p className="text-[10px] text-emerald-700 font-medium mt-0.5 line-clamp-1" title={item.storageTip}>
+                          💡 {item.storageTip}
+                        </p>
+                      )}
                     </div>
                     <select
                       aria-label={`Độ tươi ${item.name}`}

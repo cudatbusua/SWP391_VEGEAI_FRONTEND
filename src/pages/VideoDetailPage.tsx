@@ -14,10 +14,6 @@ import {
   UserRound,
   Sparkles,
   ChefHat,
-  Utensils,
-  ShoppingBag,
-  CheckCircle2,
-  Flame,
   AlertCircle,
   Star
 } from 'lucide-react';
@@ -32,6 +28,7 @@ import type { VideoComment } from '../types/community';
 import { videoCategories } from '../types/community';
 import type { GeneratedRecipeAiResponse } from '../types/api';
 import { communityDate, CommunityConfirm, CommunityError, CommunityLoading, CommunityPagination, VideoCard, VideoPlayer } from '../components/CommunityUi';
+import { UnifiedRecipeStandardView } from '../components/UnifiedRecipeStandardView';
 
 function VideoAiRecipeCopilot({
   title,
@@ -106,128 +103,30 @@ function VideoAiRecipeCopilot({
       )}
 
       {recipe && (
-        <div className="mt-4 pt-4 border-t border-emerald-100 dark:border-slate-800 space-y-5 animate-in fade-in duration-300">
-          {/* Quick Metrics Bar */}
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200">
-              <Clock3 size={14} className="text-emerald-600" /> {recipe.cookTimeMinutes} phút
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200">
-              <Flame size={14} className="text-orange-500" /> ~{recipe.estimatedCalories} kcal/khẩu phần
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-xs font-bold text-emerald-800 dark:text-emerald-300">
-              <CheckCircle2 size={14} /> Độ khó: {recipe.difficulty === 'EASY' ? 'Dễ làm' : recipe.difficulty === 'MEDIUM' ? 'Vừa phải' : 'Công phu'}
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-xs font-black text-emerald-900 dark:text-emerald-200">
-              🌱 {recipe.dietaryType || 'Thuần chay'}
-            </span>
-          </div>
-
-          <div className="grid gap-5 md:grid-cols-2">
-            {/* Ingredients */}
-            <div className="bg-white/80 dark:bg-slate-800/80 rounded-xl p-4 border border-emerald-100 dark:border-slate-700">
-              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
-                <Utensils size={15} className="text-emerald-700 dark:text-emerald-400" />
-                Nguyên liệu cần chuẩn bị ({recipe.ingredients?.length || 0})
-              </h3>
-              <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-200">
-                {recipe.ingredients?.map((ing, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 mt-1.5 shrink-0" />
-                    <span>{ing}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Step-by-Step Instructions */}
-            <div className="bg-white/80 dark:bg-slate-800/80 rounded-xl p-4 border border-emerald-100 dark:border-slate-700">
-              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
-                <ChefHat size={15} className="text-emerald-700 dark:text-emerald-400" />
-                Các bước thực hiện
-              </h3>
-              <div className="space-y-2.5 text-xs text-slate-700 dark:text-slate-200 max-h-60 overflow-y-auto pr-1">
-                {recipe.instructions?.map((step, i) => (
-                  <div key={i} className="flex items-start gap-2.5 bg-slate-50/70 dark:bg-slate-900/50 p-2 rounded-lg">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-[10px] font-black text-white">
-                      {i + 1}
-                    </span>
-                    <span className="leading-relaxed">{step.replace(/^Bước\s*\d+:\s*/i, '')}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Safety & Chef Tips */}
-          {recipe.safetyNotes && recipe.safetyNotes.length > 0 && (
-            <div className="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900 text-amber-900 dark:text-amber-200 text-xs">
-              <strong className="block mb-1 font-bold">💡 Mẹo dinh dưỡng & an toàn từ Bếp trưởng:</strong>
-              <ul className="list-disc list-inside space-y-1">
-                {recipe.safetyNotes.map((note, i) => (
-                  <li key={i}>{note}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Quick Action Navigation Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+        <div className="mt-4 pt-4 border-t border-emerald-100 dark:border-slate-800 space-y-4 animate-in fade-in duration-300">
+          <UnifiedRecipeStandardView
+            recipe={{
+              title: recipe.title,
+              description: recipe.description || `Công thức bóc tách từ video "${title}"`,
+              calories: recipe.estimatedCalories,
+              cookTimeMinutes: recipe.cookTimeMinutes,
+              difficulty: recipe.difficulty,
+              dietaryType: recipe.dietaryType,
+              ingredients: recipe.ingredients,
+              instructions: recipe.instructions,
+              safetyNotes: recipe.safetyNotes,
+              sourceType: 'VIDEO_AI',
+              sourceUrl: videoUrl,
+            }}
+          />
+          <div className="flex justify-end pt-2">
             <button
               type="button"
               onClick={handleExtractRecipe}
               className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 underline cursor-pointer"
             >
-              Phân tích lại công thức
+              Phân tích lại công thức từ video
             </button>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Link
-                to={'/ai-chef?prompt=' + encodeURIComponent(
-                  `Tôi muốn hỏi thêm về món "${recipe.title}" từ video "${title}". Nguyên liệu chính: ${(recipe.ingredients ?? []).slice(0, 8).join(', ')}. Thời gian khoảng ${recipe.cookTimeMinutes} phút, ước tính ${recipe.estimatedCalories} kcal. Hãy tư vấn ngắn gọn và trả lời câu hỏi tiếp theo của tôi dựa trên thông tin món này.`
-                )}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs"
-              >
-                <ChefHat size={14} /> Chuyển sang AI Bếp Trưởng
-              </Link>
-              <Link
-                to="/smart-market"
-                state={{
-                  planTitle: recipe.title,
-                  recipeSummary: {
-                    title: recipe.title,
-                    cookTimeMinutes: recipe.cookTimeMinutes,
-                    calories: recipe.estimatedCalories,
-                    servings: 2
-                  },
-                  importedItems: recipe.ingredients?.map((ing, idx) => {
-                    const colonParts = ing.split(':');
-                    const rawName = colonParts.length > 1 ? colonParts[0].trim() : ing.split('(')[0].trim();
-                    const rawAmount = colonParts.length > 1
-                      ? colonParts.slice(1).join(':').trim()
-                      : (ing.includes('(') ? ing.split('(')[1].replace(')', '').trim() : '1 phần');
-                    const lower = rawName.toLowerCase();
-                    const isProtein = lower.includes('đậu') || lower.includes('tofu') || lower.includes('tàu hũ') || lower.includes('hạt');
-                    const isSpice = lower.includes('nước tương') || lower.includes('xì dầu') || lower.includes('dầu') || lower.includes('sốt') || lower.includes('hạt nấm') || lower.includes('hạt nêm') || lower.includes('muối') || lower.includes('tiêu');
-                    const isGrain = lower.includes('gạo') || lower.includes('bún') || lower.includes('phở') || lower.includes('mì');
-                    const category = isProtein ? ('protein' as const) : isSpice ? ('spices' as const) : isGrain ? ('grains' as const) : ('produce' as const);
-                    const categoryLabel = isProtein ? 'Đậu hũ & Đạm thực vật' : isSpice ? 'Gia vị bếp chay' : isGrain ? 'Tinh bột & Ngũ cốc' : 'Rau củ & Nấm tươi';
-                    return {
-                      id: `vid-ing-${Date.now()}-${idx}`,
-                      name: rawName,
-                      amount: rawAmount || '1 phần',
-                      category,
-                      categoryLabel,
-                      mealNote: `Món: ${recipe.title}`,
-                      checked: false
-                    };
-                  })
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-xs"
-              >
-                <ShoppingBag size={14} /> Đi chợ mua nguyên liệu
-              </Link>
-            </div>
           </div>
         </div>
       )}

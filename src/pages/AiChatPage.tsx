@@ -43,6 +43,7 @@ import { DEFAULT_WEEKLY_SCHEDULE } from '../data/weeklyScheduleData';
 import { wearableService } from '../utils/wearableService';
 import { userService } from '../services/userService';
 import { fridgeService } from '../services/fridgeService';
+import { BlogBody } from '../components/BlogUi';
 import { calculateBmr, calculateTdee, calculateExactAge } from '../utils/nutritionProfile';
 
 export type SessionCategory = 'fridge-scan' | 'ai-chef';
@@ -1088,7 +1089,13 @@ export function AiChatPage() {
                         <img src={msg.image} alt="Ảnh đính kèm" className="w-full h-auto object-cover max-h-56 rounded-lg" />
                       </div>
                     )}
-                    <div className="whitespace-pre-wrap font-sans break-words">{msg.text}</div>
+                    {msg.sender === 'user' ? (
+                      <div className="whitespace-pre-wrap font-sans break-words">{msg.text}</div>
+                    ) : (
+                      <div className="font-sans break-words text-slate-800 dark:text-slate-100">
+                        <BlogBody content={msg.text} />
+                      </div>
+                    )}
 
                     {/* Interactive 7-Day Meal Schedule Card */}
                     {msg.mealScheduleCard && (

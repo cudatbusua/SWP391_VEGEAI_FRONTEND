@@ -34,7 +34,7 @@ import { aiService } from '../services/aiService';
 import { blogCategories, BLOG_POST_TEMPLATES, resolvePostAiMode } from '../types/blog';
 import type { BlogCategory, BlogComment, BlogPost } from '../types/blog';
 import type { GeneratedRecipeAiResponse, PageResponse } from '../types/api';
-import type { SmartMarketItem } from '../data/smartMarketData';
+import { UnifiedRecipeStandardView } from '../components/UnifiedRecipeStandardView';
 import '../styles/blog.css';
 
 interface KnowledgeAiAnalysisResult {
@@ -72,43 +72,12 @@ function buildKnowledgeFallback(post: BlogPost): KnowledgeAiAnalysisResult {
   };
 }
 
-function parseMarketItemsFromStrings(rawIngredients: string[], recipeTitle: string): SmartMarketItem[] {
-  return rawIngredients.map((raw, idx) => {
-    const colonIdx = raw.indexOf(':');
-    let name = raw.trim();
-    let amount = '1 phần';
-    if (colonIdx > 0) {
-      name = raw.slice(0, colonIdx).trim();
-      amount = raw.slice(colonIdx + 1).trim() || '1 phần';
-    } else {
-      const parenMatch = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-      if (parenMatch) {
-        name = parenMatch[1].trim();
-        amount = parenMatch[2].trim();
-      }
-    }
-    const lower = name.toLowerCase();
-    const isProtein = lower.includes('đậu') || lower.includes('hạt') || lower.includes('tofu');
-    const isSpice = lower.includes('sốt') || lower.includes('dầu') || lower.includes('tương') || lower.includes('tiêu') || lower.includes('muối');
-    const category: SmartMarketItem['category'] = isProtein ? 'protein' : isSpice ? 'spices' : 'produce';
-    const categoryLabel = isProtein ? 'Đậu hũ & Đạm thực vật' : isSpice ? 'Gia vị bếp chay' : 'Rau củ & Nấm tươi';
-    return {
-      id: `blog-ing-${Date.now()}-${idx}`,
-      name,
-      amount,
-      category,
-      categoryLabel,
-      mealNote: `Từ bài đăng: ${recipeTitle}`,
-      checked: false,
-    };
-  });
-}
-
 export function BlogPage() {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<BlogCategory | ''>('');
+  const [showOnlyVideo, setShowOnlyVideo] = useState(false);
   const [page, setPage] = useState(0);
   const [data, setData] = useState<PageResponse<BlogPost> | null>(null);
   const [busy, setBusy] = useState(true);
@@ -295,18 +264,29 @@ export function BlogPage() {
         <div className="space-y-3">
           <div className="blog-filter-bar">
             <div className="blog-tabs">
-              <button aria-pressed={!category} onClick={() => { setCategory(''); setPage(0); }}>
+              <button
+                aria-pressed={!category && !showOnlyVideo}
+                onClick={() => { setCategory(''); setShowOnlyVideo(false); setPage(0); }}
+              >
                 Tất cả bài đăng
               </button>
               {Object.entries(blogCategories).map(([code, label]) => (
                 <button
                   key={code}
-                  aria-pressed={category === code}
-                  onClick={() => { setCategory(code as BlogCategory); setPage(0); }}
+                  aria-pressed={category === code && !showOnlyVideo}
+                  onClick={() => { setCategory(code as BlogCategory); setShowOnlyVideo(false); setPage(0); }}
                 >
                   {label}
                 </button>
               ))}
+              <button
+                aria-pressed={showOnlyVideo}
+                onClick={() => { setShowOnlyVideo(true); setCategory(''); setPage(0); }}
+                className="flex items-center gap-1.5 font-bold"
+              >
+                <VideoIcon size={14} className={showOnlyVideo ? 'text-white' : 'text-rose-500'} />
+                <span>🎬 Video Bếp Chay</span>
+              </button>
             </div>
             <label className="blog-search">
               <Search size={17} />
@@ -350,13 +330,15 @@ export function BlogPage() {
         {/* FACEBOOK-STYLE SOCIAL FEED CARDS WITH INTEGRATED CONTEXT-AWARE AI */}
         {!error && data && data.items.length > 0 && (
           <div className={'space-y-6 ' + (busy ? 'opacity-60' : '')}>
-            {data.items.map(post => {
-              const hasVideo = !!post.videoUrl;
-              const aiMode = resolvePostAiMode(post);
-              const tpl = BLOG_POST_TEMPLATES[post.category] || BLOG_POST_TEMPLATES.KITCHEN;
-              const recipeResult = feedRecipeResults[post.postId];
-              const knowledgeResult = feedKnowledgeResults[post.postId];
-              const isAnalyzingThis = analyzingPostId === post.postId;
+            {data.items
+              .filter(post => !showOnlyVideo || !!post.videoUrl)
+              .map(post => {
+                const hasVideo = !!post.videoUrl;
+                const aiMode = resolvePostAiMode(post);
+                const tpl = BLOG_POST_TEMPLATES[post.category] || BLOG_POST_TEMPLATES.KITCHEN;
+                const recipeResult = feedRecipeResults[post.postId];
+                const knowledgeResult = feedKnowledgeResults[post.postId];
+                const isAnalyzingThis = analyzingPostId === post.postId;
 
               return (
                 <article
@@ -465,95 +447,24 @@ export function BlogPage() {
                   {feedErrors[post.postId] && (
                     <p role="alert" className="mx-4 sm:mx-6 mb-3 text-xs font-semibold text-red-600">{feedErrors[post.postId]}</p>
                   )}
-                  {/* INLINE AI ANALYSIS OUTPUT FOR RECIPE POSTS (Shows Ingredients + Cooking Steps + Switch to Chatbot) */}
+                  {/* INLINE AI ANALYSIS OUTPUT FOR RECIPE POSTS (Unified Recipe Standard View) */}
                   {recipeResult && (
-                    <div className="mx-4 sm:mx-6 mb-5 p-5 rounded-2xl border-2 border-emerald-500/30 bg-emerald-50/40 dark:bg-slate-800/80 space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-emerald-200/60 dark:border-slate-700">
-                        <div>
-                          <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                            <Sparkles size={13} /> AI Recipe Copilot — Đã bóc tách công thức &amp; các bước nấu
-                          </span>
-                          <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mt-0.5">
-                            {recipeResult.title}
-                          </h3>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                          <span>⏱ {recipeResult.cookTimeMinutes} phút</span>
-                          <span>·</span>
-                          <span>🔥 ~{recipeResult.estimatedCalories} kcal</span>
-                        </div>
-                      </div>
-
-                      <div className="grid md:grid-cols-12 gap-4">
-                        <div className="md:col-span-5 space-y-1.5">
-                          <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase">
-                            🥗 Nguyên liệu cần chuẩn bị ({recipeResult.ingredients.length}):
-                          </h4>
-                          <ul className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
-                            {recipeResult.ingredients.map((ing, i) => (
-                              <li key={i} className="flex items-start gap-1.5 p-1.5 rounded-lg bg-white dark:bg-slate-900">
-                                <CheckCircle2 size={13} className="text-emerald-600 shrink-0 mt-0.5" />
-                                <span>{ing}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-
-                        <div className="md:col-span-7 space-y-1.5">
-                          <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase">
-                            👨‍🍳 Các bước nấu thực hiện:
-                          </h4>
-                          <ol className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
-                            {recipeResult.instructions.map((step, i) => (
-                              <li key={i} className="flex gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-emerald-100 dark:border-slate-700">
-                                <span className="w-5 h-5 rounded-full bg-emerald-700 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-                                  {i + 1}
-                                </span>
-                                <span className="leading-relaxed">{step}</span>
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      </div>
-
-                      <div className="pt-3 border-t border-emerald-200/60 dark:border-slate-700 flex flex-wrap items-center justify-end gap-2">
-                        <Link
-                          to="/smart-market"
-                          state={{
-                            planTitle: recipeResult.title,
-                            recipeSummary: {
-                              title: recipeResult.title,
-                              cookingTimeMinutes: recipeResult.cookTimeMinutes,
-                              caloriesEstimate: recipeResult.estimatedCalories,
-                              source: 'blog-recipe',
-                            },
-                            importedItems: parseMarketItemsFromStrings(recipeResult.ingredients, recipeResult.title),
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold transition shadow-2xs"
-                        >
-                          <MapPin size={14} />
-                          <span>Tìm điểm bán nguyên liệu gần tôi (GPS)</span>
-                        </Link>
-                        <Link
-                          to="/ai-chef"
-                          state={{
-                            source: 'blog-recipe',
-                            title: recipeResult.title,
-                            recipeContext: {
-                              title: recipeResult.title,
-                              cookingTimeMinutes: recipeResult.cookTimeMinutes,
-                              caloriesEstimate: recipeResult.estimatedCalories,
-                              ingredients: recipeResult.ingredients,
-                              instructions: recipeResult.instructions,
-                            },
-                            initialPrompt: `Tôi vừa dùng AI phân tích công thức "${recipeResult.title}" từ bài đăng cộng đồng (Nguyên liệu: ${recipeResult.ingredients.join(', ')}). Bếp trưởng hãy tư vấn thêm mẹo nấu món này ngon nhất hoặc cách điều chỉnh khẩu phần cho tôi nhé!`
-                          }}
-                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-2xs"
-                        >
-                          <ChefHat size={14} />
-                          <span>Chuyển sang Chatbot AI Bếp Trưởng tư vấn tiếp</span>
-                        </Link>
-                      </div>
+                    <div className="mx-4 sm:mx-6 mb-5">
+                      <UnifiedRecipeStandardView
+                        recipe={{
+                          title: recipeResult.title,
+                          description: recipeResult.description || `Công thức bóc tách từ bài đăng của ${post.authorName}`,
+                          calories: recipeResult.estimatedCalories,
+                          cookTimeMinutes: recipeResult.cookTimeMinutes,
+                          difficulty: recipeResult.difficulty,
+                          dietaryType: recipeResult.dietaryType,
+                          ingredients: recipeResult.ingredients,
+                          instructions: recipeResult.instructions,
+                          safetyNotes: recipeResult.safetyNotes,
+                          sourceType: 'BLOG_AI',
+                          sourceUrl: post.videoUrl,
+                        }}
+                      />
                     </div>
                   )}
 
@@ -802,6 +713,16 @@ export function BlogDetailPage() {
                   />
                 </div>
               </div>
+            ) : videoObj?.kind === 'file' ? (
+              <div className="my-6 space-y-3">
+                <div className="aspect-video w-full rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800 bg-black">
+                  <video
+                    src={videoObj.src}
+                    controls
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              </div>
             ) : (
               <BlogCover post={{ ...post, postId: post.postId }} />
             )}
@@ -850,101 +771,23 @@ export function BlogDetailPage() {
 
               {aiError && <p className="text-xs text-red-600 font-semibold">{aiError}</p>}
 
-              {/* Output Type A: Recipe Steps + Switch to Chatbot + Find Nearby Stores */}
+              {/* Output Type A: Unified Recipe Standard View with cross-ecosystem action buttons */}
               {aiRecipe && (
-                <div className="p-5 rounded-2xl border border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                        Kết quả AI bóc tách công thức nấu ăn
-                      </span>
-                      <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5">
-                        {aiRecipe.title}
-                      </h3>
-                      {aiRecipe.description && (
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{aiRecipe.description}</p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 dark:text-slate-300 font-bold">
-                      {aiRecipe.cookTimeMinutes > 0 && <span>⏱ {aiRecipe.cookTimeMinutes} phút</span>}
-                      {aiRecipe.estimatedCalories > 0 && <span>🔥 ~{aiRecipe.estimatedCalories} kcal</span>}
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px]">
-                        🌱 {aiRecipe.dietaryType || 'VEGAN'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-2 uppercase">
-                      🥗 Nguyên liệu cần chuẩn bị ({aiRecipe.ingredients.length}):
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {aiRecipe.ingredients.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                          <span>{item}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-2 uppercase">
-                      👨‍🍳 Các bước nấu thực hiện:
-                    </h4>
-                    <div className="space-y-2.5">
-                      {aiRecipe.instructions.map((step, idx) => (
-                        <div key={idx} className="flex gap-3 p-3 rounded-xl bg-emerald-50/50 dark:bg-slate-800/40 border border-emerald-100 dark:border-slate-800">
-                          <div className="w-6 h-6 rounded-full bg-emerald-700 text-white text-xs font-bold flex items-center justify-center shrink-0">
-                            {idx + 1}
-                          </div>
-                          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
-                            {step}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
-                    <Link
-                      to="/smart-market"
-                      state={{
-                        planTitle: aiRecipe.title,
-                        recipeSummary: {
-                          title: aiRecipe.title,
-                          cookingTimeMinutes: aiRecipe.cookTimeMinutes,
-                          caloriesEstimate: aiRecipe.estimatedCalories,
-                          source: 'blog-recipe',
-                        },
-                        importedItems: parseMarketItemsFromStrings(aiRecipe.ingredients, aiRecipe.title),
-                      }}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold transition shadow-xs"
-                    >
-                      <MapPin size={14} />
-                      <span>Tìm điểm bán nguyên liệu gần tôi (GPS)</span>
-                    </Link>
-                    <Link
-                      to="/ai-chef"
-                      state={{
-                        source: 'blog-recipe',
-                        title: aiRecipe.title,
-                        recipeContext: {
-                          title: aiRecipe.title,
-                          cookingTimeMinutes: aiRecipe.cookTimeMinutes,
-                          caloriesEstimate: aiRecipe.estimatedCalories,
-                          ingredients: aiRecipe.ingredients,
-                          instructions: aiRecipe.instructions,
-                        },
-                        initialPrompt: `Tôi vừa phân tích công thức "${aiRecipe.title}" từ bài đăng cộng đồng (Nguyên liệu: ${aiRecipe.ingredients.join(', ')}). Bếp trưởng hãy hướng dẫn chi tiết hơn hoặc gợi ý cách biến tấu phù hợp với mục tiêu sức khỏe của tôi nhé!`
-                      }}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-xs"
-                    >
-                      <ChefHat size={14} />
-                      <span>Chuyển sang Chatbot AI Bếp Trưởng tư vấn tiếp</span>
-                    </Link>
-                  </div>
-                </div>
+                <UnifiedRecipeStandardView
+                  recipe={{
+                    title: aiRecipe.title,
+                    description: aiRecipe.description || `Công thức bóc tách từ bài viết "${post.title}"`,
+                    calories: aiRecipe.estimatedCalories,
+                    cookTimeMinutes: aiRecipe.cookTimeMinutes,
+                    difficulty: aiRecipe.difficulty,
+                    dietaryType: aiRecipe.dietaryType,
+                    ingredients: aiRecipe.ingredients,
+                    instructions: aiRecipe.instructions,
+                    safetyNotes: aiRecipe.safetyNotes,
+                    sourceType: 'BLOG_AI',
+                    sourceUrl: post.videoUrl,
+                  }}
+                />
               )}
 
               {/* Output Type B: Knowledge / Green Living / Review Analysis + Switch to Chatbot */}

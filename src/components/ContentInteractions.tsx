@@ -98,14 +98,15 @@ export function ContentInteractions({ type, id }: { type: InteractionTarget; id:
     setError('');
     setNotice('');
     try {
+      const targetReview = editing || comments?.items.find(c => c.authorId === user?.id);
       await contentInteractionService.submitReview(type, id, {
         content: draft.trim(),
         stars: selectedStars,
         tags: selectedTags,
         publicDisplayName,
         photoUrls: photos.filter(photo => !photo.file).map(photo => photo.url),
-      }, photos.flatMap(photo => photo.file ? [photo.file] : []), editing || undefined);
-      setNotice(editing ? 'Đã cập nhật đánh giá.' : 'Đã gửi đánh giá của bạn.');
+      }, photos.flatMap(photo => photo.file ? [photo.file] : []), targetReview || undefined);
+      setNotice(targetReview ? 'Đã cập nhật đánh giá.' : 'Đã gửi đánh giá của bạn.');
       resetForm();
       setSelectedStars(selectedStars);
       setReload(value => value + 1);
@@ -148,6 +149,7 @@ export function ContentInteractions({ type, id }: { type: InteractionTarget; id:
 
   const rating = data?.rating;
   const comments = data?.comments;
+  const myReview = comments?.items.find(c => c.authorId === user?.id);
   const targetLabel = type === 'BLOG' ? 'bài viết' : type === 'VIDEO' ? 'video' : 'công thức';
   const ratingSummary = rating?.ratingCount
     ? `${rating.averageStars?.toFixed(1)} / 5 từ ${rating.ratingCount} lượt đánh giá`
@@ -162,14 +164,63 @@ export function ContentInteractions({ type, id }: { type: InteractionTarget; id:
       <div className="ci-review-rating-copy"><strong>Đánh giá chất lượng {type === 'RECIPE' ? 'món ăn' : targetLabel}</strong><span>{ratingSummary}</span></div>
       <div className="ci-stars ci-review-stars" role="group" aria-label="Đánh giá từ 1 đến 5 sao">
         {stars.map(star => <button key={star} type="button" title={`${star} sao`} aria-label={`Đánh giá ${star} sao`} aria-pressed={selectedStars === star}
-          disabled={!canInteract || busy} onClick={() => setSelectedStars(star)}>
+          disabled={!canInteract || busy || (!editing && !!myReview)} onClick={() => setSelectedStars(star)}>
           <Star size={28} fill={selectedStars >= star ? 'currentColor' : 'none'} />
         </button>)}
       </div>
       {selectedStars > 0 && <span className="ci-rating-phrase">{ratingPhrases[selectedStars]}</span>}
     </div>
-    {canInteract ? <form className="ci-review-form" onSubmit={saveReview}>
-      <div className="ci-review-label-row"><label htmlFor={`ci-comment-${id}`}>Cảm nhận của bạn về {targetLabel}</label><span>{draft.length} / 500 ký tự</span></div>
+    {canInteract ? (myReview && !editing) ? (
+      <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4.5 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-700 text-white shadow-2xs">
+              <Star size={14} className="fill-white" />
+            </span>
+            <div>
+              <strong className="text-sm font-bold text-emerald-900 dark:text-emerald-200">Đánh giá của bạn đã được ghi nhận</strong>
+              <p className="text-xs text-slate-500">Mỗi thành viên có 1 đánh giá cho mỗi món để đảm bảo tính khách quan.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => beginEdit(myReview)}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300"
+            >
+              <Pencil size={13} /> Chỉnh sửa đánh giá
+            </button>
+            <button
+              type="button"
+              onClick={() => removeComment(myReview)}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 transition dark:border-rose-900/50 dark:bg-slate-900 dark:text-rose-400"
+            >
+              <Trash2 size={13} /> Xóa
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-amber-500 my-1.5">
+          {stars.map(s => <Star key={s} size={15} fill={s <= (myReview.reviewStars || 0) ? 'currentColor' : 'none'} />)}
+          <span className="text-xs font-semibold ml-1.5 text-slate-700 dark:text-slate-300">{ratingPhrases[myReview.reviewStars || 5]}</span>
+        </div>
+        <p className="text-sm text-slate-800 dark:text-slate-200 mt-1">{myReview.content}</p>
+        {!!myReview.tags?.length && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {myReview.tags.map(tag => <span key={tag} className="rounded-md bg-white/80 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-900">{tag}</span>)}
+          </div>
+        )}
+        {!!myReview.photoUrls?.length && (
+          <div className="flex gap-2 mt-2.5">
+            {myReview.photoUrls.map((url, i) => (
+              <img key={url} src={url} alt={`Ảnh đánh giá ${i + 1}`} className="w-14 h-14 object-cover rounded-xl border border-emerald-200 dark:border-emerald-800 shadow-2xs" />
+            ))}
+          </div>
+        )}
+      </div>
+    ) : <form className="ci-review-form" onSubmit={saveReview}>
+      <div className="ci-review-label-row"><label htmlFor={`ci-comment-${id}`}>{editing ? `Chỉnh sửa cảm nhận về ${targetLabel}` : `Cảm nhận của bạn về ${targetLabel}`}</label><span>{draft.length} / 500 ký tự</span></div>
       <textarea id={`ci-comment-${id}`} value={draft} maxLength={500} rows={4}
         placeholder="Chia sẻ cảm nhận của bạn..." onChange={event => setDraft(event.target.value)} />
       <div className="ci-review-quick-tags" aria-label="Gắn thẻ cảm nhận">

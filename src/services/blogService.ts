@@ -34,8 +34,20 @@ export const blogService = {
   async withdraw(id: string, version: number) {
     return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/withdraw', { method: 'POST', body: { version } }));
   },
+  async archive(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/archive', { method: 'POST', body: { version } }));
+  },
+  async restore(id: string, version: number) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/restore', { method: 'POST', body: { version } }));
+  },
+  async requestPublishedEdit(id: string, input: BlogInput) {
+    return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/request-review', { method: 'PUT', body: input }));
+  },
   async remove(id: string, version: number) {
     await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '?version=' + version, { method: 'DELETE' });
+  },
+  async deletePermanent(id: string, version: number) {
+    await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '/permanent?version=' + version, { method: 'DELETE' });
   },
   async queue(status: BlogStatus, keyword: string, page: number, signal?: AbortSignal) {
     const query = new URLSearchParams({ status, page: String(page), size: '10' });

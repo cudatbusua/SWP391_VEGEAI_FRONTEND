@@ -41,6 +41,7 @@ function setup(handler) {
     nutrition: load('src/services/nutritionService.ts').nutritionService,
     mealPlans: load('src/services/mealPlanService.ts').mealPlanService,
     community: load('src/services/communityService.ts').communityService,
+    cookbook: load('src/services/cookbookService.ts').cookbookService,
     videoMedia: load('src/utils/communityVideo.ts') };
 }
 const profile = { userId: 'user-1', username: 'member', email: 'member@example.com', fullName: 'Thành viên', role: 'USER', status: 'ACTIVE' };
@@ -539,4 +540,25 @@ test('a late 401 from an old session cannot invalidate a newer login', async () 
   resolve(reply(undefined, 401, 'Old token'));
   await assert.rejects(pending, /Old token/);
   assert.equal(fixture.api.hasSession(), true); assert.equal(fixture.calls.length, 1);
+});
+
+test('cookbook saves, queries and removes recipes using personal cookbook endpoints', async () => {
+  const fixture = setup(url => {
+    if (url.includes('/recipes/cookbook?')) return reply({ items: [{ id: 'cb-1', title: 'Đậu sốt cà chua' }], totalElements: 1, totalPages: 1, currentPage: 0 });
+    if (url.endsWith('/recipes/cookbook/cb-1')) return reply(null);
+    return reply({ id: 'cb-1', title: 'Đậu sốt cà chua' }, 201);
+  });
+  fixture.api.setSession(auth(), true);
+  const saved = await fixture.cookbook.save({ title: 'Đậu sốt cà chua', ingredients: ['Đậu: 2 bìa'] });
+  assert.equal(saved.id, 'cb-1');
+  assert.equal(fixture.calls[0].url, '/api/recipes/cookbook');
+  assert.equal(fixture.calls[0].method, 'POST');
+
+  const list = await fixture.cookbook.list(0, 10, 'đậu');
+  assert.equal(list.items.length, 1);
+  assert.match(fixture.calls[1].url, /\/api\/recipes\/cookbook\?page=0&size=10&keyword=%C4%91%E1%BA%ADu/);
+
+  await fixture.cookbook.remove('cb-1');
+  assert.equal(fixture.calls[2].url, '/api/recipes/cookbook/cb-1');
+  assert.equal(fixture.calls[2].method, 'DELETE');
 });

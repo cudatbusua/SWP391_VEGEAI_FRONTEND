@@ -76,10 +76,20 @@ export interface FridgeScanResponse {
     visualSigns?: string;
     confidence?: number;
     storageTip?: string;
+    matchedExistingFridgeItemId?: string;
+    isPreviouslyTracked?: boolean;
+    previousDaysInFridge?: number;
   }[];
   suggestedRecipes?: string[];
   warnings?: string[];
   scannedAt: string;
+  requiresProfileSetup?: boolean;
+}
+
+export interface GenerateRecipeAiRequest {
+  recipeName: string;
+  availableIngredients?: string[];
+  contextNotes?: string;
 }
 
 export type FridgeItemStatus = 'ACTIVE' | 'CONSUMED' | 'DISCARDED';

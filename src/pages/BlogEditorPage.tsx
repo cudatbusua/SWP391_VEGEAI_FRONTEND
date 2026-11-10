@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Save, Send, Eye, FilePenLine, Image, Video, Sparkles, Wand2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Save, Send, Eye, FilePenLine, Image, Video, Sparkles, Utensils, Upload, Loader2, Trash2 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { BlogAccess, BlogBadge, BlogBody, BlogCover, BlogError } from '../components/BlogUi';
 import { useAuth } from '../hooks/useAuth';
 import { blogService } from '../services/blogService';
+import { communityService } from '../services/communityService';
 import { errorMessage } from '../services/apiClient';
 import { videoSource } from '../utils/communityVideo';
 import type { BlogCategory, BlogInput, BlogPost } from '../types/blog';
-import { blogCategories, BLOG_POST_TEMPLATES } from '../types/blog';
+import { blogCategories, RECIPE_POST_TEMPLATE } from '../types/blog';
 import '../styles/blog.css';
 
 const initial: BlogInput = {
   title: '',
   excerpt: '',
-  content: BLOG_POST_TEMPLATES.KITCHEN.contentTemplate,
+  content: '',
   category: 'KITCHEN',
   coverImage: '/images/vietnamese-vegan-table.png',
   videoUrl: '',
@@ -35,6 +36,7 @@ export function BlogEditorPage() {
   const [form, setForm] = useState<BlogInput>(initial);
   const [post, setPost] = useState<BlogPost | null>(null);
   const [mediaTab, setMediaTab] = useState<'image' | 'video'>('image');
+  const [uploadingMedia, setUploadingMedia] = useState<'image' | 'video' | null>(null);
   const [loading, setLoading] = useState(!!id);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -59,20 +61,21 @@ export function BlogEditorPage() {
 
       if (state?.recipeTitle || state?.recipeContent || state?.recipeCategory) {
         const selectedCat: BlogCategory = state.recipeCategory || 'KITCHEN';
-        const tpl = BLOG_POST_TEMPLATES[selectedCat] || BLOG_POST_TEMPLATES.KITCHEN;
         setForm({
           ...initial,
           title: state.recipeTitle || '',
           excerpt: state.recipeExcerpt || '',
-          content: state.recipeContent || tpl.contentTemplate,
+          content: state.recipeContent || '',
           category: selectedCat,
-          coverImage: state.coverImage || tpl.defaultCover,
+          coverImage: state.coverImage || initial.coverImage,
           videoUrl: state.videoUrl || '',
         });
         if (state.mediaTab === 'video' || state.videoUrl) {
           setMediaTab('video');
         }
-        setMessage(`✨ Đã nạp khung bài đăng chuẩn "${tpl.badgeLabel}". Bạn có thể điền nội dung, đính kèm hình ảnh/video và đăng bài!`);
+        if (state.recipeContent) {
+          setMessage('Đã nạp sẵn nội dung bản nháp. Bạn có thể chỉnh sửa trước khi gửi bài.');
+        }
         setDirty(true);
       } else {
         setForm(initial);
@@ -105,7 +108,7 @@ export function BlogEditorPage() {
       if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [id, isAuthenticated, user?.id, reload]);
+  }, [id, isAuthenticated, user?.id, reload, location.state]);
 
   useEffect(() => {
     const preventLoss = (event: BeforeUnloadEvent) => {
@@ -124,25 +127,40 @@ export function BlogEditorPage() {
     setMessage('');
   };
 
-  const applyClassificationTemplate = (cat: BlogCategory, forceReplaceContent = false) => {
-    const tpl = BLOG_POST_TEMPLATES[cat];
-    const isUsingDefaultTemplate = Object.values(BLOG_POST_TEMPLATES).some(
-      t => t.contentTemplate.trim() === form.content.trim()
-    );
-    const shouldReplaceContent = forceReplaceContent || !form.content.trim() || isUsingDefaultTemplate;
+  const uploadBlogMedia = async (file: File | undefined, isVideo: boolean) => {
+    if (!file || uploadingMedia) return;
+    setUploadingMedia(isVideo ? 'video' : 'image');
+    setError('');
+    setMessage('');
+    try {
+      const asset = await communityService.uploadMyVideoAsset(file, isVideo);
+      if (isVideo) {
+        change('videoUrl', asset.url);
+        setMessage('Đã tải video lên từ thiết bị thành công.');
+      } else {
+        change('coverImage', asset.url);
+        setMessage('Đã tải ảnh bìa lên từ thiết bị thành công.');
+      }
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setUploadingMedia(null);
+    }
+  };
+
+  const insertRecipeStructure = () => {
     setForm(prev => ({
       ...prev,
-      category: cat,
-      coverImage: prev.coverImage || tpl.defaultCover,
-      content: shouldReplaceContent ? tpl.contentTemplate : prev.content,
+      category: 'KITCHEN',
+      content: prev.content.trim() ? `${prev.content.trim()}\n\n${RECIPE_POST_TEMPLATE}` : RECIPE_POST_TEMPLATE,
     }));
     setDirty(true);
-    setMessage(`Đã chọn phân loại "${tpl.badgeLabel}" — Chế độ AI tích hợp: ${tpl.aiActionLabel}.`);
+    setMessage('Đã chèn khung Nguyên liệu & Các bước thực hiện. Bấm "Xem trước" để xem hiển thị dạng 2 cột chuẩn Công thức!');
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || uploadingMedia) return;
     if (!form.title.trim()) {
       setPreview(false);
       setError('Vui lòng nhập tiêu đề bài viết.');
@@ -157,6 +175,13 @@ export function BlogEditorPage() {
     setError('');
     setMessage('');
     try {
+      if (post?.status === 'PUBLISHED' && !isAdmin) {
+        const updated = await blogService.requestPublishedEdit(post.postId, { ...form, version: post.version });
+        setPost(updated);
+        setDirty(false);
+        navigate('/blog/my-posts/' + updated.postId);
+        return;
+      }
       const saved = await blogService.save({ ...form, version: post?.version }, post?.postId || id);
       setPost(saved);
       setForm(previous => ({ ...previous, version: saved.version }));
@@ -175,9 +200,8 @@ export function BlogEditorPage() {
     }
   };
 
-  const editable = !post || ['DRAFT', 'REJECTED'].includes(post.status) || (isAdmin && post.status === 'PUBLISHED');
+  const editable = !post || ['DRAFT', 'REJECTED', 'PUBLISHED'].includes(post.status);
   const videoSourceObj = form.videoUrl ? videoSource(form.videoUrl) : null;
-  const activeTemplate = BLOG_POST_TEMPLATES[form.category] || BLOG_POST_TEMPLATES.KITCHEN;
 
   return (
     <MainLayout>
@@ -185,79 +209,19 @@ export function BlogEditorPage() {
         <BlogAccess>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <Link to="/blog" className="blog-back">
-              <ArrowLeft size={15} /> Bảng tin Cộng đồng
+              <ArrowLeft size={15} /> Blog cộng đồng
             </Link>
             <Link to="/blog/my-posts" className="text-xs font-bold text-emerald-700 hover:underline">
-              Quản lý bài đăng của tôi →
+              Bài viết của tôi →
             </Link>
           </div>
           <header className="blog-page-heading">
             <div>
-              <span className="blog-eyebrow">ĐĂNG BÀI CỘNG ĐỒNG THEO KHUNG CHUẨN AI</span>
-              <h1>{id ? 'Chỉnh sửa bài đăng' : 'Tạo bài đăng mới'}</h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Chọn đúng phân loại bài đăng để AI tự động kích hoạt chế độ phân tích tương ứng (Bóc tách các bước nấu ăn hoặc Phân tích kiến thức & Tư vấn Chatbot).
-              </p>
+              <span className="blog-eyebrow">BLOG CỘNG ĐỒNG</span>
+              <h1>{id ? 'Chỉnh sửa bài viết' : 'Viết bài chia sẻ mới'}</h1>
             </div>
             {post && <BlogBadge status={post.status} />}
           </header>
-
-          {/* 4 STANDARDIZED POST TEMPLATES SELECTOR */}
-          {editable && (
-            <section className="mb-6 p-4 sm:p-5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-200/80 dark:border-slate-800 shadow-xs space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                    <Sparkles size={14} /> Bước 1: Chọn phân loại &amp; Template bài đăng chuẩn
-                  </span>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {activeTemplate.classificationRule}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => applyClassificationTemplate(form.category, true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition cursor-pointer self-start sm:self-auto"
-                >
-                  <Wand2 size={13} /> Áp dụng lại khung mẫu của phân loại này
-                </button>
-              </div>
-
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {(Object.keys(BLOG_POST_TEMPLATES) as BlogCategory[]).map(catKey => {
-                  const tpl = BLOG_POST_TEMPLATES[catKey];
-                  const isSelected = form.category === catKey;
-                  return (
-                    <button
-                      key={catKey}
-                      type="button"
-                      onClick={() => applyClassificationTemplate(catKey, false)}
-                      className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-2 ${
-                        isSelected
-                          ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-900'
-                          : 'bg-slate-50/60 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-white'
-                      }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-xs font-extrabold text-slate-900 dark:text-white">
-                            {tpl.badgeLabel}
-                          </span>
-                          {isSelected && <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />}
-                        </div>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-snug">
-                          {tpl.description}
-                        </p>
-                      </div>
-                      <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-slate-700">
-                        {tpl.aiActionLabel}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
 
           {error && <BlogError message={error} retry={id ? () => setReload(value => value + 1) : undefined} />}
           {message && <p role="status" className="blog-message">{message}</p>}
@@ -274,10 +238,10 @@ export function BlogEditorPage() {
               <div className="blog-editor-main">
                 <div className="blog-editor-tabs">
                   <button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>
-                    <FilePenLine size={16} /> Soạn bài ({activeTemplate.shortLabel})
+                    <FilePenLine size={16} /> Soạn thảo
                   </button>
                   <button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>
-                    <Eye size={16} /> Xem trước hiển thị
+                    <Eye size={16} /> Xem trước
                   </button>
                 </div>
 
@@ -290,35 +254,51 @@ export function BlogEditorPage() {
 
                 <fieldset disabled={busy} className={preview ? 'blog-editor-fields is-hidden' : 'blog-editor-fields'}>
                   <label>
-                    Tiêu đề bài đăng
+                    Tiêu đề bài viết
                     <input
                       required={!preview}
                       maxLength={150}
                       value={form.title}
                       onChange={event => change('title', event.target.value)}
-                      placeholder={activeTemplate.titlePlaceholder}
+                      placeholder="VD: Đậu khuôn kho nấm đông cô tiêu xanh đậm đà đưa cơm"
                     />
                   </label>
                   <label>
-                    Mô tả ngắn / Caption mở đầu
+                    Tóm tắt ngắn
                     <textarea
                       aria-label="Tóm tắt"
                       rows={3}
                       maxLength={400}
                       value={form.excerpt}
                       onChange={event => change('excerpt', event.target.value)}
-                      placeholder={activeTemplate.excerptPlaceholder}
+                      placeholder="Giới thiệu ngắn gọn về món ăn hoặc câu chuyện bạn muốn chia sẻ..."
                     />
                   </label>
+
+                  {form.category === 'KITCHEN' && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-emerald-50/70 dark:bg-slate-800/60 border border-emerald-200/80 dark:border-slate-700 text-xs">
+                      <span className="text-slate-600 dark:text-slate-300">
+                        Mẹo: Trình bày theo mục <strong>Nguyên liệu:</strong> và <strong>Các bước thực hiện:</strong> để bài viết hiển thị dạng bảng 2 cột chuẩn Công thức.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={insertRecipeStructure}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 hover:bg-emerald-50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-slate-700 font-bold transition cursor-pointer shrink-0"
+                      >
+                        <Utensils size={13} /> + Chèn khung Nguyên liệu &amp; Các bước
+                      </button>
+                    </div>
+                  )}
+
                   <label>
-                    Nội dung chi tiết (Theo cấu trúc chuẩn giúp AI phân tích chính xác nhất)
+                    Nội dung bài viết
                     <textarea
                       aria-label="Nội dung"
-                      rows={17}
+                      rows={16}
                       maxLength={50000}
                       value={form.content}
                       onChange={event => change('content', event.target.value)}
-                      placeholder="Chia sẻ công thức, kiến thức dinh dưỡng hoặc câu chuyện sống chay của bạn..."
+                      placeholder="Chia sẻ công thức, kinh nghiệm dinh dưỡng hoặc câu chuyện sống xanh của bạn..."
                     />
                   </label>
                   <span className="blog-character-count">{form.content.length.toLocaleString('vi-VN')} / 50.000 ký tự</span>
@@ -340,6 +320,10 @@ export function BlogEditorPage() {
                           allowFullScreen
                         />
                       </div>
+                    ) : videoSourceObj?.kind === 'file' ? (
+                      <div className="my-5 aspect-video w-full rounded-2xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-800 bg-black">
+                        <video src={videoSourceObj.src} controls className="w-full h-full object-contain" />
+                      </div>
                     ) : (
                       <BlogCover post={{ title: form.title || 'Ảnh bìa', coverImage: form.coverImage }} />
                     )}
@@ -350,10 +334,10 @@ export function BlogEditorPage() {
               </div>
 
               <aside className="blog-editor-side">
-                <fieldset disabled={busy} className="space-y-4">
+                <fieldset disabled={busy || !!uploadingMedia} className="space-y-4">
                   <label>
-                    Chủ đề phân loại
-                    <select value={form.category} onChange={event => applyClassificationTemplate(event.target.value as BlogCategory, false)}>
+                    Chủ đề
+                    <select value={form.category} onChange={event => change('category', event.target.value)}>
                       {Object.entries(blogCategories).map(([code, label]) => (
                         <option key={code} value={code}>{label}</option>
                       ))}
@@ -362,7 +346,7 @@ export function BlogEditorPage() {
 
                   {/* Media Format Switcher */}
                   <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Định dạng Hình ảnh / Video đính kèm:</span>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Định dạng Media đính kèm:</span>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <button
                         type="button"
@@ -373,7 +357,7 @@ export function BlogEditorPage() {
                             : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                         }`}
                       >
-                        <Image size={14} /> Ảnh minh họa
+                        <Image size={14} /> Ảnh bìa
                       </button>
                       <button
                         type="button"
@@ -389,66 +373,131 @@ export function BlogEditorPage() {
                     </div>
 
                     {mediaTab === 'image' ? (
-                      <div className="space-y-2 pt-1">
+                      <div className="space-y-2.5 pt-1">
+                        <div>
+                          <span className="blog-inline-label mb-1.5 block"><Upload size={14} /> Tải ảnh bìa từ thiết bị</span>
+                          <label className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-dashed border-emerald-400 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/30 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/40 text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer transition">
+                            {uploadingMedia === 'image' ? (
+                              <>
+                                <Loader2 size={15} className="animate-spin" /> Đang tải ảnh lên...
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={15} /> Chọn file ảnh (JPG, PNG, WebP · tối đa 5MB)
+                              </>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="hidden"
+                              disabled={busy || !!uploadingMedia}
+                              onChange={event => {
+                                uploadBlogMedia(event.target.files?.[0], false);
+                                event.currentTarget.value = '';
+                              }}
+                            />
+                          </label>
+                        </div>
                         <label>
-                          <span className="blog-inline-label"><Image size={15} /> Link ảnh minh họa</span>
+                          <span className="blog-inline-label"><Image size={15} /> Hoặc dán Link ảnh bìa (URL)</span>
                           <input
                             value={form.coverImage}
                             maxLength={1000}
                             onChange={event => change('coverImage', event.target.value)}
-                            placeholder="https://..."
+                            placeholder="https://... hoặc /api/public/community-media/..."
                           />
                         </label>
-                        <span className="text-[11px] text-slate-500 block">Hoặc chọn ảnh mẫu có sẵn:</span>
-                        <div className="blog-cover-options">
-                          {covers.map(cover => (
-                            <label key={cover.src} title={cover.label}>
-                              <input
-                                type="radio"
-                                name="cover"
-                                aria-label={cover.label}
-                                checked={form.coverImage === cover.src}
-                                onChange={() => change('coverImage', cover.src)}
-                              />
-                              <img src={cover.src} alt={cover.label} />
-                            </label>
-                          ))}
+                        <div className="blog-cover-picks">
+                          <span>Hoặc chọn ảnh mẫu có sẵn:</span>
+                          <div>
+                            {covers.map(item => (
+                              <button
+                                key={item.src}
+                                type="button"
+                                className={form.coverImage === item.src ? 'is-selected' : ''}
+                                onClick={() => change('coverImage', item.src)}
+                              >
+                                <img src={item.src} alt={item.label} />
+                                <span>{item.label}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                        <BlogCover post={{ title: form.title || 'Ảnh bìa', coverImage: form.coverImage }} />
+                        <BlogCover post={{ title: form.title || 'Ảnh bìa xem trước', coverImage: form.coverImage }} />
                       </div>
                     ) : (
                       <div className="space-y-3 pt-1">
+                        <div>
+                          <span className="blog-inline-label mb-1.5 block"><Upload size={14} /> Tải file Video từ thiết bị</span>
+                          <label className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-dashed border-emerald-400 dark:border-emerald-700 bg-emerald-50/60 dark:bg-emerald-950/30 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/40 text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer transition">
+                            {uploadingMedia === 'video' ? (
+                              <>
+                                <Loader2 size={15} className="animate-spin" /> Đang tải video lên...
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={15} /> Chọn file video (MP4, WebM · tối đa 60MB)
+                              </>
+                            )}
+                            <input
+                              type="file"
+                              accept="video/mp4,video/webm"
+                              className="hidden"
+                              disabled={busy || !!uploadingMedia}
+                              onChange={event => {
+                                uploadBlogMedia(event.target.files?.[0], true);
+                                event.currentTarget.value = '';
+                              }}
+                            />
+                          </label>
+                        </div>
                         <label>
-                          <span className="blog-inline-label text-red-600 dark:text-red-400 font-bold">
-                            <Video size={15} /> Đường dẫn Video (YouTube, Shorts)
-                          </span>
+                          <span className="blog-inline-label"><Video size={15} /> Hoặc dán Link YouTube / Video URL</span>
                           <input
-                            type="url"
                             value={form.videoUrl || ''}
-                            maxLength={1000}
+                            maxLength={500}
                             onChange={event => change('videoUrl', event.target.value)}
-                            placeholder="https://www.youtube.com/watch?v=..."
+                            placeholder="VD: https://www.youtube.com/watch?v=... hoặc file đã tải lên"
                           />
                         </label>
-
+                        {form.videoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => change('videoUrl', '')}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:underline"
+                          >
+                            <Trash2 size={13} /> Gỡ video đính kèm
+                          </button>
+                        )}
                         {videoSourceObj?.kind === 'embed' ? (
                           <div className="space-y-2">
-                            <div className="aspect-video w-full rounded-xl overflow-hidden shadow-xs border border-slate-200 dark:border-slate-800">
+                            <div className="aspect-video w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-black">
                               <iframe
                                 src={videoSourceObj.src.replace('autoplay=1', 'autoplay=0')}
                                 className="w-full h-full border-0"
-                                title="Video preview"
+                                title="Xem trước video"
+                                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 allowFullScreen
                               />
                             </div>
                             <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
                               <Sparkles size={14} className="shrink-0" />
-                              <span>AI sẽ tự động nhận diện video và hỗ trợ bóc tách công thức / nội dung khi xuất bản!</span>
+                              <span>Người đọc có thể xem trực tiếp video và bóc tách các bước nấu từ bài viết này.</span>
+                            </div>
+                          </div>
+                        ) : videoSourceObj?.kind === 'file' ? (
+                          <div className="space-y-2">
+                            <div className="aspect-video w-full rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-black">
+                              <video src={videoSourceObj.src} controls className="w-full h-full object-contain" />
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                              <Sparkles size={14} className="shrink-0" />
+                              <span>Video tải lên từ thiết bị đã sẵn sàng hiển thị trong bài viết.</span>
                             </div>
                           </div>
                         ) : (
                           <div className="p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500">
-                            Dán liên kết YouTube vào ô trên để nhúng video vào bài đăng.
+                            Tải file video MP4/WebM từ thiết bị hoặc dán liên kết YouTube vào ô trên.
                           </div>
                         )}
                       </div>
@@ -456,22 +505,31 @@ export function BlogEditorPage() {
                   </div>
                 </fieldset>
 
-                <div className="blog-editor-submit">
-                  <button name="intent" value="draft" type="submit" className="blog-button secondary" disabled={busy}>
-                    <Save size={16} />
-                    {busy ? 'Đang xử lý...' : post?.status === 'PUBLISHED' ? 'Lưu thay đổi' : 'Lưu bản nháp'}
-                  </button>
-                  {post?.status !== 'PUBLISHED' && (
-                    <button name="intent" value="submit" type="submit" className="blog-button" disabled={busy}>
+                <div className="blog-editor-actions">
+                  {post?.status === 'PUBLISHED' && !isAdmin ? (
+                    <button name="intent" value="submit" type="submit" className="blog-button" disabled={busy || !!uploadingMedia}>
                       <Send size={16} />
-                      {isAdmin ? 'Xuất bản ngay' : 'Đăng bài (Gửi duyệt)'}
+                      Gửi bản chỉnh sửa chờ duyệt
                     </button>
+                  ) : (
+                    <>
+                      <button name="intent" value="draft" type="submit" className="blog-button secondary" disabled={busy || !!uploadingMedia}>
+                        <Save size={16} />
+                        {post?.status === 'PUBLISHED' ? 'Cập nhật bài viết' : 'Lưu bản nháp'}
+                      </button>
+                      {post?.status !== 'PUBLISHED' && (
+                        <button name="intent" value="submit" type="submit" className="blog-button" disabled={busy || !!uploadingMedia}>
+                          <Send size={16} />
+                          {isAdmin ? 'Xuất bản ngay' : 'Gửi duyệt bài'}
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
 
                 {!isAdmin && (
                   <p className="blog-moderation-note">
-                    Bài đăng được chuẩn hóa theo template giúp AI kiểm duyệt nhanh chóng và hỗ trợ người đọc phân tích tự động.
+                    Bài viết sẽ hiển thị công khai sau khi được ban biên tập và hệ thống kiểm duyệt nội dung.
                   </p>
                 )}
               </aside>

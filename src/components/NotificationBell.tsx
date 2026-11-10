@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Bell, Check, CheckCheck, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { notificationService, type UserNotification } from '../services/notificationService';
@@ -110,6 +110,17 @@ export function NotificationBell() {
     }
   };
 
+  // Deduplicate identical spam notifications (e.g. repeated profile updates)
+  const displayedItems = useMemo(() => {
+    const seen = new Set<string>();
+    return items.filter(item => {
+      const key = `${item.title}::${item.content}::${item.isRead}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [items]);
+
   return (
     <div className="relative">
       <button
@@ -118,7 +129,7 @@ export function NotificationBell() {
         aria-label={unreadCount ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="relative rounded-xl p-2 text-gray-500 transition hover:bg-gray-50 hover:text-emerald-700"
+        className="relative rounded-xl p-2 text-gray-500 dark:text-slate-300 transition hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-emerald-700 dark:hover:text-emerald-400"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-emerald-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
@@ -128,30 +139,30 @@ export function NotificationBell() {
       {open && <section
         role="dialog"
         aria-label="Thông báo hoạt động"
-        className="absolute right-0 top-12 z-50 w-[min(92vw,390px)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl"
+        className="absolute right-0 top-12 z-50 w-[min(92vw,390px)] overflow-hidden rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-[#121922] shadow-xl dark:shadow-2xl"
       >
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-          <div><h2 className="font-bold text-slate-800">Thông báo</h2><p className="text-xs text-slate-500">{unreadCount} chưa đọc</p></div>
-          <button type="button" onClick={() => void markAllRead()} disabled={busy || unreadCount === 0} className="flex items-center gap-1 text-xs font-semibold text-emerald-700 disabled:opacity-40">
+        <div className="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 px-4 py-3">
+          <div><h2 className="font-bold text-slate-800 dark:text-white">Thông báo</h2><p className="text-xs text-slate-500 dark:text-slate-400">{unreadCount} chưa đọc</p></div>
+          <button type="button" onClick={() => void markAllRead()} disabled={busy || unreadCount === 0} className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 disabled:opacity-40">
             <CheckCheck size={15} /> Đọc tất cả
           </button>
         </div>
-        {error && <p role="alert" className="m-3 rounded-lg bg-red-50 p-3 text-xs text-red-700">{error}</p>}
-        {busy && items.length === 0 && <div role="status" className="flex items-center justify-center gap-2 p-8 text-sm text-slate-500"><Loader2 size={17} className="animate-spin" />Đang tải...</div>}
-        {!busy && items.length === 0 && !error && <p className="p-8 text-center text-sm text-slate-500">Chưa có thông báo hoạt động.</p>}
+        {error && <p role="alert" className="m-3 rounded-lg bg-red-50 dark:bg-red-950/40 p-3 text-xs text-red-700 dark:text-red-300">{error}</p>}
+        {busy && displayedItems.length === 0 && <div role="status" className="flex items-center justify-center gap-2 p-8 text-sm text-slate-500 dark:text-slate-400"><Loader2 size={17} className="animate-spin" />Đang tải...</div>}
+        {!busy && displayedItems.length === 0 && !error && <p className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">Chưa có thông báo hoạt động.</p>}
         <div className="max-h-[min(65vh,480px)] overflow-y-auto">
-          {items.map(item => <article key={item.id} className={`border-b border-gray-100 px-4 py-3 last:border-b-0 ${item.isRead ? 'bg-white' : 'bg-emerald-50/60'}`}>
+          {displayedItems.map(item => <article key={item.id} className={`border-b border-gray-100 dark:border-slate-800/80 px-4 py-3 last:border-b-0 transition-colors ${item.isRead ? 'bg-white dark:bg-[#121922]' : 'bg-emerald-50/60 dark:bg-emerald-950/30'}`}>
             <div className="flex items-start gap-3">
-              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.isRead ? 'bg-gray-300' : 'bg-emerald-600'}`} aria-hidden="true" />
+              <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${item.isRead ? 'bg-gray-300 dark:bg-slate-700' : 'bg-emerald-600 dark:bg-emerald-400'}`} aria-hidden="true" />
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-semibold text-slate-800">{item.title}</h3>
-                <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-600">{item.content}</p>
-                <time dateTime={item.createdAt} className="mt-2 block text-[11px] text-slate-400">{formatTime(item.createdAt)}</time>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{item.title}</h3>
+                <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-slate-600 dark:text-slate-300">{item.content}</p>
+                <time dateTime={item.createdAt} className="mt-2 block text-[11px] text-slate-400 dark:text-slate-500">{formatTime(item.createdAt)}</time>
                 <div className="mt-2 flex gap-3">
-                  <Link to={safeInternalPath(item.redirectUrl)} onClick={() => { void markRead(item); setOpen(false); }} className="text-xs font-semibold text-emerald-700">
+                  <Link to={safeInternalPath(item.redirectUrl)} onClick={() => { void markRead(item); setOpen(false); }} className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300">
                     Mở hoạt động
                   </Link>
-                  {!item.isRead && <button type="button" onClick={() => void markRead(item)} className="flex items-center gap-1 text-xs text-slate-500 hover:text-emerald-700">
+                  {!item.isRead && <button type="button" onClick={() => void markRead(item)} className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400">
                     <Check size={13} /> Đánh dấu đã đọc
                   </button>}
                 </div>

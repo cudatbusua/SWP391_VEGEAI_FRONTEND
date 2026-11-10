@@ -17,9 +17,6 @@ import {
   Play,
   MessageCircle,
   BookOpen,
-  PenLine,
-  MapPin,
-  Sparkles,
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
@@ -168,7 +165,7 @@ export function RecipeDiscoveryPage() {
                 Khám phá công thức <ArrowUpRight size={18} />
               </a>
               <Link to="/blog" className="discovery-hero-secondary">
-                <BookOpen size={18} /> Bảng tin Cộng đồng (AI)
+                <BookOpen size={18} /> Blog cộng đồng
               </Link>
               {isAuthenticated && (
                 <Link to="/fridge-scan" className="discovery-hero-secondary">
@@ -180,45 +177,6 @@ export function RecipeDiscoveryPage() {
         </section>
 
         <div className="discovery-shell">
-          {/* Unified Community & Discovery Hub Strip */}
-          <div className="mb-6 rounded-2xl border border-emerald-200/80 bg-white p-4 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-start sm:items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                <Sparkles size={18} />
-              </span>
-              <div>
-                <h2 className="text-sm font-black text-slate-900">
-                  Không gian Khám phá &amp; Mạng xã hội Ẩm thực Chay VEGEAI
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Mọi bài đăng trên Cộng đồng đều được AI phân tích tự động (tách bước nấu cho Công thức hoặc đúc kết kiến thức Sống xanh) và kết nối thẳng với Chatbot &amp; Bản đồ GPS.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <Link
-                to="/blog"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3.5 py-2 text-xs font-bold text-emerald-900 transition"
-              >
-                <BookOpen size={14} /> Bảng tin Cộng đồng
-              </Link>
-              {isAuthenticated && (
-                <Link
-                  to="/blog/write"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 px-3.5 py-2 text-xs font-bold text-white shadow-2xs transition"
-                >
-                  <PenLine size={14} /> Đăng bài mới (Kèm AI)
-                </Link>
-              )}
-              <Link
-                to="/smart-market"
-                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 px-3.5 py-2 text-xs font-bold text-slate-700 transition"
-              >
-                <MapPin size={14} /> Định vị Quán chay &amp; Điểm bán (GPS)
-              </Link>
-            </div>
-          </div>
-
           <div className="discovery-toolbar" id="cong-thuc">
             <label className="discovery-search">
               <Search size={20} />
@@ -518,7 +476,7 @@ export function RecipeDiscoveryPage() {
                 <div className="discovery-journal-heading">
                   <span className="discovery-section-label">CHUYỆN TỪ CĂN BẾP</span>
                   <h2 id="discovery-journal-title">Thêm cảm hứng, thêm vị ngon</h2>
-                  <p>Cùng nấu, cùng chia sẻ một lối sống xanh trên Bảng tin Cộng đồng.</p>
+                  <p>Cùng nấu, cùng chia sẻ một lối sống xanh trên Blog cộng đồng.</p>
                 </div>
                 <div className="discovery-journal-grid">
                   {isAuthenticated && (
@@ -538,7 +496,7 @@ export function RecipeDiscoveryPage() {
                         <h3>
                           Vào bếp cùng nhau <ArrowUpRight size={19} />
                         </h3>
-                        <p>Xem video và nhờ AI bóc tách nguyên liệu, các bước nấu chi tiết.</p>
+                        <p>Xem video hướng dẫn chế biến món chay trực quan mỗi ngày.</p>
                       </div>
                     </Link>
                   )}
@@ -554,11 +512,11 @@ export function RecipeDiscoveryPage() {
                       </span>
                     </div>
                     <div>
-                      <small>BẢNG TIN CỘNG ĐỒNG (AI)</small>
+                      <small>BLOG CỘNG ĐỒNG</small>
                       <h3>
                         Chuyện bếp, chuyện xanh <ArrowUpRight size={19} />
                       </h3>
-                      <p>Đăng bài theo mẫu chuẩn, phân tích AI tự động và chuyển tiếp sang Chatbot.</p>
+                      <p>Chia sẻ công thức, mẹo nấu chay và kinh nghiệm dinh dưỡng thực vật.</p>
                     </div>
                   </Link>
                   <Link to="/questions">

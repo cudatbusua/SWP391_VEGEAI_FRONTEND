@@ -7,9 +7,17 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       host: true,
+      port: 5173,
+      strictPort: true,
       allowedHosts: true,
       proxy: {
-        '/api': { target: env.API_PROXY_TARGET || 'http://localhost:8081', changeOrigin: true },
+        '/api': {
+          target: env.API_PROXY_TARGET || 'http://localhost:8081',
+          changeOrigin: true,
+          headers: {
+            Origin: 'http://localhost:5173',
+          },
+        },
       },
     },
     plugins: [

@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, Flame, Users, RefreshCw, BookOpen, ArrowUpRight, Chef
 import { MainLayout } from '../layouts/MainLayout';
 import { RecipeImage } from '../components/RecipeImage';
 import { VideoPlayer } from '../components/CommunityUi';
+import { ContentInteractions } from '../components/ContentInteractions';
 import { recipeService } from '../services/recipeService';
 import { errorMessage } from '../services/apiClient';
 import type { RecipeDetail } from '../types/recipe';
@@ -163,6 +164,10 @@ export function RecipeDetailPage() {
           </Link>
         </div>
       </section>
+
+      <div className="mt-8">
+        <ContentInteractions type="RECIPE" id={recipe.recipeId} />
+      </div>
     </>}
   </div></MainLayout>;
 }

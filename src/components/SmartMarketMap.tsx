@@ -107,7 +107,7 @@ export function SmartMarketMap({ stores, selectedStore, onSelect, userLocation }
               <div className="flex items-center justify-center gap-1 text-blue-600 dark:text-blue-400 font-bold text-xs uppercase mb-1">
                 <MapPin size={14} /> Vị trí của bạn
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">Khu vực Trung tâm TP.HCM</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">Điểm xuất phát tìm kiếm quanh bạn</p>
             </div>
           </Popup>
         </Marker>

@@ -298,7 +298,12 @@ export const SmartMarketPage: React.FC = () => {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'VEGAN_STORE' | 'SUPERMARKET'>('ALL');
   const [locationAddress, setLocationAddress] = useState(() => {
-    return sessionStorage.getItem(SESSION_ADDR_KEY) || '';
+    const saved = sessionStorage.getItem(SESSION_ADDR_KEY) || '';
+    const cleaned = saved
+      .replace(/\s*\((?:GPS:?\s*)?-?\d+\.\d+\s*,\s*-?\d+\.\d+\)/gi, '')
+      .replace(/^(?:Vị trí GPS|Tọa độ GPS)\s*$/i, '')
+      .trim();
+    return cleaned;
   });
   const [isLocating, setIsLocating] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
@@ -439,12 +444,27 @@ export const SmartMarketPage: React.FC = () => {
       return;
     }
     loadNearbyPlaces(userCoords.lat, userCoords.lon);
-  }, [loadNearbyPlaces, userCoords]);
+    if (!locationAddress) {
+      reverseGeocodeAddress(userCoords.lat, userCoords.lon).then((addr) => {
+        const cleaned = (addr || '')
+          .replace(/\s*\((?:GPS:?\s*)?-?\d+\.\d+\s*,\s*-?\d+\.\d+\)/gi, '')
+          .replace(/^(?:Vị trí GPS|Tọa độ GPS)\s*$/i, '')
+          .trim();
+        const finalAddr = cleaned || 'Khu vực hiện tại của bạn';
+        setLocationAddress(finalAddr);
+        try {
+          sessionStorage.setItem(SESSION_ADDR_KEY, finalAddr);
+        } catch {
+          // ignore
+        }
+      });
+    }
+  }, [loadNearbyPlaces, userCoords, locationAddress]);
 
   const handleLocateMe = () => {
     sfx.playTap();
     setIsLocating(true);
-    setLocationNotice('Đang lấy tọa độ GPS thực tế của bạn và tìm các quán chay & điểm bán nguyên liệu gần nhất...');
+    setLocationNotice('Đang xác định vị trí của bạn và tìm các quán chay & điểm bán nguyên liệu gần nhất...');
 
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -455,7 +475,11 @@ export const SmartMarketPage: React.FC = () => {
           sessionStorage.setItem(SESSION_GPS_KEY, JSON.stringify({ lat, lon }));
 
           const addr = await reverseGeocodeAddress(lat, lon);
-          const finalAddr = addr ? `${addr} (GPS: ${lat}, ${lon})` : `Tọa độ GPS (${lat}, ${lon})`;
+          const cleanedAddr = (addr || '')
+            .replace(/\s*\((?:GPS:?\s*)?-?\d+\.\d+\s*,\s*-?\d+\.\d+\)/gi, '')
+            .replace(/^(?:Vị trí GPS|Tọa độ GPS)\s*$/i, '')
+            .trim();
+          const finalAddr = cleanedAddr || 'Khu vực hiện tại của bạn';
           setLocationAddress(finalAddr);
           sessionStorage.setItem(SESSION_ADDR_KEY, finalAddr);
 
@@ -463,7 +487,7 @@ export const SmartMarketPage: React.FC = () => {
           setIsLocating(false);
           sfx.playSuccess();
           setLocationNotice(
-            `Đã định vị thành công tại ${addr || `${lat}, ${lon}`}. Hệ thống đã liệt kê các quán chay và cửa hàng bán nguyên liệu gần bạn nhất!`
+            `Đã định vị thành công (${finalAddr}). Hệ thống đã liệt kê các quán chay và cửa hàng bán nguyên liệu gần bạn nhất!`
           );
         },
         (error) => {
@@ -508,7 +532,7 @@ export const SmartMarketPage: React.FC = () => {
     if (!query) return;
     sfx.playTap();
     setIsLocating(true);
-    setLocationNotice(`Đang tìm tọa độ cho địa chỉ "${query}"...`);
+    setLocationNotice(`Đang tìm địa điểm quanh khu vực "${query}"...`);
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
         query + ', Việt Nam'
@@ -528,9 +552,9 @@ export const SmartMarketPage: React.FC = () => {
         setShowManualLocationInput(false);
         await loadNearbyPlaces(lat, lon);
         sfx.playSuccess();
-        setLocationNotice(`Đã định vị theo địa chỉ: ${displayName} (${lat}, ${lon}).`);
+        setLocationNotice(`Đã định vị theo địa chỉ: ${displayName}.`);
       } else {
-        setLocationNotice(`Không tìm thấy tọa độ chính xác cho "${query}". Vui lòng nhập rõ Quận/Huyện hoặc Tỉnh/Thành phố.`);
+        setLocationNotice(`Không tìm thấy khu vực phù hợp cho "${query}". Vui lòng nhập rõ Quận/Huyện hoặc Tỉnh/Thành phố.`);
       }
     } catch {
       setLocationNotice('Không thể kết nối dịch vụ bản đồ lúc này. Vui lòng thử lại.');
@@ -705,14 +729,14 @@ export const SmartMarketPage: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="bg-[#F6FBF7] min-h-screen py-8 pb-20 text-slate-900">
+      <div className="smart-market-page bg-[#F6FBF7] dark:bg-[#0b1118] min-h-screen py-8 pb-20 text-slate-900 dark:text-slate-100">
         <div className="container mx-auto px-4 max-w-7xl">
           {/* Header Banner */}
           <div className="bg-gradient-to-r from-[#0F291E] via-[#143d2b] to-[#1b523a] rounded-3xl p-6 md:p-8 text-white shadow-xl mb-8 relative overflow-hidden">
             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="max-w-3xl">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold uppercase tracking-wider mb-3">
-                  <Compass className="w-3.5 h-3.5" /> GPS Store &amp; Vegan Restaurant Locator
+                  <Compass className="w-3.5 h-3.5" /> Bản đồ Quán chay &amp; Điểm bán nguyên liệu
                 </div>
                 <h1 className="text-2xl md:text-4xl font-black tracking-tight mb-2">
                   Định Vị Quán Chay &amp; Điểm Bán Nguyên Liệu Gần Bạn
@@ -751,7 +775,7 @@ export const SmartMarketPage: React.FC = () => {
 
           {/* Active Context Banner (when redirected from Recipe / Video / Fridge / AI Chat) */}
           {activeRecipe && (
-            <div className="mb-6 bg-white border border-emerald-200 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="mb-6 bg-white dark:bg-[#121922] border border-emerald-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-start gap-3.5">
                 <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 font-black">
                   <Sparkles className="w-5 h-5" />
@@ -761,9 +785,9 @@ export const SmartMarketPage: React.FC = () => {
                     <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                       Đang tìm nguyên liệu theo ngữ cảnh
                     </span>
-                    <h2 className="text-base font-black text-slate-900">{activeRecipe.title}</h2>
+                    <h2 className="text-base font-black text-slate-900 dark:text-white">{activeRecipe.title}</h2>
                   </div>
-                  <p className="text-xs text-slate-600 mt-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
                     Hệ thống đã tự động đối chiếu với <strong>Kho Tủ Lạnh (/fridge)</strong> của bạn: hiện có{' '}
                     <strong className="text-emerald-700">{inFridgeOrCheckedItems.length} nguyên liệu đã sẵn sàng</strong> và{' '}
                     <strong className="text-amber-700">{neededItems.length} nguyên liệu cần tìm điểm bán gần đây</strong>.
@@ -773,14 +797,14 @@ export const SmartMarketPage: React.FC = () => {
               <div className="flex items-center gap-2 shrink-0">
                 <Link
                   to="/fridge"
-                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-colors"
                 >
                   🧊 Xem Kho Tủ Lạnh
                 </Link>
                 <button
                   type="button"
                   onClick={resetDefault}
-                  className="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition-colors cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold transition-colors cursor-pointer"
                 >
                   Đặt lại danh sách
                 </button>
@@ -792,13 +816,13 @@ export const SmartMarketPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* LEFT COLUMN (4 cols): Ingredients Needed & Fridge Cross-Check */}
             <div className="lg:col-span-4 space-y-6">
-              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
+              <div className="bg-white dark:bg-[#121922] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6">
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <div>
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700">
                       Bước 1 · Nguyên liệu cần tìm
                     </span>
-                    <h2 className="text-lg font-black text-slate-900">
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">
                       Danh sách nguyên liệu ({neededItems.length} cần mua)
                     </h2>
                   </div>
@@ -810,7 +834,7 @@ export const SmartMarketPage: React.FC = () => {
                   </Link>
                 </div>
 
-                <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
                   Đánh dấu những món bạn đã có sẵn ở nhà. Các cửa hàng bên phải sẽ được lọc ưu tiên theo những <strong>nguyên liệu chưa đánh dấu (cần tìm nơi bán)</strong>.
                 </p>
 
@@ -825,7 +849,7 @@ export const SmartMarketPage: React.FC = () => {
                         if (inputError) setInputError(null);
                       }}
                       placeholder="Thêm nguyên liệu cần tìm chỗ bán..."
-                      className="flex-1 px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:bg-white font-medium"
+                      className="flex-1 px-3.5 py-2.5 text-xs bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white rounded-xl focus:outline-none focus:border-emerald-500 focus:bg-white dark:focus:bg-slate-800 font-medium"
                     />
                     <input
                       type="text"
@@ -869,7 +893,7 @@ export const SmartMarketPage: React.FC = () => {
                               ? 'bg-slate-50/80 border-slate-200/70 opacity-75'
                               : allergyConflict
                               ? 'bg-rose-50/60 border-rose-300'
-                              : 'bg-white border-emerald-200/80 hover:border-emerald-400 shadow-2xs'
+                              : 'bg-white dark:bg-[#161f2b] border-emerald-200/80 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-500 shadow-2xs'
                           }`}
                         >
                           <div className="flex items-start gap-2.5 min-w-0">
@@ -973,7 +997,7 @@ export const SmartMarketPage: React.FC = () => {
             {/* RIGHT COLUMN (8 cols): GPS Location Control + Interactive Map + Nearby Vegan Restaurants & Ingredient Stores */}
             <div className="lg:col-span-8 space-y-6">
               {/* Step 2: GPS Location Card */}
-              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
+              <div className="bg-white dark:bg-[#121922] rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-6">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
                   <div>
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700">
@@ -982,14 +1006,14 @@ export const SmartMarketPage: React.FC = () => {
                     <h2 className="text-xl font-black text-slate-900 mt-0.5 flex items-center gap-2">
                       <MapPin className="w-5 h-5 text-emerald-600 shrink-0" />
                       {userCoords
-                        ? `Vị trí hiện tại: ${locationAddress}`
+                        ? `Vị trí hiện tại: ${locationAddress || 'Khu vực hiện tại của bạn'}`
                         : 'Xác nhận vị trí để hiển thị Quán chay & Cửa hàng nguyên liệu gần bạn'}
                     </h2>
                     <p className="text-xs text-slate-500 mt-1">
                       {userCoords
                         ? usingRealData
-                          ? 'Đang hiển thị dữ liệu địa điểm thực tế từ bản đồ OpenStreetMap quanh tọa độ của bạn.'
-                          : 'Không lấy được dữ liệu địa điểm thực tế từ bản đồ. Danh sách dưới đây chỉ là gợi ý minh họa quanh tọa độ của bạn, chưa được xác thực — hãy kiểm tra trên bản đồ trước khi đến.'
+                          ? 'Đang hiển thị dữ liệu địa điểm thực tế từ bản đồ OpenStreetMap quanh khu vực của bạn.'
+                          : 'Danh sách gợi ý minh họa quanh khu vực của bạn — hãy kiểm tra trên bản đồ trước khi đến.'
                         : 'Bấm "Định vị GPS tự động" hoặc nhập địa chỉ để hệ thống quét các điểm bán gần bạn nhất.'}
                     </p>
                   </div>
@@ -1001,8 +1025,8 @@ export const SmartMarketPage: React.FC = () => {
                       disabled={isLocating}
                       className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
                     >
-                      <Navigation className={`w-4 h-4 ${isLocating ? 'animate-spin' : ''}`} />
-                      {isLocating ? 'Đang định vị GPS...' : '📍 Định vị GPS tự động'}
+                      <MapPin className="w-4 h-4 shrink-0" />
+                      {isLocating ? 'Đang định vị GPS...' : 'Định vị GPS tự động'}
                     </button>
                     <button
                       type="button"
@@ -1165,8 +1189,8 @@ export const SmartMarketPage: React.FC = () => {
                       onClick={handleLocateMe}
                       className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md transition-all cursor-pointer"
                     >
-                      <Navigation className="w-4 h-4" />
-                      📍 Bật định vị GPS ngay
+                      <MapPin className="w-4 h-4 shrink-0" />
+                      Bật định vị GPS ngay
                     </button>
                     <button
                       type="button"

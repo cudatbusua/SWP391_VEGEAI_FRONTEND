@@ -89,7 +89,9 @@ html.dark .site-navigation {
   border-top-color: #212c3b;
   color: #94a3b8;
 }
-html.dark .site-navigation > a:hover,
+html.dark .site-navigation > a:hover {
+  color: #34d399;
+}
 html.dark .site-navigation > a[aria-current="page"] {
   color: #34d399;
   border-bottom-color: #10b981;

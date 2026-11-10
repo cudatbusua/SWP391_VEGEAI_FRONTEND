@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, BadgeCheck, Clock, Copy, FilePenLine, Send, ShieldCheck, Trash2, Undo2, XCircle } from 'lucide-react';
+import { Archive, ArrowLeft, ArrowUpRight, BadgeCheck, Clock, Copy, FilePenLine, RotateCcw, Send, ShieldCheck, Trash2, Undo2, XCircle } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { BlogAccess, BlogBadge, BlogBody, BlogCover, BlogError, blogDate } from '../components/BlogUi';
 import { useAuth } from '../hooks/useAuth';
 import { blogService } from '../services/blogService';
 import { errorMessage } from '../services/apiClient';
+import { videoSource } from '../utils/communityVideo';
 import type { BlogPost } from '../types/blog';
 import { blogCategories } from '../types/blog';
 import '../styles/blog.css';
@@ -20,7 +21,7 @@ export function BlogPostStatusPage({ adminMode = false }: { adminMode?: boolean 
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [reason, setReason] = useState('');
-  const [confirm, setConfirm] = useState<'APPROVE' | 'REJECT' | 'DELETE' | 'WITHDRAW' | null>(null);
+  const [confirm, setConfirm] = useState<'APPROVE' | 'REJECT' | 'DELETE' | 'WITHDRAW' | 'ARCHIVE' | null>(null);
   const [reload, setReload] = useState(0);
   useEffect(() => {
     if (!isAuthenticated || (adminMode && user?.role !== 'admin')) return;
@@ -48,16 +49,30 @@ export function BlogPostStatusPage({ adminMode = false }: { adminMode?: boolean 
     }, 15000);
     return () => { clearInterval(timer); controller.abort(); };
   }, [adminMode, isAuthenticated, id, post?.status, busy, confirm]);
-  const action = async (operation: 'SUBMIT' | 'WITHDRAW' | 'DELETE' | 'APPROVE' | 'REJECT') => {
+  const action = async (operation: 'SUBMIT' | 'WITHDRAW' | 'DELETE' | 'ARCHIVE' | 'RESTORE' | 'APPROVE' | 'REJECT') => {
     if (!post || busy) return;
     if (operation === 'REJECT' && !reason.trim()) { setError('Vui lòng nhập lý do từ chối.'); return; }
     setBusy(true); setError(''); setMessage('');
     try {
-      if (operation === 'DELETE') { await blogService.remove(post.postId, post.version); navigate('/blog/my-posts'); return; }
+      if (operation === 'DELETE') {
+        await blogService.deletePermanent(post.postId, post.version);
+        navigate('/blog/my-posts');
+        return;
+      }
       const value = operation === 'SUBMIT' ? await blogService.submit(post.postId, post.version)
         : operation === 'WITHDRAW' ? await blogService.withdraw(post.postId, post.version)
+        : operation === 'ARCHIVE' ? await blogService.archive(post.postId, post.version)
+        : operation === 'RESTORE' ? await blogService.restore(post.postId, post.version)
         : await blogService.review(post.postId, post.version, operation, reason.trim());
-      setPost(value); setConfirm(null); setReason(''); setMessage(operation === 'SUBMIT' ? (value.status === 'PUBLISHED' ? 'Đã xuất bản bài viết.' : 'Đã gửi bài chờ duyệt.') : operation === 'WITHDRAW' ? 'Đã rút bài về bản nháp.' : operation === 'APPROVE' ? 'Đã xuất bản bài viết.' : 'Đã gửi lý do từ chối cho tác giả.');
+      setPost(value); setConfirm(null); setReason('');
+      setMessage(
+        operation === 'SUBMIT' ? (value.status === 'PUBLISHED' ? 'Đã xuất bản bài viết.' : 'Đã gửi bài chờ duyệt.')
+        : operation === 'WITHDRAW' ? 'Đã rút bài về bản nháp.'
+        : operation === 'ARCHIVE' ? 'Đã ẩn bài viết vào mục Đã ẩn.'
+        : operation === 'RESTORE' ? 'Đã khôi phục bài viết.'
+        : operation === 'APPROVE' ? 'Đã xuất bản bài viết.'
+        : 'Đã gửi lý do từ chối cho tác giả.'
+      );
     } catch (value) { setError(errorMessage(value)); }
     finally { setBusy(false); }
   };
@@ -68,10 +83,11 @@ export function BlogPostStatusPage({ adminMode = false }: { adminMode?: boolean 
   };
   const headline = post ? { DRAFT: 'Câu chuyện của bạn đang thành hình', PENDING_REVIEW: 'Bài viết đang chờ admin duyệt', PUBLISHED: 'Bài viết đã được xuất bản', REJECTED: 'Bài viết cần được chỉnh sửa', ARCHIVED: 'Bài viết đang ở trong kho đã ẩn' }[post.status] : '';
   const StatusIcon = post?.status === 'PUBLISHED' ? BadgeCheck : post?.status === 'REJECTED' ? XCircle : post?.status === 'PENDING_REVIEW' ? Clock : FilePenLine;
+  const videoObj = post?.videoUrl ? videoSource(post.videoUrl) : null;
   return <MainLayout><div className="blog-shell"><BlogAccess admin={adminMode}><Link to={adminMode ? '/admin/blog' : '/blog/my-posts'} className="blog-back"><ArrowLeft size={15} />{adminMode ? 'Hàng chờ duyệt Blog' : 'Bài viết của tôi'}</Link>
     {error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}{message && <p role="status" className="blog-message">{message}</p>}
     {loading && <p role="status" className="blog-empty">Đang tải bài viết...</p>}
-    {post && <><header className={'blog-status-banner ' + post.status.toLowerCase()}><StatusIcon size={42} /><div><BlogBadge status={post.status} /><h1>{adminMode && post.status === 'PENDING_REVIEW' ? 'Xem xét bài viết cộng đồng' : headline}</h1><p>{post.status === 'PUBLISHED' ? 'Câu chuyện của bạn đã xuất hiện trên Blog cộng đồng VEGEAI.' : post.status === 'PENDING_REVIEW' ? 'Ban biên tập sẽ xem xét nội dung trước khi xuất bản.' : post.status === 'REJECTED' ? 'Xem góp ý từ ban biên tập, chỉnh sửa và gửi duyệt lại.' : 'Lưu những ý tưởng của bạn và gửi bài khi đã sẵn sàng.'}</p></div></header>
+    {post && <><header className={'blog-status-banner ' + post.status.toLowerCase()}><StatusIcon size={42} /><div><BlogBadge status={post.status} /><h1>{adminMode && post.status === 'PENDING_REVIEW' ? 'Xem xét bài viết cộng đồng' : headline}</h1><p>{post.status === 'PUBLISHED' ? 'Câu chuyện của bạn đã xuất hiện trên Blog cộng đồng VEGEAI.' : post.status === 'PENDING_REVIEW' ? 'Ban biên tập sẽ xem xét nội dung trước khi xuất bản.' : post.status === 'REJECTED' ? 'Xem góp ý từ ban biên tập, chỉnh sửa và gửi duyệt lại.' : post.status === 'ARCHIVED' ? 'Bài viết hiện đang được ẩn khỏi Blog cộng đồng. Bạn có thể khôi phục bất cứ lúc nào.' : 'Lưu những ý tưởng của bạn và gửi bài khi đã sẵn sàng.'}</p></div></header>
       <div className="blog-review-grid"><div className="blog-review-main"><div className="blog-review-title"><span className="blog-eyebrow">{blogCategories[post.category]}</span><h2>{post.title}</h2><div className="blog-public-meta"><span>{post.authorName}</span><span>{post.readingMinutes} phút đọc</span><span>Cập nhật {blogDate(post.updatedAt)}</span></div></div>
         {post.status === 'REJECTED' && <section className="blog-rejection-note"><h3><ShieldCheck size={17} /> Lý do từ chối từ ban biên tập</h3><p>{post.moderationReason}</p><span>{post.reviewerName} · {blogDate(post.reviewedAt)}</span></section>}
         {post.aiModerationStatus && (
@@ -88,16 +104,34 @@ export function BlogPostStatusPage({ adminMode = false }: { adminMode?: boolean 
             </p>
           </section>
         )}
-        <BlogCover post={{ ...post, postId: post.postId }} /><p className="blog-lead">{post.excerpt}</p><BlogBody content={post.content || ''} />
+        {videoObj?.kind === 'embed' ? (
+          <div className="my-5 aspect-video w-full rounded-2xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-800 bg-black">
+            <iframe
+              src={videoObj.src.replace('autoplay=1', 'autoplay=0')}
+              className="w-full h-full border-0"
+              title={post.title}
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        ) : videoObj?.kind === 'file' ? (
+          <div className="my-5 aspect-video w-full rounded-2xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-800 bg-black">
+            <video src={videoObj.src} controls className="w-full h-full object-contain" />
+          </div>
+        ) : (
+          <BlogCover post={{ ...post, postId: post.postId }} />
+        )}
+        <p className="blog-lead">{post.excerpt}</p><BlogBody content={post.content || ''} />
         <section className="blog-review-history"><h3><ShieldCheck size={17} /> Lịch sử bài viết</h3><ol><li><span>Tạo bản nháp</span><time>{blogDate(post.createdAt)}</time></li>{post.submittedAt && <li><span>Gửi ban biên tập</span><time>{blogDate(post.submittedAt)}</time></li>}{post.reviewedAt && <li><span>{post.status === 'PUBLISHED' ? 'Duyệt xuất bản' : 'Từ chối'} · {post.reviewerName}</span><time>{blogDate(post.reviewedAt)}</time></li>}</ol></section>
       </div>
       <aside className="blog-review-side"><h3>{adminMode ? 'Quyết định của ban biên tập' : 'Hành động tiếp theo'}</h3>
         {adminMode ? post.status === 'PENDING_REVIEW' ? <><button className="blog-button" disabled={busy} onClick={() => { setConfirm('APPROVE'); setError(''); }}><BadgeCheck size={17} /> Duyệt và xuất bản</button><button className="blog-button danger-outline" disabled={busy} onClick={() => { setConfirm('REJECT'); setError(''); }}><XCircle size={17} /> Từ chối kèm lý do</button></> : <p className="blog-moderation-note">Bài viết đã có kết quả xét duyệt.</p> : <>
-          {['DRAFT', 'REJECTED'].includes(post.status) && <><Link className="blog-button" to={'/blog/my-posts/' + post.postId + '/edit'}><FilePenLine size={17} />{post.status === 'REJECTED' ? 'Chỉnh sửa và gửi lại' : 'Tiếp tục viết'}</Link>{post.status === 'DRAFT' && <button className="blog-button secondary" disabled={busy} onClick={() => action('SUBMIT')}><Send size={16} />{user?.role === 'admin' ? 'Xuất bản' : 'Gửi admin duyệt'}</button>}<button className="blog-button danger-outline" disabled={busy} onClick={() => setConfirm('DELETE')}><Trash2 size={16} /> Xóa bài viết</button></>}
+          {['DRAFT', 'REJECTED'].includes(post.status) && <><Link className="blog-button" to={'/blog/my-posts/' + post.postId + '/edit'}><FilePenLine size={17} />{post.status === 'REJECTED' ? 'Chỉnh sửa và gửi lại' : 'Tiếp tục viết'}</Link>{post.status === 'DRAFT' && <button className="blog-button secondary" disabled={busy} onClick={() => action('SUBMIT')}><Send size={16} />{user?.role === 'admin' ? 'Xuất bản' : 'Gửi admin duyệt'}</button>}<button className="blog-button danger-outline" disabled={busy} onClick={() => setConfirm('DELETE')}><Trash2 size={16} /> Xóa vĩnh viễn</button></>}
           {post.status === 'PENDING_REVIEW' && <button className="blog-button secondary" disabled={busy} onClick={() => setConfirm('WITHDRAW')}><Undo2 size={16} /> Rút bài để chỉnh sửa</button>}
+          {post.status === 'ARCHIVED' && <><button className="blog-button" disabled={busy} onClick={() => action('RESTORE')}><RotateCcw size={16} /> Khôi phục bài viết</button><button className="blog-button danger-outline" disabled={busy} onClick={() => setConfirm('DELETE')}><Trash2 size={16} /> Xóa vĩnh viễn</button></>}
         </>}
-        {post.status === 'PUBLISHED' && <>{!adminMode && user?.role === 'admin' && post.authorId === user.id && <Link className="blog-button secondary" to={'/blog/my-posts/' + post.postId + '/edit'}><FilePenLine size={16} /> Chỉnh sửa bài viết</Link>}<Link to={'/blog/' + post.postId} className="blog-button"><ArrowUpRight size={17} /> Xem bài trên Blog</Link><label className="blog-link-field">Đường dẫn công khai<input aria-label="Đường dẫn công khai" readOnly value={publicUrl} onFocus={event => event.target.select()} /></label><button className="blog-button secondary" onClick={copy}><Copy size={16} /> Sao chép liên kết</button></>}
-        {confirm && <div className="blog-confirm" role="alert"><h4>{confirm === 'APPROVE' ? 'Xuất bản bài viết này?' : confirm === 'REJECT' ? 'Lý do từ chối' : confirm === 'WITHDRAW' ? 'Rút bài về bản nháp?' : 'Xóa vĩnh viễn bài viết?'}</h4>{confirm === 'REJECT' && <textarea aria-label="Lý do từ chối" maxLength={2000} rows={5} value={reason} onChange={event => setReason(event.target.value)} placeholder="Góp ý cụ thể để tác giả chỉnh sửa..." />}<div><button className={'blog-button ' + (confirm === 'DELETE' || confirm === 'REJECT' ? 'danger' : '')} disabled={busy || (confirm === 'REJECT' && !reason.trim())} onClick={() => action(confirm)}>{busy ? 'Đang xử lý...' : 'Xác nhận'}</button><button className="blog-button secondary" disabled={busy} onClick={() => setConfirm(null)}>Hủy</button></div></div>}
+        {post.status === 'PUBLISHED' && <>{!adminMode && post.authorId === user?.id && <><Link className="blog-button secondary" to={'/blog/my-posts/' + post.postId + '/edit'}><FilePenLine size={16} /> Chỉnh sửa bài viết</Link><button className="blog-button secondary" disabled={busy} onClick={() => setConfirm('ARCHIVE')}><Archive size={16} /> Ẩn bài viết</button><button className="blog-button danger-outline" disabled={busy} onClick={() => setConfirm('DELETE')}><Trash2 size={16} /> Xóa vĩnh viễn</button></>}<Link to={'/blog/' + post.postId} className="blog-button"><ArrowUpRight size={17} /> Xem bài trên Blog</Link><label className="blog-link-field">Đường dẫn công khai<input aria-label="Đường dẫn công khai" readOnly value={publicUrl} onFocus={event => event.target.select()} /></label><button className="blog-button secondary" onClick={copy}><Copy size={16} /> Sao chép liên kết</button></>}
+        {confirm && <div className="blog-confirm" role="alert"><h4>{confirm === 'APPROVE' ? 'Xuất bản bài viết này?' : confirm === 'REJECT' ? 'Lý do từ chối' : confirm === 'WITHDRAW' ? 'Rút bài về bản nháp?' : confirm === 'ARCHIVE' ? 'Ẩn bài viết khỏi Blog công khai?' : 'Xóa vĩnh viễn bài viết?'}</h4>{confirm === 'REJECT' && <textarea aria-label="Lý do từ chối" maxLength={2000} rows={5} value={reason} onChange={event => setReason(event.target.value)} placeholder="Góp ý cụ thể để tác giả chỉnh sửa..." />}<div><button className={'blog-button ' + (confirm === 'DELETE' || confirm === 'REJECT' ? 'danger' : '')} disabled={busy || (confirm === 'REJECT' && !reason.trim())} onClick={() => action(confirm)}>{busy ? 'Đang xử lý...' : 'Xác nhận'}</button><button className="blog-button secondary" disabled={busy} onClick={() => setConfirm(null)}>Hủy</button></div></div>}
         <Link className="blog-back" to={adminMode ? '/admin/blog' : '/blog/my-posts'}><ArrowLeft size={15} /> Về danh sách</Link>
       </aside></div>
     </>}

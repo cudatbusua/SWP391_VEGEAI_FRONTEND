@@ -15,10 +15,12 @@ export function BlogAccess({ children, admin = false }: { children: ReactNode; a
   if (admin && user?.role !== 'admin') return <p role="alert" className="blog-empty">Bạn cần quyền admin để duyệt bài viết.</p>;
   return children;
 }
+
 export function BlogBadge({ status }: { status: BlogStatus }) {
   const Icon = { DRAFT: FileText, PENDING_REVIEW: Clock, PUBLISHED: BadgeCheck, REJECTED: XCircle, ARCHIVED: Archive }[status];
   return <span className={'blog-badge ' + status.toLowerCase()}><Icon size={14} />{blogStatuses[status]}</span>;
 }
+
 // Pin a distinct, topic-matched image to each published post so reused or stale API covers cannot create duplicate cards.
 const editorialCovers: Record<string, string> = {
   '10cda16b-d4f8-4414-8bfb-5ba348357594': 'https://www.lesfruitsetlegumesfrais.com/app/uploads/cache/2013/03/r70-1-salade-chou-rouge-orange-graines/328725460.jpg',
@@ -49,9 +51,159 @@ export function BlogCover({ post }: { post: Pick<BlogPost, 'coverImage' | 'title
     if (!event.currentTarget.src.endsWith('/images/vietnamese-vegan-table.png')) event.currentTarget.src = '/images/vietnamese-vegan-table.png';
   }} /></div>;
 }
+
+function cleanMarkdownInline(text: string): string {
+  return text.replace(/\*\*(.+?)\*\*/g, '$1').trim();
+}
+
+function tryParseStructuredRecipeContent(content: string): {
+  introLines: string[];
+  ingredients: { name: string; amount: string }[];
+  steps: string[];
+  outroLines: string[];
+} | null {
+  const lines = content.split(/\r?\n/).map(l => l.trim());
+  const ingHeaderIdx = lines.findIndex(l =>
+    /^(?:#+\s*)?(?:🥗\s*)?nguyên liệu(?:\s+cần\s+chuẩn\s+bị)?\s*:?\s*$/i.test(l)
+  );
+  const stepHeaderIdx = lines.findIndex(l =>
+    /^(?:#+\s*)?(?:👨‍🍳\s*)?(?:các\s+bước\s+thực\s+hiện|cách\s+làm|các\s+bước\s+chế\s+biến)\s*:?\s*$/i.test(l)
+  );
+
+  if (ingHeaderIdx === -1 || stepHeaderIdx === -1 || stepHeaderIdx <= ingHeaderIdx) {
+    return null;
+  }
+
+  const introLines = lines
+    .slice(0, ingHeaderIdx)
+    .map(l => cleanMarkdownInline(l.replace(/^#+\s*/, '')))
+    .filter(Boolean);
+
+  const rawIngLines = lines.slice(ingHeaderIdx + 1, stepHeaderIdx).filter(Boolean);
+  const ingredients = rawIngLines
+    .map(line => {
+      const cleaned = cleanMarkdownInline(line.replace(/^[-*•+]\s*/, ''));
+      const colonIdx = cleaned.indexOf(':');
+      if (colonIdx > 0) {
+        return {
+          name: cleaned.slice(0, colonIdx).trim(),
+          amount: cleaned.slice(colonIdx + 1).trim(),
+        };
+      }
+      return { name: cleaned, amount: '' };
+    })
+    .filter(item => item.name.length > 0);
+
+  const afterStepLines = lines.slice(stepHeaderIdx + 1);
+  const steps: string[] = [];
+  const outroLines: string[] = [];
+  let inOutro = false;
+
+  for (const rawLine of afterStepLines) {
+    if (!rawLine) continue;
+    if (/^(?:#+\s*)?(?:💡\s*)?(?:mẹo|lưu ý|ghi chú)/i.test(rawLine)) {
+      inOutro = true;
+      continue;
+    }
+    if (inOutro) {
+      outroLines.push(cleanMarkdownInline(rawLine.replace(/^[-*•+]\s*/, '')));
+    } else {
+      const cleanedStep = cleanMarkdownInline(
+        rawLine
+          .replace(/^\d+[.)]\s*/, '')
+          .replace(/^[-*•+]\s*/, '')
+          .replace(/^bước\s*\d+\s*[-:–]?\s*/i, '')
+      );
+      if (cleanedStep) steps.push(cleanedStep);
+    }
+  }
+
+  if (ingredients.length === 0 || steps.length === 0) return null;
+  return { introLines, ingredients, steps, outroLines };
+}
+
 export function BlogBody({ content }: { content: string }) {
   if (!/<\/?[a-z][\s\S]*>/i.test(content) || typeof DOMParser === 'undefined') {
-    return <div className="blog-body">{content.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>;
+    const structuredRecipe = tryParseStructuredRecipeContent(content);
+    if (structuredRecipe) {
+      return (
+        <div className="blog-body space-y-6">
+          {structuredRecipe.introLines.map((paragraph, idx) => (
+            <p key={`intro-${idx}`}>{paragraph}</p>
+          ))}
+
+          <div className="grid md:grid-cols-[1fr_2fr] gap-8 my-6 not-prose">
+            <section className="min-w-0 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Nguyên liệu</h2>
+              <p className="text-xs text-slate-400 mb-4">Định lượng chuẩn bị</p>
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800 text-xs sm:text-sm">
+                {structuredRecipe.ingredients.map((ing, idx) => (
+                  <li key={idx} className="py-2.5 flex justify-between gap-4">
+                    <span className="min-w-0 break-words font-medium text-slate-800 dark:text-slate-200">{ing.name}</span>
+                    {ing.amount && <span className="text-slate-500 font-semibold shrink-0">{ing.amount}</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+
+            <section className="min-w-0 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Các bước thực hiện</h2>
+              <ol className="space-y-4">
+                {structuredRecipe.steps.map((step, idx) => (
+                  <li key={idx} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                    <h3 className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 mb-1.5 uppercase">
+                      Bước {idx + 1}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                      {step}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          </div>
+
+          {structuredRecipe.outroLines.length > 0 && (
+            <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-slate-800/50 border border-emerald-200/70 dark:border-slate-700 text-xs sm:text-sm text-slate-700 dark:text-slate-300 space-y-1.5">
+              <strong className="block text-emerald-800 dark:text-emerald-400">Mẹo nhỏ từ căn bếp:</strong>
+              {structuredRecipe.outroLines.map((tip, idx) => (
+                <p key={`tip-${idx}`}>{tip}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const blocks = content.split(/\n\s*\n/).filter(Boolean);
+    return (
+      <div className="blog-body space-y-4">
+        {blocks.map((block, index) => {
+          const lines = block.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          if (lines.length === 1 && /^#+\s+/.test(lines[0])) {
+            return <h2 key={index}>{cleanMarkdownInline(lines[0].replace(/^#+\s+/, ''))}</h2>;
+          }
+          const isNumberedList = lines.length > 1 && lines.every(l => /^\d+[.)]\s+/.test(l));
+          if (isNumberedList) {
+            return (
+              <ol key={index} className="space-y-3 not-prose my-4">
+                {lines.map((line, idx) => (
+                  <li key={idx} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                    <h3 className="text-xs font-extrabold text-emerald-700 dark:text-emerald-400 mb-1 uppercase">
+                      Bước {idx + 1}
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {cleanMarkdownInline(line.replace(/^\d+[.)]\s+/, ''))}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            );
+          }
+          return <p key={index}>{cleanMarkdownInline(block.replace(/^#+\s+/gm, ''))}</p>;
+        })}
+      </div>
+    );
   }
 
   const document = new DOMParser().parseFromString(content, 'text/html');
@@ -103,13 +255,16 @@ export function BlogBody({ content }: { content: string }) {
 
   return <div className="blog-body">{Array.from(document.body.childNodes).map((node, index) => renderNode(node, `blog-${index}`))}</div>;
 }
+
 export function BlogError({ message, retry }: { message: string; retry?: () => void }) {
   return <div role="alert" className="blog-error"><p>{message}</p>{retry && <button onClick={retry}><RefreshCw size={15} /> Tải lại</button>}</div>;
 }
+
 export function BlogPagination({ data, busy, change }: { data: PageResponse<BlogPost> | null; busy: boolean; change: (page: number) => void }) {
   if (!data || data.totalPages <= 1) return null;
   return <nav className="blog-pagination" aria-label="Phân trang bài viết"><button title="Trang trước" aria-label="Trang trước" disabled={busy || data.first} onClick={() => change(data.page - 1)}><ChevronLeft size={18} /></button><span>{data.page + 1} / {data.totalPages}</span><button title="Trang sau" aria-label="Trang sau" disabled={busy || data.last} onClick={() => change(data.page + 1)}><ChevronRight size={18} /></button></nav>;
 }
+
 export function blogDate(value?: string) {
   return value ? new Date(value).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }) : '';
 }

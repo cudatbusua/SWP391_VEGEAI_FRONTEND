@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Watch,
   Flame,
@@ -64,7 +64,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
   const [metrics, setMetrics] = useState<WearableMetrics>(() => wearableService.getMetrics());
   const [isSyncing, setIsSyncing] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
-  const [showArchitectureGuide, setShowArchitectureGuide] = useState(false);
+  const [showArchitectureGuide, setShowArchitectureGuide] = useState(true);
   const [showHubInfo, setShowHubInfo] = useState(false);
   const [activeGuideTab, setActiveGuideTab] = useState<'phone' | 'apple' | 'samsung' | 'xiaomi' | 'garmin'>('phone');
   const [showManualHrModal, setShowManualHrModal] = useState(false);
@@ -80,9 +80,15 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
   useEffect(() => {
     const token = wearableService.getStoredToken();
     if (token) {
-      wearableService.fetchGoogleFitLive(token).catch(err => {
-        console.warn('Background auto-sync with Google Fit:', err);
-      });
+      setIsSyncing(true);
+      wearableService
+        .fetchGoogleFitLive(token)
+        .catch(err => {
+          console.warn('Background auto-sync with Google Fit:', err);
+        })
+        .finally(() => {
+          setIsSyncing(false);
+        });
     }
   }, []);
 
@@ -149,13 +155,29 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
     try {
       const live = await wearableService.fetchGoogleFitLive(token);
       sfx.playSuccess();
+      const updated = wearableService.getMetrics();
       const hrText = live.heartRate > 0 ? `, nhịp tim ${live.heartRate} bpm` : '';
-      setStatusMessage(`Đồng bộ thành công lúc ${new Date().toLocaleTimeString('vi-VN')}: ${live.steps.toLocaleString('vi-VN')} bước chân, +${live.calories} kcal${hrText}!`);
+      const dateNote = updated.dataDateLabel && updated.dataDateLabel !== 'Hôm nay' ? ` (${updated.dataDateLabel})` : '';
+      setStatusMessage(`Đồng bộ thành công lúc ${new Date().toLocaleTimeString('vi-VN')}${dateNote}: ${live.steps.toLocaleString('vi-VN')} bước chân, +${live.calories} kcal${hrText}!`);
     } catch (err: any) {
       setStatusMessage(err.message || 'Chưa thể cập nhật dữ liệu từ thiết bị. Vui lòng thử lại sau.');
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const handleSelectPreset = (preset: 'light' | 'moderate' | 'intense') => {
+    sfx.playTap();
+    const updated = wearableService.setPreset(preset);
+    setStatusMessage(
+      `Đã áp dụng kịch bản mô phỏng: ${
+        preset === 'light'
+          ? 'Nhẹ nhàng (3.850 bước · +180 kcal)'
+          : preset === 'moderate'
+          ? 'Tiêu chuẩn (8.420 bước · +485 kcal)'
+          : 'Cường độ cao (13.600 bước · +760 kcal)'
+      } — Nhịp tim ${updated.avgHeartRate} bpm, SpO₂ ${updated.spo2}%, Giấc ngủ ${updated.sleepHours}.`
+    );
   };
 
   const handleDisconnect = () => {
@@ -188,6 +210,11 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
                 <span className={`w-2 h-2 rounded-full ${metrics.isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
                 {metrics.isConnected ? 'Đã liên kết Google Fit' : 'Chưa kết nối thiết bị'}
               </span>
+              {metrics.dataDateLabel && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                  {metrics.dataDateLabel}
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-2">
               <span>Hỗ trợ: <strong className="text-slate-700 dark:text-slate-200">{metrics.deviceModel}</strong> · {metrics.lastSyncedAt}</span>
@@ -218,7 +245,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
                 </div>
 
                 <p className="leading-relaxed text-slate-600 dark:text-slate-300">
-                  VEGEAI đồng bộ an toàn qua <strong>Google Fit Cloud</strong> (tính chuẩn từ 00:00 sáng nay). Bạn <strong>không bắt buộc</strong> phải có smartwatch hay smartband đắt tiền. Hãy chọn phương thức hoặc thiết bị bạn đang dùng bên dưới:
+                  VEGEAI đồng bộ an toàn qua <strong>Google Fit Cloud</strong> (tự động lấy dữ liệu hôm nay hoặc phiên đồng bộ gần nhất trong 30 ngày). Bạn <strong>không bắt buộc</strong> phải có smartwatch hay smartband đắt tiền. Hãy chọn phương thức hoặc thiết bị bạn đang dùng bên dưới:
                 </p>
 
                 {/* Device Selector Tabs */}
@@ -338,7 +365,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
                       <li>Mở app quản lý vòng tay: <strong>Mi Fitness</strong> (Xiaomi/Redmi) hoặc <strong>Zepp / Zepp Life</strong> (Amazfit).</li>
                       <li>Vào tab <strong>Hồ sơ (Profile)</strong> &gt; <strong>Dữ liệu bên thứ ba</strong> (hoặc <strong>Health Connect</strong>).</li>
                       <li>Chọn <strong>Google Fit</strong> (hoặc Health Connect) &gt; Bật cho phép đồng bộ <em>Số bước, Calo &amp; Hoạt động</em>.</li>
-                      <li>Mỗi khi muốn số liệu cập nhật ngay, chỉ cần mở app Mi Fitness / Zepp vuốt nhẹ để sync vòng tay, sau đó bấm <strong>"Đồng bộ lại"</strong> trên VEGEAI!</li>
+                      <li>Mỗi khi muốn số liệu cập nhật ngay, chỉ cần mở app Mi Fitness / Zepp vuốt nhẹ để sync vòng tay, mở Google Fit trên điện thoại, sau đó bấm <strong>"Đồng bộ lại"</strong> trên VEGEAI!</li>
                     </ol>
                   </div>
                 )}
@@ -415,8 +442,52 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         </div>
       )}
 
+      {/* Simulator Preset Control Strip (Quick Scenarios for Demo & When Phone Has Not Synced Today) */}
+      <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+          <span className="font-bold text-slate-700 dark:text-slate-300">
+            Chế độ thử nghiệm kịch bản thể trạng (Simulator Presets):
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(['light', 'moderate', 'intense'] as const).map(p => {
+            const isCurrent =
+              metrics.source === 'simulator' &&
+              localStorage.getItem('wearable_preset') === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => handleSelectPreset(p)}
+                className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer transition ${
+                  isCurrent
+                    ? 'bg-emerald-700 text-white shadow-2xs'
+                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                {p === 'light'
+                  ? 'Nhẹ nhàng (3.850 bước)'
+                  : p === 'moderate'
+                  ? 'Tiêu chuẩn (8.420 bước)'
+                  : 'Cường độ cao (13.600 bước)'}
+              </button>
+            );
+          })}
+          {metrics.source === 'simulator' && (
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-800 transition cursor-pointer"
+              title="Xóa dữ liệu mô phỏng để trở về trạng thái trống"
+            >
+              Xóa mô phỏng
+            </button>
+          )}
+        </div>
+      </div>
 
-      {/* Metric Cards Grid: only metrics that Google Fit actually shares from Mi Fitness */}
+      {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <MetricCard
           title="Bước chân hôm nay"
@@ -425,7 +496,9 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
           unit="bước"
           valueClass="text-slate-900 dark:text-white"
           note={metrics.steps > 0
-            ? `Mục tiêu ${metrics.stepTarget.toLocaleString('vi-VN')} bước (${Math.round((metrics.steps / metrics.stepTarget) * 100)}%)`
+            ? `Mục tiêu ${metrics.stepTarget.toLocaleString('vi-VN')} bước (${Math.round((metrics.steps / metrics.stepTarget) * 100)}%)${
+                metrics.dataDateLabel && metrics.dataDateLabel !== 'Hôm nay' ? ` · ${metrics.dataDateLabel}` : ''
+              }`
             : 'Chưa có dữ liệu bước chân'}
         >
           {metrics.steps > 0 && (
@@ -469,7 +542,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
           unit="điểm"
           valueClass="text-rose-500"
           note={metrics.heartPoints > 0
-            ? 'Điểm vận động tim mạch hôm nay (mục tiêu của Google: 150 điểm/tuần)'
+            ? 'Điểm vận động tim mạch (mục tiêu của Google: 150 điểm/tuần)'
             : 'Chưa nhận được từ Google Fit'}
         />
 
@@ -480,7 +553,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
           unit="%"
           valueClass="text-sky-500"
           note={metrics.spo2 > 0
-            ? (metrics.spo2 >= 95 ? 'Trong ngưỡng bình thường' : 'Thấp hơn ngưỡng thông thường – chỉ tham khảo, không thay thế tư vấn y tế')
+            ? (metrics.spo2 >= 95 ? 'Trong ngưỡng bình thường (95% – 100%)' : 'Thấp hơn ngưỡng thông thường – chỉ tham khảo, không thay thế tư vấn y tế')
             : 'Chưa nhận được từ Google Fit'}
         />
 
@@ -491,12 +564,12 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
           unit=""
           valueClass="text-indigo-600 dark:text-indigo-400"
           note={metrics.sleepHours && metrics.sleepHours !== '—'
-            ? (Number(metrics.sleepHours.split('h')[0]) >= 7 ? 'Ngủ đủ giấc' : 'Ngủ chưa đủ 7 giờ – nên nghỉ ngơi thêm')
+            ? (Number(metrics.sleepHours.split('h')[0]) >= 7 ? 'Ngủ đủ giấc – hồi phục tốt' : 'Ngủ chưa đủ 7 giờ – nên nghỉ ngơi thêm')
             : 'Chưa nhận được từ Google Fit'}
         />
       </div>
 
-      {/* Heart rate (bpm): not shared by Mi Fitness to Google Fit, so be explicit and offer manual entry */}
+      {/* Heart rate (bpm): not shared by Mi Fitness to Google Fit continuously, so be explicit and offer manual entry */}
       <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Heart className={`w-5 h-5 text-rose-500 ${metrics.avgHeartRate > 0 ? 'fill-rose-500/20' : ''}`} />
@@ -563,7 +636,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         <button
           type="button"
           onClick={() => setShowArchitectureGuide(prev => !prev)}
-          className="w-full flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 transition"
+          className="w-full flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 transition cursor-pointer"
         >
           <span className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-emerald-600" />

@@ -5,7 +5,8 @@ import { MainLayout } from '../layouts/MainLayout';
 import { RecipeImage } from '../components/RecipeImage';
 import { VideoPlayer } from '../components/CommunityUi';
 import { recipeService } from '../services/recipeService';
-import { errorMessage } from '../services/apiClient';
+import { ApiError, errorMessage } from '../services/apiClient';
+import { ContentInteractions } from '../components/ContentInteractions';
 import type { RecipeDetail } from '../types/recipe';
 
 function inferIngredientCategory(name: string): { category: 'produce' | 'protein' | 'grains' | 'spices'; categoryLabel: string } {
@@ -27,12 +28,17 @@ export function RecipeDetailPage() {
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [notFound, setNotFound] = useState(false);
   const [reload, setReload] = useState(0);
   useEffect(() => {
-    const controller = new AbortController(); setLoading(true); setRecipe(null); setError('');
-    if (!id) { setError('Không tìm thấy công thức.'); setLoading(false); return; }
+    const controller = new AbortController(); setLoading(true); setRecipe(null); setError(''); setNotFound(false);
+    if (!id) { setNotFound(true); setLoading(false); return; }
     recipeService.detail(id, controller.signal).then(value => { if (!controller.signal.aborted) setRecipe(value); })
-      .catch(reason => { if (!controller.signal.aborted) setError(errorMessage(reason)); })
+      .catch(reason => {
+        if (controller.signal.aborted) return;
+        if (reason instanceof ApiError && ([400, 404].includes(reason.status) || [1001, 2101].includes(reason.code || 0))) setNotFound(true);
+        else setError(errorMessage(reason));
+      })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [id, reload]);
@@ -42,6 +48,7 @@ export function RecipeDetailPage() {
   return <MainLayout><div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <Link to="/explore" className="inline-flex gap-2 items-center text-sm font-semibold text-emerald-700 dark:text-emerald-400 mb-6 hover:underline"><ArrowLeft size={16} /> Quay lại khám phá công thức</Link>
     {loading && <p role="status" className="p-8 text-center text-sm text-slate-500">Đang tải công thức...</p>}
+    {notFound && <div role="status" className="discovery-empty"><BookOpen size={36} /><h3>Không tìm thấy công thức</h3><p>Công thức này không tồn tại hoặc đường dẫn chưa chính xác.</p><Link to="/explore">Về trang khám phá</Link></div>}
     {error && <div role="alert" className="p-6 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl text-rose-700 dark:text-rose-300"><p>{error}</p><button onClick={() => setReload(value => value + 1)} className="flex items-center gap-2 mt-4 font-bold text-xs underline"><RefreshCw size={16} /> Thử lại</button></div>}
     {recipe && <><div className="grid md:grid-cols-2 gap-8 items-start bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
       <RecipeImage src={recipe.imageUrl} title={recipe.title} detail />
@@ -163,6 +170,7 @@ export function RecipeDetailPage() {
           </Link>
         </div>
       </section>
+      <ContentInteractions type="RECIPE" id={recipe.recipeId} />
     </>}
   </div></MainLayout>;
 }

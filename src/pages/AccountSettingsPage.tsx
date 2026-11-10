@@ -497,15 +497,18 @@ export const AccountSettingsPage: React.FC = () => {
             
             {/* Avatar & Identifiers */}
             <div className="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left">
-              <div className="relative">
+              <div className="flex flex-col items-center gap-2 shrink-0">
+                <div className="relative">
                 <div className="w-24 h-24 overflow-hidden rounded-full bg-linear-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white flex items-center justify-center font-extrabold text-3xl shadow-lg ring-4 ring-emerald-100 dark:ring-emerald-950/60">
                   {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" onError={() => setAvatar('')} /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
                 </div>
                 <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" title="Đang trực tuyến" />
-                <label className="absolute -bottom-7 left-1/2 -translate-x-1/2 whitespace-nowrap cursor-pointer text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                  Đổi avatar
-                  <input type="file" accept="image/png,image/jpeg" className="sr-only" onChange={async event => {
+                </div>
+                <label className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 cursor-pointer text-[11px] font-bold text-emerald-800 dark:text-emerald-300 transition">
+                  📷 Đổi ảnh đại diện
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={async event => {
                     const file = event.target.files?.[0];
+                    event.currentTarget.value = '';
                     if (!file) return;
                     if (file.size > 2 * 1024 * 1024) { setProfileError('Avatar không được vượt quá 2 MB.'); return; }
                     try { const updated = await userService.updateAvatar(file); setProfile(updated); setAvatar(updated.avatarUrl || ''); setProfileSuccess('Đã cập nhật avatar.'); }

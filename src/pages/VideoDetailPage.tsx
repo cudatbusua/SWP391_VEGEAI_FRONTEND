@@ -29,6 +29,7 @@ import { aiService } from '../services/aiService';
 import { errorMessage } from '../services/apiClient';
 import { safeMediaUrl } from '../utils/communityVideo';
 import type { VideoComment } from '../types/community';
+import { ContentInteractions } from '../components/ContentInteractions';
 import { videoCategories } from '../types/community';
 import type { GeneratedRecipeAiResponse } from '../types/api';
 import { communityDate, CommunityConfirm, CommunityError, CommunityLoading, CommunityPagination, VideoCard, VideoPlayer } from '../components/CommunityUi';
@@ -309,6 +310,8 @@ function VideoComments({ videoId }: { videoId: string }) {
 }
 
 function VideoDetail({ videoId }: { videoId: string }) {
+  // Keep the legacy renderer available during the shared-interactions rollout.
+  void VideoComments;
   const { user, isAuthenticated } = useAuth();
   const query = useCommunityQuery('video:' + videoId, signal => communityService.video(videoId, signal));
   const relatedCategory = query.data?.category || '';
@@ -354,7 +357,7 @@ function VideoDetail({ videoId }: { videoId: string }) {
         const sourceUrl = safeMediaUrl(line.trim());
         return <Fragment key={index}>{index > 0 && '\n'}{sourceUrl ? <a className="cm-source-link" href={sourceUrl} target="_blank" rel="noopener noreferrer">{new URL(sourceUrl).hostname} <ExternalLink size={14} /></a> : line}</Fragment>;
       })}</p>}
-      <VideoComments videoId={videoId} />
+      <ContentInteractions type="VIDEO" id={videoId} />
     </div>{!!recommendations.length && <aside className="cm-video-sidebar"><h2>Cùng vào bếp</h2>{recommendations.map(video => <VideoCard key={video.id} video={video} />)}</aside>}</div>}
   </div>;
 }

@@ -195,6 +195,19 @@ export function errorMessage(error: unknown): string {
   const code = error instanceof ApiError ? error.code : undefined;
   const status = error instanceof ApiError ? error.status : undefined;
 
+  if (code === 1001 || code === 1002) return 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+  if (code === 1303) return 'Mật khẩu nhập lại không khớp.';
+  if (code === 1601 || code === 1602) return 'Bạn không thể thay đổi vai trò/trạng thái của chính mình hoặc quản trị viên khác.';
+  if (code === 1801) return 'Không tìm thấy nguyên liệu trong tủ lạnh.';
+  if (code === 2001) return 'Bạn cần thiết lập hồ sơ dinh dưỡng trước.';
+  if (code === 2002) return 'Tuổi phải trong khoảng 13–100.';
+  if (code === 2004) return msg;
+
+  // Credential failures also use HTTP 401, so they must be checked before generic session expiry.
+  if (code === 1101 || /invalid credentials|invalid username/i.test(msg)) {
+    return 'Tên đăng nhập, email hoặc mật khẩu không chính xác.';
+  }
+
   // 1. Session & Token errors
   if (
     code === 1201 ||
@@ -207,11 +220,6 @@ export function errorMessage(error: unknown): string {
     /revoked|token.*expired|invalid.*token|token.*invalid|unauthorized/i.test(msg)
   ) {
     return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-  }
-
-  // 2. Authentication credentials
-  if (code === 1101 || /invalid credentials|invalid username/i.test(msg)) {
-    return 'Tên đăng nhập, email hoặc mật khẩu không chính xác.';
   }
 
   // 3. Account status
@@ -284,5 +292,5 @@ export function errorMessage(error: unknown): string {
     return msg;
   }
 
-  return 'Có lỗi xảy ra trong quá trình xử lý. Vui lòng thử lại.';
+  return `Có lỗi xảy ra trong quá trình xử lý. Vui lòng thử lại.${code ? ` (Mã lỗi: ${code})` : ''}`;
 }

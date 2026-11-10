@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, ImagePlus, MessageCircle, Pencil, Send, Star, Trash2, X } from 'lucide-react';
+import { Camera, ChevronDown, ImagePlus, MessageCircle, Pencil, Send, Star, Trash2, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { contentInteractionService } from '../services/contentInteractionService';
 import { errorMessage } from '../services/apiClient';
@@ -33,6 +33,7 @@ export function ContentInteractions({ type, id }: { type: InteractionTarget; id:
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [reload, setReload] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
 
@@ -117,6 +118,7 @@ export function ContentInteractions({ type, id }: { type: InteractionTarget; id:
   };
 
   const beginEdit = (comment: InteractionComment) => {
+    setExpanded(true);
     setEditing(comment);
     setDraft(comment.content);
     setSelectedStars(comment.reviewStars ?? data?.rating.myRating ?? 0);
@@ -158,6 +160,11 @@ export function ContentInteractions({ type, id }: { type: InteractionTarget; id:
       <span className="ci-review-dot" aria-hidden="true" />
       <div><h2>Đánh giá &amp; Chia sẻ trải nghiệm</h2><p>Ý kiến của bạn giúp cộng đồng chọn món phù hợp.</p></div>
     </header>
+    <button type="button" className="ci-expand-trigger" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>
+      <span><Star size={18} fill="currentColor" />{ratingSummary}</span>
+      <span>{expanded ? 'Thu gọn' : 'Xem và viết đánh giá'}<ChevronDown size={18} className={expanded ? 'is-open' : ''} /></span>
+    </button>
+    {expanded && <>
     <div className="ci-review-rating">
       <div className="ci-review-rating-copy"><strong>Đánh giá chất lượng {type === 'RECIPE' ? 'món ăn' : targetLabel}</strong><span>{ratingSummary}</span></div>
       <div className="ci-stars ci-review-stars" role="group" aria-label="Đánh giá từ 1 đến 5 sao">
@@ -227,5 +234,6 @@ export function ContentInteractions({ type, id }: { type: InteractionTarget; id:
       <button type="button" disabled={comments.first} onClick={() => setPage(value => Math.max(0, value - 1))}>Trước</button><span>Trang {comments.page + 1} / {comments.totalPages}</span>
       <button type="button" disabled={comments.last} onClick={() => setPage(value => value + 1)}>Sau</button>
     </nav>}
+    </>}
   </section>;
 }

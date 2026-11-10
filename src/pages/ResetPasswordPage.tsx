@@ -32,7 +32,7 @@ export function ResetPasswordPage() {
     bannerTitle="Bảo vệ tài khoản ăn chay thông minh"
     bannerDescription="Xác thực OTP giúp giữ an toàn cho hồ sơ dinh dưỡng, lịch sử AI và kho tủ lạnh cá nhân của bạn."
   >
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} noValidate className="space-y-4">
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {message && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
       <Input label="Email" type="email" required value={email} onChange={e => setEmail(e.target.value)} />

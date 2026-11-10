@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Save, Send, Eye, FilePenLine, Image, Video, Sparkles, Wand2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Save, Send, Eye, FilePenLine, Image, Video, Sparkles, Wand2, CheckCircle2, Loader2, Upload, X } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { BlogAccess, BlogBadge, BlogBody, BlogCover, BlogError } from '../components/BlogUi';
 import { useAuth } from '../hooks/useAuth';
 import { blogService } from '../services/blogService';
+import { communityService } from '../services/communityService';
 import { errorMessage } from '../services/apiClient';
 import { videoSource } from '../utils/communityVideo';
 import type { BlogCategory, BlogInput, BlogPost } from '../types/blog';
@@ -37,6 +38,7 @@ export function BlogEditorPage() {
   const [mediaTab, setMediaTab] = useState<'image' | 'video'>('image');
   const [loading, setLoading] = useState(!!id);
   const [busy, setBusy] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState<'image' | 'video' | null>(null);
   const [dirty, setDirty] = useState(false);
   const [preview, setPreview] = useState(false);
   const [error, setError] = useState('');
@@ -137,7 +139,7 @@ export function BlogEditorPage() {
       content: shouldReplaceContent ? tpl.contentTemplate : prev.content,
     }));
     setDirty(true);
-    setMessage(`Đã chọn phân loại "${tpl.badgeLabel}" — Chế độ AI tích hợp: ${tpl.aiActionLabel}.`);
+    setMessage(`Đã chọn phân loại "${tpl.badgeLabel}".`);
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -157,7 +159,9 @@ export function BlogEditorPage() {
     setError('');
     setMessage('');
     try {
-      const saved = await blogService.save({ ...form, version: post?.version }, post?.postId || id);
+      const saved = post?.status === 'PUBLISHED' && !isAdmin
+        ? await blogService.requestPublishedEdit(post.postId, { ...form, version: post.version })
+        : await blogService.save({ ...form, version: post?.version }, post?.postId || id);
       setPost(saved);
       setForm(previous => ({ ...previous, version: saved.version }));
       setDirty(false);
@@ -165,7 +169,7 @@ export function BlogEditorPage() {
         await blogService.submit(saved.postId, saved.version);
         navigate('/blog/my-posts/' + saved.postId);
       } else {
-        setMessage(saved.status === 'PUBLISHED' ? 'Đã cập nhật bài viết công khai.' : 'Đã lưu bản nháp.');
+        setMessage(post?.status === 'PUBLISHED' && !isAdmin ? 'Đã gửi bản chỉnh sửa để ban biên tập duyệt.' : saved.status === 'PUBLISHED' ? 'Đã cập nhật bài viết công khai.' : 'Đã lưu bản nháp.');
         if (!id) navigate('/blog/my-posts/' + saved.postId + '/edit', { replace: true });
       }
     } catch (reason) {
@@ -175,9 +179,26 @@ export function BlogEditorPage() {
     }
   };
 
-  const editable = !post || ['DRAFT', 'REJECTED'].includes(post.status) || (isAdmin && post.status === 'PUBLISHED');
+  const editable = !post || ['DRAFT', 'REJECTED', 'PUBLISHED'].includes(post.status);
   const videoSourceObj = form.videoUrl ? videoSource(form.videoUrl) : null;
   const activeTemplate = BLOG_POST_TEMPLATES[form.category] || BLOG_POST_TEMPLATES.KITCHEN;
+
+  const uploadMedia = async (file: File | undefined, video: boolean) => {
+    if (!file || uploadingMedia) return;
+    setUploadingMedia(video ? 'video' : 'image');
+    setError('');
+    try {
+      const result = await (isAdmin
+        ? communityService.uploadVideoAsset(file, video)
+        : communityService.uploadMyVideoAsset(file, video));
+      change(video ? 'videoUrl' : 'coverImage', result.url);
+      setMessage(video ? 'Đã tải video lên bài viết.' : 'Đã tải ảnh bìa lên bài viết.');
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setUploadingMedia(null);
+    }
+  };
 
   return (
     <MainLayout>
@@ -193,10 +214,10 @@ export function BlogEditorPage() {
           </div>
           <header className="blog-page-heading">
             <div>
-              <span className="blog-eyebrow">ĐĂNG BÀI CỘNG ĐỒNG THEO KHUNG CHUẨN AI</span>
+              <span className="blog-eyebrow">ĐĂNG BÀI CỘNG ĐỒNG</span>
               <h1>{id ? 'Chỉnh sửa bài đăng' : 'Tạo bài đăng mới'}</h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Chọn đúng phân loại bài đăng để AI tự động kích hoạt chế độ phân tích tương ứng (Bóc tách các bước nấu ăn hoặc Phân tích kiến thức & Tư vấn Chatbot).
+                Chọn phân loại phù hợp để bài viết được trình bày rõ ràng và dễ tìm kiếm.
               </p>
             </div>
             {post && <BlogBadge status={post.status} />}
@@ -208,7 +229,7 @@ export function BlogEditorPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
-                    <Sparkles size={14} /> Bước 1: Chọn phân loại &amp; Template bài đăng chuẩn
+                    <Sparkles size={14} /> Phân loại &amp; mẫu bài đăng
                   </span>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                     {activeTemplate.classificationRule}
@@ -311,7 +332,7 @@ export function BlogEditorPage() {
                     />
                   </label>
                   <label>
-                    Nội dung chi tiết (Theo cấu trúc chuẩn giúp AI phân tích chính xác nhất)
+                    Nội dung chi tiết
                     <textarea
                       aria-label="Nội dung"
                       rows={17}
@@ -340,6 +361,8 @@ export function BlogEditorPage() {
                           allowFullScreen
                         />
                       </div>
+                    ) : videoSourceObj?.kind === 'file' ? (
+                      <video controls preload="metadata" src={videoSourceObj.src} className="my-5 aspect-video w-full rounded-2xl bg-black object-contain shadow-md" />
                     ) : (
                       <BlogCover post={{ title: form.title || 'Ảnh bìa', coverImage: form.coverImage }} />
                     )}
@@ -399,6 +422,12 @@ export function BlogEditorPage() {
                             placeholder="https://..."
                           />
                         </label>
+                        <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          {uploadingMedia === 'image' ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                          {uploadingMedia === 'image' ? 'Đang tải ảnh...' : 'Tải ảnh bìa từ thiết bị'}
+                          <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={!!uploadingMedia} onChange={event => void uploadMedia(event.target.files?.[0], false)} />
+                        </label>
+                        <span className="text-[11px] text-slate-500 block">JPG, PNG hoặc WebP; tối đa 5 MB.</span>
                         <span className="text-[11px] text-slate-500 block">Hoặc chọn ảnh mẫu có sẵn:</span>
                         <div className="blog-cover-options">
                           {covers.map(cover => (
@@ -431,6 +460,13 @@ export function BlogEditorPage() {
                           />
                         </label>
 
+                        <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-emerald-300 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          {uploadingMedia === 'video' ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                          {uploadingMedia === 'video' ? 'Đang tải video...' : 'Tải MP4 / WebM từ thiết bị'}
+                          <input className="sr-only" type="file" accept="video/mp4,video/webm" disabled={!!uploadingMedia} onChange={event => void uploadMedia(event.target.files?.[0], true)} />
+                        </label>
+                        <span className="text-[11px] text-slate-500 block">MP4 hoặc WebM; tối đa 150 MB.</span>
+
                         {videoSourceObj?.kind === 'embed' ? (
                           <div className="space-y-2">
                             <div className="aspect-video w-full rounded-xl overflow-hidden shadow-xs border border-slate-200 dark:border-slate-800">
@@ -443,8 +479,13 @@ export function BlogEditorPage() {
                             </div>
                             <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
                               <Sparkles size={14} className="shrink-0" />
-                              <span>AI sẽ tự động nhận diện video và hỗ trợ bóc tách công thức / nội dung khi xuất bản!</span>
+                              <span>Video sẽ được nhận diện và hiển thị cùng bài viết sau khi xuất bản.</span>
                             </div>
+                          </div>
+                        ) : videoSourceObj?.kind === 'file' ? (
+                          <div className="space-y-2">
+                            <video controls preload="metadata" src={videoSourceObj.src} className="aspect-video w-full rounded-xl bg-black object-contain" />
+                            <button type="button" onClick={() => change('videoUrl', '')} className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:underline"><X size={13} /> Gỡ video đính kèm</button>
                           </div>
                         ) : (
                           <div className="p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500">
@@ -471,7 +512,7 @@ export function BlogEditorPage() {
 
                 {!isAdmin && (
                   <p className="blog-moderation-note">
-                    Bài đăng được chuẩn hóa theo template giúp AI kiểm duyệt nhanh chóng và hỗ trợ người đọc phân tích tự động.
+                    Bài đăng sử dụng mẫu thống nhất để ban biên tập duyệt và người đọc theo dõi dễ dàng.
                   </p>
                 )}
               </aside>

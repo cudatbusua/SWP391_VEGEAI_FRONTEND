@@ -14,7 +14,6 @@ import {
   Play,
   Star,
   Sparkles,
-  Send,
   MessageSquare,
   CheckCircle2,
   ChefHat,
@@ -28,11 +27,12 @@ import { MainLayout } from '../layouts/MainLayout';
 import { blogService } from '../services/blogService';
 import { errorMessage } from '../services/apiClient';
 import { BlogBody, BlogCover, BlogError, BlogPagination, blogDate } from '../components/BlogUi';
+import { ContentInteractions } from '../components/ContentInteractions';
 import { useAuth } from '../hooks/useAuth';
 import { videoSource } from '../utils/communityVideo';
 import { aiService } from '../services/aiService';
 import { blogCategories, BLOG_POST_TEMPLATES, resolvePostAiMode } from '../types/blog';
-import type { BlogCategory, BlogComment, BlogPost } from '../types/blog';
+import type { BlogCategory, BlogPost } from '../types/blog';
 import type { GeneratedRecipeAiResponse, PageResponse } from '../types/api';
 import type { SmartMarketItem } from '../data/smartMarketData';
 import '../styles/blog.css';
@@ -184,36 +184,39 @@ export function BlogPage() {
   return (
     <MainLayout>
       <div className="blog-shell max-w-[1120px] mx-auto px-4 py-6 sm:py-8 space-y-6">
-        {/* Top Social Feed Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800">
-          <div>
-            <span className="blog-eyebrow"><BookOpen size={15} /> BẢNG TIN CỘNG ĐỒNG &amp; AI TÍCH HỢP</span>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
-              Cộng đồng Sống Xanh &amp; Bếp Chay VEGEAI
+        {/* Editorial Blog Header */}
+        <header className="relative overflow-hidden rounded-[28px] bg-linear-to-br from-emerald-950 via-emerald-900 to-teal-700 px-6 py-8 text-white shadow-lg sm:px-9 sm:py-10">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+          <div className="relative flex flex-col justify-between gap-7 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.14em]"><BookOpen size={14} /> Blog VEGEAI</span>
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">
+              Chuyện bếp chay, sống xanh mỗi ngày
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
-              Nơi mọi thành viên đăng bài chia sẻ <strong>Công thức nấu ăn</strong>, <strong>Kiến thức dinh dưỡng</strong> hoặc <strong>Lan tỏa lối sống xanh</strong> kèm hình ảnh/video — tích hợp AI phân tích tự động theo từng phân loại bài đăng.
+            <p className="mt-3 max-w-xl text-sm leading-7 text-emerald-50/85">
+              Khám phá công thức, kiến thức dinh dưỡng và những câu chuyện truyền cảm hứng từ cộng đồng.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {user?.role === 'admin' && (
-              <Link className="blog-button secondary" to="/admin/blog">
+              <Link className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20" to="/admin/blog">
                 <ClipboardCheck size={16} /> Duyệt bài đăng
               </Link>
             )}
             {isAuthenticated && (
-              <Link className="blog-button secondary" to="/blog/my-posts">
+              <Link className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20" to="/blog/my-posts">
                 <FileText size={16} /> Bài đăng của tôi
               </Link>
             )}
-            <Link className="blog-button" to={isAuthenticated ? '/blog/write' : '/login'}>
+            <Link className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-emerald-900 shadow-sm transition hover:bg-emerald-50" to={isAuthenticated ? '/blog/write' : '/login'}>
               <Plus size={17} /> {isAuthenticated ? 'Tạo bài đăng mới' : 'Đăng nhập để đăng bài'}
             </Link>
+          </div>
           </div>
         </header>
 
         {/* FACEBOOK-STYLE QUICK POST COMPOSER BOX */}
-        <section className="rounded-3xl border border-emerald-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs space-y-4">
+        <section className="space-y-4 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-emerald-700 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-2xs">
               {isAuthenticated ? (user?.name || user?.username || 'U').charAt(0).toUpperCase() : '🌱'}
@@ -349,8 +352,8 @@ export function BlogPage() {
 
         {/* FACEBOOK-STYLE SOCIAL FEED CARDS WITH INTEGRATED CONTEXT-AWARE AI */}
         {!error && data && data.items.length > 0 && (
-          <div className={'space-y-6 ' + (busy ? 'opacity-60' : '')}>
-            {data.items.map(post => {
+          <div className={'blog-magazine-grid ' + (busy ? 'opacity-60' : '')}>
+            {data.items.map((post, index) => {
               const hasVideo = !!post.videoUrl;
               const aiMode = resolvePostAiMode(post);
               const tpl = BLOG_POST_TEMPLATES[post.category] || BLOG_POST_TEMPLATES.KITCHEN;
@@ -361,7 +364,7 @@ export function BlogPage() {
               return (
                 <article
                   key={post.postId}
-                  className="rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs overflow-hidden transition hover:shadow-md"
+                  className={`blog-magazine-card rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs overflow-hidden transition hover:shadow-md ${index === 0 ? 'blog-magazine-featured' : ''}`}
                 >
                   {/* Post Author & Classification Header (Facebook Card Header) */}
                   <div className="p-4 sm:px-6 sm:pt-5 flex items-start justify-between gap-3">
@@ -645,9 +648,8 @@ export function BlogPage() {
 
 export function BlogDetailPage() {
   const { id } = useParams();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [post, setPost] = useState<BlogPost | null>(null);
-  const [comments, setComments] = useState<BlogComment[]>([]);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
@@ -658,16 +660,6 @@ export function BlogDetailPage() {
   const [aiKnowledge, setAiKnowledge] = useState<KnowledgeAiAnalysisResult | null>(null);
   const [aiError, setAiError] = useState('');
 
-  // Review & Rating form state
-  const [rating, setRating] = useState<number>(5);
-  const [hoverRating, setHoverRating] = useState<number>(0);
-  const [commentContent, setCommentContent] = useState('');
-  const [submittingComment, setSubmittingComment] = useState(false);
-  const [commentError, setCommentError] = useState('');
-  const [commentSuccess, setCommentSuccess] = useState('');
-
-  const starLabels = ['', 'Rất tệ', 'Chưa đạt', 'Tương đối ổn', 'Rất ngon & bổ ích', 'Tuyệt vời, 5 sao!'];
-
   useEffect(() => {
     if (!id) return;
     const controller = new AbortController();
@@ -677,14 +669,10 @@ export function BlogDetailPage() {
     setAiRecipe(null);
     setAiKnowledge(null);
 
-    Promise.all([
-      blogService.publicPost(id, controller.signal),
-      blogService.getComments(id, controller.signal),
-    ])
-      .then(([postData, commentsData]) => {
+    blogService.publicPost(id, controller.signal)
+      .then(postData => {
         if (controller.signal.aborted) return;
         setPost(postData);
-        setComments(commentsData);
       })
       .catch(reason => {
         if (!controller.signal.aborted) setError(errorMessage(reason));
@@ -723,40 +711,7 @@ export function BlogDetailPage() {
     }
   };
 
-  // Submit comment & review
-  const handleSubmitComment = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!id || !post) return;
-    if (!commentContent.trim()) {
-      setCommentError('Vui lòng nhập nội dung nhận xét của bạn.');
-      return;
-    }
-    setSubmittingComment(true);
-    setCommentError('');
-    setCommentSuccess('');
-
-    try {
-      const newComment = await blogService.addComment(id, {
-        content: commentContent.trim(),
-        rating: rating,
-      });
-      setComments(prev => [newComment, ...prev]);
-      setCommentContent('');
-      setCommentSuccess('Cảm ơn bạn đã gửi đánh giá & bình luận!');
-      if (post.ratingCount !== undefined && post.ratingAverage !== undefined) {
-        const newCount = post.ratingCount + 1;
-        const newAvg = (post.ratingAverage * post.ratingCount + rating) / newCount;
-        setPost({ ...post, ratingCount: newCount, ratingAverage: Number(newAvg.toFixed(1)) });
-      }
-    } catch (err) {
-      setCommentError(errorMessage(err));
-    } finally {
-      setSubmittingComment(false);
-    }
-  };
-
   const videoObj = post?.videoUrl ? videoSource(post.videoUrl) : null;
-  const currentRating = hoverRating || rating;
   const aiMode = post ? resolvePostAiMode(post) : 'KNOWLEDGE_INSIGHT';
 
   return (
@@ -776,7 +731,7 @@ export function BlogDetailPage() {
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-400 font-bold text-xs">
                 <Star size={14} fill="#f59e0b" className="text-amber-500" />
                 <span>{(post.ratingAverage || 5.0).toFixed(1)} / 5.0</span>
-                <span className="text-slate-400 font-normal">({post.ratingCount || comments.length} đánh giá)</span>
+                <span className="text-slate-400 font-normal">({post.ratingCount || 0} đánh giá)</span>
               </div>
             </div>
 
@@ -802,6 +757,8 @@ export function BlogDetailPage() {
                   />
                 </div>
               </div>
+            ) : videoObj?.kind === 'file' ? (
+              <video controls preload="metadata" src={videoObj.src} className="my-6 aspect-video w-full rounded-2xl bg-black object-contain shadow-lg" />
             ) : (
               <BlogCover post={{ ...post, postId: post.postId }} />
             )}
@@ -1053,7 +1010,8 @@ export function BlogDetailPage() {
               </div>
             </section>
 
-            {/* ── 5-STAR REVIEWS & COMMENTS SECTION ── */}
+            <ContentInteractions type="BLOG" id={post.postId} />
+            {/* Legacy comments UI removed after migration to shared ContentInteractions.
             <section className="mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 space-y-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
@@ -1214,6 +1172,7 @@ export function BlogDetailPage() {
                 )}
               </div>
             </section>
+            */}
 
             <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
               <Link to="/blog" className="blog-read-link">

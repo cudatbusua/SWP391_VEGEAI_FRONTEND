@@ -182,3 +182,11 @@
   .recipe-card-kicker, .recipe-card-tags, .recipe-card-meta { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .discovery-journal-photo img { transition: none; } }
+
+/* Editorial recipe grid: the first result works as the page's visual lead. */
+@media (min-width: 1050px) {
+  .recipe-grid > .recipe-featured { grid-column: span 2; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr); }
+  .recipe-grid > .recipe-featured > div:first-child { aspect-ratio: auto; min-height: 100%; }
+  .recipe-grid > .recipe-featured > div:first-child > div { min-height: 100%; }
+  .recipe-grid > .recipe-featured h3 { font-size: 24px; }
+}

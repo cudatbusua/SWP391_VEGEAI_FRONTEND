@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, Save, Video } from 'lucide-react';
+import { ArrowLeft, Image, Loader2, Save, Upload, Video } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useCommunityQuery } from '../hooks/useCommunityQuery';
 import { communityService } from '../services/communityService';
 import { errorMessage } from '../services/apiClient';
 import { videoCategories, type VideoInput, type VideoStatus } from '../types/community';
-import { safeMediaUrl } from '../utils/communityVideo';
+import { safeMediaUrl, videoSource } from '../utils/communityVideo';
 import { CommunityAdminNav, CommunityError, CommunityGuard, CommunityLoading, VideoCover } from '../components/CommunityUi';
 
 interface EditorForm { title: string; description: string; videoUrl: string; thumbnailUrl: string; category: string; duration: string; status: VideoStatus }
@@ -17,13 +17,30 @@ function VideoEditor({ videoId, member = false }: { videoId?: string; member?: b
   const [form, setForm] = useState<EditorForm>(empty);
   const [initial, setInitial] = useState(JSON.stringify(empty));
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState<'video' | 'image' | null>(null);
   const [error, setError] = useState('');
   const upload = async (file: File | undefined, video: boolean) => {
     if (!file) return;
-    setBusy(true); setError('');
-    try { const result = await (member ? communityService.uploadMyVideoAsset(file, video) : communityService.uploadVideoAsset(file, video)); update(video ? 'videoUrl' : 'thumbnailUrl', result.url); }
+    setUploading(video ? 'video' : 'image'); setError('');
+    try {
+      if (video) {
+        const objectUrl = URL.createObjectURL(file);
+        try {
+          const seconds = await new Promise<number>((resolve, reject) => {
+            const element = document.createElement('video');
+            element.preload = 'metadata';
+            element.onloadedmetadata = () => resolve(Math.max(1, Math.round(element.duration)));
+            element.onerror = () => reject(new Error('Không đọc được thời lượng video.'));
+            element.src = objectUrl;
+          });
+          update('duration', String(seconds));
+        } finally { URL.revokeObjectURL(objectUrl); }
+      }
+      const result = await (member ? communityService.uploadMyVideoAsset(file, video) : communityService.uploadVideoAsset(file, video));
+      update(video ? 'videoUrl' : 'thumbnailUrl', result.url);
+    }
     catch (reason) { setError(errorMessage(reason)); }
-    finally { setBusy(false); }
+    finally { setUploading(null); }
   };
   useEffect(() => {
     if (!query.data) return;
@@ -53,17 +70,18 @@ function VideoEditor({ videoId, member = false }: { videoId?: string; member?: b
     finally { setBusy(false); }
   };
   const categoryOptions = Array.from(new Set([...Object.keys(videoCategories), form.category])).filter(Boolean);
+  const previewVideo = form.videoUrl ? videoSource(form.videoUrl) : null;
   return <div className="cm-shell">{!member && <CommunityAdminNav />}<Link to={member ? "/videos/mine" : "/admin/videos"} className="cm-back"><ArrowLeft size={15} /> Quản lý video</Link><header className="cm-heading"><div><span className="cm-eyebrow"><Video size={15} /> NỘI DUNG VEGEAI</span><h1>{videoId ? 'Chỉnh sửa video' : 'Thêm video'}</h1></div></header>
     {query.busy ? <CommunityLoading /> : query.error ? <CommunityError message={query.error} retry={query.refresh} /> : <div className="cm-editor-layout"><form className="cm-form" onSubmit={save}>
       {error && <CommunityError message={error} />}
       <label className="cm-field">Tiêu đề<input aria-label="Tiêu đề video" value={form.title} onChange={event => update('title', event.target.value)} maxLength={200} required disabled={busy} placeholder="Tên món ăn hoặc câu chuyện căn bếp" /></label>
       <label className="cm-field">Mô tả<textarea aria-label="Mô tả video" value={form.description} onChange={event => update('description', event.target.value)} maxLength={10000} disabled={busy} rows={6} /><small>{form.description.length}/10000</small></label>
-      <label className="cm-field">Video<input aria-label="Đường dẫn video" value={form.videoUrl} onChange={event => update('videoUrl', event.target.value)} maxLength={2000} required disabled={busy} placeholder="Dán URL hoặc tải tệp MP4/WebM" /><input type="file" accept="video/mp4,video/webm" disabled={busy} onChange={event => void upload(event.target.files?.[0], true)} /><small>Tải trực tiếp tối đa 150 MB hoặc dùng URL có sẵn.</small></label>
-      <label className="cm-field">Ảnh bìa<input aria-label="Đường dẫn ảnh bìa" value={form.thumbnailUrl} onChange={event => update('thumbnailUrl', event.target.value)} maxLength={2000} disabled={busy} placeholder="Dán URL hoặc tải ảnh" /><input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event => void upload(event.target.files?.[0], false)} /><small>JPG, PNG hoặc WebP; tối đa 5 MB.</small></label>
+      <label className="cm-field">Video<input aria-label="Đường dẫn video" value={form.videoUrl} onChange={event => update('videoUrl', event.target.value)} maxLength={2000} required disabled={busy} placeholder="Dán URL hoặc tải tệp MP4/WebM" /><span className="cm-button secondary mt-2 inline-flex cursor-pointer"><Upload size={16} />{uploading === 'video' ? 'Đang tải video...' : 'Tải MP4 / WebM từ máy'}<input className="sr-only" type="file" accept="video/mp4,video/webm" disabled={busy || !!uploading} onChange={event => void upload(event.target.files?.[0], true)} /></span><small>Tự động nhận diện thời lượng; tối đa 150 MB.</small></label>
+      <label className="cm-field">Ảnh bìa<input aria-label="Đường dẫn ảnh bìa" value={form.thumbnailUrl} onChange={event => update('thumbnailUrl', event.target.value)} maxLength={2000} disabled={busy} placeholder="Dán URL hoặc tải ảnh" /><span className="cm-button secondary mt-2 inline-flex cursor-pointer"><Image size={16} />{uploading === 'image' ? 'Đang tải ảnh...' : 'Tải ảnh bìa từ máy'}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy || !!uploading} onChange={event => void upload(event.target.files?.[0], false)} /></span><small>JPG, PNG hoặc WebP; tối đa 5 MB.</small></label>
       <div className="cm-grid-two"><label className="cm-field">Danh mục<select aria-label="Danh mục video" value={form.category} disabled={busy} onChange={event => update('category', event.target.value)}><option value="">Chưa phân loại</option>{categoryOptions.map(value => <option key={value} value={value}>{videoCategories[value] || value}</option>)}</select></label><label className="cm-field">Thời lượng (giây)<input aria-label="Thời lượng (giây)" type="number" min={1} max={86400} step={1} value={form.duration} disabled={busy} onChange={event => update('duration', event.target.value)} /></label></div>
-      <label className="cm-field">Trạng thái hiển thị<select aria-label="Trạng thái hiển thị" value={form.status} disabled={busy} onChange={event => update('status', event.target.value)}><option value="DRAFT">Bản nháp</option><option value="PUBLISHED">Công khai</option><option value="ARCHIVED">Đã ẩn</option></select></label>
+      <label className="cm-field">Trạng thái hiển thị<select aria-label="Trạng thái hiển thị" value={form.status} disabled={busy} onChange={event => update('status', event.target.value)}><option value="DRAFT">Bản nháp</option>{member && form.status === 'PENDING_REVIEW' && <option value="PENDING_REVIEW">Đang chờ kiểm duyệt</option>}<option value="PUBLISHED">{member ? 'Gửi duyệt công khai' : 'Công khai'}</option><option value="ARCHIVED">Đã ẩn</option></select></label>
       <div className="cm-actions"><button className="cm-button" disabled={busy || (!!videoId && !dirty)}>{busy ? <Loader2 size={16} className="cm-spin" /> : <Save size={16} />} Lưu video</button><Link className="cm-button secondary" to={member ? "/videos/mine" : "/admin/videos"}>Hủy</Link></div>
-    </form><aside className="cm-editor-preview"><h2>Ảnh bìa</h2><VideoCover video={{ title: form.title || 'Video VEGEAI', videoUrl: form.videoUrl, thumbnailUrl: form.thumbnailUrl, durationSeconds: form.duration ? Number(form.duration) : undefined }} /><h3>{form.title || 'Video mới'}</h3><p>{form.description}</p></aside></div>}
+    </form><aside className="cm-editor-preview"><h2>Xem trước video</h2>{previewVideo?.kind === 'embed' ? <div className="aspect-video overflow-hidden rounded-xl bg-black"><iframe src={previewVideo.src.replace('autoplay=1', 'autoplay=0')} title="Xem trước video" className="h-full w-full border-0" allowFullScreen /></div> : previewVideo?.kind === 'file' ? <video controls preload="metadata" src={previewVideo.src} className="aspect-video w-full rounded-xl bg-black object-contain" /> : <VideoCover video={{ title: form.title || 'Video VEGEAI', videoUrl: form.videoUrl, thumbnailUrl: form.thumbnailUrl, durationSeconds: form.duration ? Number(form.duration) : undefined }} />}<h3>{form.title || 'Video mới'}</h3><p>{form.description}</p></aside></div>}
   </div>;
 }
 export function AdminVideoEditorPage() { const { id } = useParams(); return <MainLayout><CommunityGuard admin><VideoEditor key={id || 'new'} videoId={id} /></CommunityGuard></MainLayout>; }

@@ -119,7 +119,7 @@ export const ForgotPasswordForm: React.FC = () => {
 
       {/* Step 1: Request OTP (Image 4) */}
       {step === 'request' && (
-        <form onSubmit={handleRequestSubmit} className="space-y-4">
+        <form onSubmit={handleRequestSubmit} noValidate className="space-y-4">
           <Input
             label="Email"
             type="email"
@@ -147,7 +147,7 @@ export const ForgotPasswordForm: React.FC = () => {
 
       {/* Step 2: Enter OTP & New Password */}
       {step === 'otp' && (
-        <form onSubmit={handleOtpSubmit} className="space-y-3.5">
+        <form onSubmit={handleOtpSubmit} noValidate className="space-y-3.5">
           <Input
             label="Mã xác thực OTP (6 chữ số)"
             placeholder="Nhập 6 chữ số"

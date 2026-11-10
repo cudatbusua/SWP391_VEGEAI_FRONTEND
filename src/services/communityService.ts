@@ -14,10 +14,10 @@ function query(values: Record<string, string | number | boolean | undefined>) {
 const id = encodeURIComponent;
 export const communityService = {
   async questions(params: { keyword?: string; answered?: boolean; page: number }, signal?: AbortSignal) {
-    return data(await apiRequest<PageResponse<Question>>('/questions' + query({ ...params, size: 8 }), { signal }));
+    return data(await apiRequest<PageResponse<Question>>('/questions' + query({ ...params, size: 8 }), { auth: 'none', signal }));
   },
   async question(questionId: string, signal?: AbortSignal) {
-    return data(await apiRequest<Question>('/questions/' + id(questionId), { signal }));
+    return data(await apiRequest<Question>('/questions/' + id(questionId), { auth: 'none', signal }));
   },
   async myQuestions(status: QuestionStatus | '', page: number, signal?: AbortSignal) {
     return data(await apiRequest<PageResponse<Question>>('/questions/mine' + query({ status, page, size: 8 }), { signal }));

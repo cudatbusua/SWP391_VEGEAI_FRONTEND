@@ -36,7 +36,7 @@ const editorialCovers: Record<string, string> = {
   '75e3320b-8fcd-4a8a-90f2-912b1956f8e9': 'https://osu-wams-blogs-uploads.s3.amazonaws.com/blogs.dir/3959/files/2021/03/DSCF1051-1024x712.jpg',
   '7b0c8d6e-736d-480d-b0e6-32664a9a6e77': 'https://pekis.net/sites/default/files/styles/social_share_1200x628/public/2025-05/umami_ingredients.webp?itok=ar8nfFMQ',
   '8cfb46bd-76c8-4b08-b0ba-90994707aacb': 'https://images.happycow.net/venues/1024/21/84/hcmp218476_3837667.jpeg',
-  'b96617bf-0c99-4a38-a601-e961e7db21db': 'https://img.chefkoch-cdn.de/rezepte/1417861246630035/bilder/1519684/crop-640x427/gemuesebruehe.jpg',
+  'b96617bf-0c99-4a38-a601-e961e7db21db': '/images/vietnamese-vegan-table.png',
   '2f3aff14-ed81-4354-a50d-290f046e415d': 'https://hips.hearstapps.com/hmg-prod/images/vegan-pumpkin-overnight-oats-with-cinnamon-cashew-cream-1-700x963-1546552834.jpg?crop=1xw%3A1xh%3Bcenter%2Ctop&resize=640%3A*',
   '99952429-4b2f-403d-b102-836f154c9ce6': 'https://cdn2.fptshop.com.vn/unsafe/Uploads/images/tin-tuc/168546/Originals/review-tu-lanh-panasonic-nr-bv280qsvn-7.jpg',
   '0fc4c746-09c6-4840-9bcc-b439a1384a2b': 'https://cdn.shopify.com/s/files/1/0757/7914/6017/files/woman2.png?v=1773659438',

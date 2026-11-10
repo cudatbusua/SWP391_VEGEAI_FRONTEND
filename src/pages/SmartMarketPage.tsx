@@ -504,8 +504,10 @@ export function SmartMarketPage() {
     }
   }, []);
 
-  // Initialize location: Only load stores if an address exists in session or in user profile
+  // Initialize location from session, guest GPS, or the signed-in user's profile.
   useEffect(() => {
+    if (isLoading) return;
+
     const cachedLoc = sessionStorage.getItem(SESSION_GPS_KEY);
     const cachedAddr = sessionStorage.getItem(SESSION_ADDR_KEY);
 
@@ -523,6 +525,27 @@ export function SmartMarketPage() {
       } catch {
         // ignore
       }
+    }
+
+    if (!isAuthenticated) {
+      if (!navigator.geolocation) return;
+      setLocationStatus('requesting');
+      navigator.geolocation.getCurrentPosition(
+        async position => {
+          const coords = { lat: position.coords.latitude, lon: position.coords.longitude };
+          const address = await reverseGeocodeAddress(coords.lat, coords.lon);
+          setUserLoc(coords);
+          setUserAddress(address);
+          setIsAddressConfirmed(true);
+          setLocationStatus('granted');
+          sessionStorage.setItem(SESSION_GPS_KEY, JSON.stringify(coords));
+          sessionStorage.setItem(SESSION_ADDR_KEY, address);
+          await loadStoresForCoords(coords.lat, coords.lon);
+        },
+        () => setLocationStatus('denied'),
+        { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
+      );
+      return;
     }
 
     // Try checking saved address from user profile
@@ -554,7 +577,7 @@ export function SmartMarketPage() {
       .catch(() => {
         // User not logged in or has no address -> Wait for user to update address!
       });
-  }, [loadStoresForCoords]);
+  }, [isAuthenticated, isLoading, loadStoresForCoords]);
 
   // Import from Weekly Meal Plan
   useEffect(() => {
@@ -1033,7 +1056,7 @@ export function SmartMarketPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-900 dark:text-white">
-                    {isAddressConfirmed ? 'Vị trí hiện tại:' : 'Chưa chọn vị trí:'}
+                    Vị trí hiện tại:
                   </span>
                   {isAddressConfirmed ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
@@ -1045,9 +1068,6 @@ export function SmartMarketPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-white truncate max-w-xl mt-0.5">
-                  {isAddressConfirmed ? userAddress : 'Chọn vị trí để tìm quán chay và cửa hàng nguyên liệu gần bạn'}
-                </p>
               </div>
             </div>
 

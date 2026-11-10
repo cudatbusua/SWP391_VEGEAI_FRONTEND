@@ -56,9 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const verifyLoginOtp = async (usernameOrEmail: string, otp: string, rememberMe: boolean): Promise<ActionResult<User>> => {
-    setIsLoading(true);
     const res = await authService.verifyLoginOtp(usernameOrEmail, otp, rememberMe);
-    setIsLoading(false);
     if (res.success && res.data) {
       authMutationVersion.current++;
       setUser(res.data);
@@ -70,9 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resendLoginOtp = (usernameOrEmail: string) => authService.resendLoginOtp(usernameOrEmail);
 
   const login = async (data: LoginFormData): Promise<ActionResult<User>> => {
-    setIsLoading(true);
     const res = await authService.login(data);
-    setIsLoading(false);
     if (res.success && res.data) {
       authMutationVersion.current++;
       setUser(res.data);
@@ -82,9 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async (idToken: string, rememberMe = true): Promise<ActionResult<User>> => {
-    setIsLoading(true);
     const res = await authService.loginWithGoogle(idToken, rememberMe);
-    setIsLoading(false);
     if (res.success && res.data) {
       authMutationVersion.current++;
       setUser(res.data);

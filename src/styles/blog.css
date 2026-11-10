@@ -145,6 +145,20 @@
 }
 @media (max-width: 480px) { .blog-public-grid { grid-template-columns: minmax(0, 1fr); } .blog-review-title h2 { font-size: 21px; } .blog-review-history li { flex-direction: column; gap: 5px; } .blog-review-history time { text-align: left; } }
 
+.owner-management-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.owner-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 12px; border: 1px solid; padding: 8px 12px; font-size: 13px; font-weight: 650; line-height: 1.2; background: #fff; transition: background-color .18s, border-color .18s; }
+.owner-action.edit, .owner-action.restore { border-color: #b8e2ce; color: #16704e; }
+.owner-action.edit:hover, .owner-action.restore:hover { background: #edf9f3; }
+.owner-action.hide { border-color: #f0d29c; color: #a06410; }
+.owner-action.hide:hover { background: #fff8e8; }
+.owner-action.delete { border-color: #f0c2c7; color: #bd3545; }
+.owner-action.delete:hover { background: #fff1f2; }
+.owner-action:disabled { opacity: .5; cursor: default; }
+html.dark .owner-action { background: #121922; }
+html.dark .owner-action.edit, html.dark .owner-action.restore { border-color: #145b43; color: #6ee7b7; }
+html.dark .owner-action.hide { border-color: #754d15; color: #f6c76b; }
+html.dark .owner-action.delete { border-color: #7f2835; color: #fda4af; }
+
 /* Dark Mode Overrides for Blog */
 html.dark .blog-shell,
 html.dark .blog-article-shell {
@@ -331,4 +345,14 @@ html.dark .blog-link-field input {
   background: #1e293b;
   border-color: #212c3b;
   color: #f1f5f9;
+}
+
+/* Magazine-style public blog feed. */
+.blog-magazine-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.blog-magazine-card { min-width: 0; }
+.blog-magazine-featured { grid-column: 1 / -1; }
+.blog-magazine-card:not(.blog-magazine-featured) h2 { font-size: 18px; }
+@media (max-width: 820px) {
+  .blog-magazine-grid { grid-template-columns: minmax(0, 1fr); }
+  .blog-magazine-featured { grid-column: auto; }
 }

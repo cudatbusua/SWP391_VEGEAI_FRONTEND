@@ -265,6 +265,16 @@ export function BlogEditorPage() {
       t => t.contentTemplate.trim() === form.content.trim()
     );
     const shouldReplaceContent = forceReplaceContent || !form.content.trim() || isUsingDefaultTemplate;
+
+    // Tự động đồng bộ chế độ soạn thảo theo phân loại:
+    // - KITCHEN (Chia sẻ Công thức): Bật chế độ RECIPE (Có nguyên liệu & từng bước nấu)
+    // - NUTRITION, GREEN_LIVING, EXPLORATION: Bật chế độ ARTICLE (Bài viết tự do, KHÔNG cần bước)
+    if (cat === 'KITCHEN') {
+      setEditorMode('RECIPE');
+    } else {
+      setEditorMode('ARTICLE');
+    }
+
     setForm(prev => ({
       ...prev,
       category: cat,
@@ -272,7 +282,7 @@ export function BlogEditorPage() {
       content: shouldReplaceContent ? tpl.contentTemplate : prev.content,
     }));
     setDirty(true);
-    setMessage(`Đã chọn phân loại "${tpl.badgeLabel}".`);
+    setMessage(`Đã chọn "${tpl.badgeLabel}". Định dạng: ${cat === 'KITCHEN' ? 'Có các bước nấu (Recipe)' : 'Bài viết tự do (không cần bước)'}.`);
   };
 
   const save = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -475,8 +485,9 @@ export function BlogEditorPage() {
                             ? 'bg-emerald-700 text-white shadow-2xs'
                             : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700'
                         }`}
+                        title="Dành cho bài chia sẻ công thức món chay có các bước nấu và nguyên liệu"
                       >
-                        <Utensils size={13} /> Công thức nấu ăn (Từng bước)
+                        <Utensils size={13} /> 🍳 Có các bước nấu (Recipe)
                       </button>
                       <button
                         type="button"
@@ -486,8 +497,9 @@ export function BlogEditorPage() {
                             ? 'bg-emerald-700 text-white shadow-2xs'
                             : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700'
                         }`}
+                        title="Dành cho bài viết kiến thức dinh dưỡng, lối sống xanh, review (Không cần bước)"
                       >
-                        <FileText size={13} /> Blog chia sẻ thông thường
+                        <FileText size={13} /> 📝 Bài viết tự do (Không cần bước)
                       </button>
                     </div>
                   </div>

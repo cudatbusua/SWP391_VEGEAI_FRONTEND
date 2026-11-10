@@ -57,7 +57,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
     // Xóa cookie g_state cooldown để tránh Google Identity Services chặn One Tap / nút đăng nhập
     document.cookie = "g_state=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '164354959561-84vaff9lo56ummq04itrgq642kmjd4qo.apps.googleusercontent.com';
     if (!clientId) return;
 
     const renderBtn = () => {
@@ -128,7 +128,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
     // Xóa cookie g_state cooldown
     document.cookie = "g_state=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
 
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '164354959561-84vaff9lo56ummq04itrgq642kmjd4qo.apps.googleusercontent.com';
     if (!clientId) {
       setGeneralError('Google Client ID chưa được cấu hình. Vui lòng thêm VITE_GOOGLE_CLIENT_ID vào file .env');
       return;

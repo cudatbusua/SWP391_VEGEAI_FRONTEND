@@ -27,7 +27,6 @@ const BlogEditorPage = lazy(() => import('./pages/BlogEditorPage').then(module =
 const MyBlogPostsPage = lazy(() => import('./pages/MyBlogPostsPage').then(module => ({ default: module.MyBlogPostsPage })));
 const BlogPostStatusPage = lazy(() => import('./pages/BlogPostStatusPage').then(module => ({ default: module.BlogPostStatusPage })));
 const AdminBlogPage = lazy(() => import('./pages/AdminBlogPage').then(module => ({ default: module.AdminBlogPage })));
-const RestaurantsPage = lazy(() => import('./pages/RestaurantsPage').then(module => ({ default: module.RestaurantsPage })));
 const QuestionsPage = lazy(() => import('./pages/QuestionsPage').then(module => ({ default: module.QuestionsPage })));
 const QuestionDetailPage = lazy(() => import('./pages/QuestionsPage').then(module => ({ default: module.QuestionDetailPage })));
 const VideosPage = lazy(() => import('./pages/VideosPage').then(module => ({ default: module.VideosPage })));
@@ -96,7 +95,7 @@ export const App: React.FC = () => {
           <Route path="/blog/:id" element={<BlogDetailPage />} />
           <Route path="/admin/blog" element={<AdminFeatureBoundary><AdminBlogPage /></AdminFeatureBoundary>} />
           <Route path="/admin/blog/:id" element={<AdminFeatureBoundary><BlogPostStatusPage adminMode /></AdminFeatureBoundary>} />
-          <Route path="/restaurants" element={<RestaurantsPage />} />
+          <Route path="/restaurants" element={<Navigate to="/smart-market" replace />} />
           <Route path="/questions" element={<PersonalFeatureBoundary><QuestionsPage /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine" element={<PersonalFeatureBoundary><QuestionsPage mine /></PersonalFeatureBoundary>} />
           <Route path="/questions/mine/:id" element={<PersonalFeatureBoundary><QuestionDetailPage mine /></PersonalFeatureBoundary>} />

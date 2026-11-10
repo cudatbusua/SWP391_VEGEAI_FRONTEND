@@ -268,7 +268,7 @@ export function SmartMarketPage() {
         if (parsed?.lat && parsed?.lon) return parsed;
       }
     } catch {}
-    return { lat: 10.8030, lon: 106.7360 };
+    return { lat: 10.7769, lon: 106.7009 };
   });
 
   const [userAddress, setUserAddress] = useState(() => {
@@ -853,7 +853,9 @@ export function SmartMarketPage() {
   // Filter stores
   const filteredStores = useMemo(() => {
     return stores.filter(store => {
-      if (storeTypeFilter !== 'ALL' && store.category !== storeTypeFilter) return false;
+      if (storeTypeFilter === 'NEAR' && (store.distanceKm ?? 0) > 3) return false;
+      if (storeTypeFilter === 'MED' && (store.distanceKm ?? 0) > 5) return false;
+      if (storeTypeFilter !== 'ALL' && storeTypeFilter !== 'NEAR' && storeTypeFilter !== 'MED' && store.category !== storeTypeFilter) return false;
       if (storeSearch.trim()) {
         const q = storeSearch.toLowerCase();
         return store.name.toLowerCase().includes(q) || store.address.toLowerCase().includes(q);
@@ -1082,19 +1084,29 @@ export function SmartMarketPage() {
                 <span>{locationStatus === 'requesting' ? 'Đang định vị GPS...' : '📍 Định vị GPS tự động'}</span>
               </button>
 
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-slate-400 hidden sm:inline">Khu vực nhanh:</span>
-                {PREDEFINED_AREAS.map(loc => (
-                  <button
-                    key={loc.name}
-                    type="button"
-                    onClick={() => handleSelectPredefinedArea(loc.addr, loc.lat, loc.lon)}
-                    className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[11px] transition cursor-pointer"
-                  >
-                    {loc.name}
-                  </button>
-                ))}
-              </div>
+              {isAddressConfirmed && (
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-slate-400 hidden sm:inline">Phạm vi tìm kiếm:</span>
+                  {[
+                    { label: 'Gần nhất (< 3km)', type: 'NEAR' },
+                    { label: 'Trong 5km', type: 'MED' },
+                    { label: 'Tất cả điểm gần', type: 'ALL' }
+                  ].map(filter => (
+                    <button
+                      key={filter.type}
+                      type="button"
+                      onClick={() => setStoreTypeFilter(filter.type)}
+                      className={`px-2.5 py-1.5 rounded-lg font-semibold text-[11px] transition cursor-pointer ${
+                        storeTypeFilter === filter.type
+                          ? 'bg-emerald-700 text-white font-bold'
+                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {isAddressConfirmed && (
                 <button
@@ -1590,21 +1602,8 @@ export function SmartMarketPage() {
 
                   <div className="flex items-center gap-3 text-xs text-slate-400">
                     <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                    <span>hoặc chọn khu vực nhanh</span>
+                    <span>hoặc nhập địa chỉ của bạn để tìm kiếm</span>
                     <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {PREDEFINED_AREAS.map(loc => (
-                      <button
-                        key={loc.name}
-                        type="button"
-                        onClick={() => handleSelectPredefinedArea(loc.addr, loc.lat, loc.lon)}
-                        className="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 hover:border-emerald-300 font-bold text-xs text-slate-700 dark:text-slate-200 transition cursor-pointer"
-                      >
-                        {loc.name}
-                      </button>
-                    ))}
                   </div>
 
                   {/* Manual street address input */}

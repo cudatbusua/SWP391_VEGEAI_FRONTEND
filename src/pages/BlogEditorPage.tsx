@@ -8,7 +8,7 @@ import { blogService } from '../services/blogService';
 import { communityService } from '../services/communityService';
 import { errorMessage } from '../services/apiClient';
 import { videoSource } from '../utils/communityVideo';
-import type { BlogCategory, BlogInput, BlogPost } from '../types/blog';
+import type { BlogCategory, BlogInput, BlogPost, PostClassificationTemplate } from '../types/blog';
 import { blogCategories, BLOG_POST_TEMPLATES } from '../types/blog';
 import '../styles/blog.css';
 
@@ -128,7 +128,7 @@ export function BlogEditorPage() {
 
   const applyClassificationTemplate = (cat: BlogCategory, forceReplaceContent = false) => {
     const tpl = BLOG_POST_TEMPLATES[cat];
-    const isUsingDefaultTemplate = Object.values(BLOG_POST_TEMPLATES).some(
+    const isUsingDefaultTemplate = (Object.values(BLOG_POST_TEMPLATES) as PostClassificationTemplate[]).some(
       t => t.contentTemplate.trim() === form.content.trim()
     );
     const shouldReplaceContent = forceReplaceContent || !form.content.trim() || isUsingDefaultTemplate;

@@ -134,29 +134,39 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
       return;
     }
 
-    const gAccounts = (window as unknown as {
+    const googleOauth = (window as unknown as {
       google?: {
         accounts?: {
-          id?: {
-            initialize: (cfg: unknown) => void;
-            prompt: (cb?: (n: { isNotDisplayed: () => boolean; isSkippedMoment: () => boolean; getNotDisplayedReason?: () => string }) => void) => void;
+          oauth2?: {
+            initTokenClient: (config: {
+              client_id: string;
+              scope: string;
+              callback: (response: { access_token?: string; error?: string }) => void;
+              error_callback?: () => void;
+            }) => { requestAccessToken: (options?: { prompt?: string }) => void };
           };
         };
       };
-    })?.google?.accounts?.id;
+    })?.google?.accounts?.oauth2;
 
-    if (!gAccounts) {
+    if (!googleOauth) {
       setGeneralError('Google Identity SDK đang được tải hoặc bị chặn bởi tiện ích mở rộng. Vui lòng thử lại sau vài giây.');
       return;
     }
 
     try {
       setIsGoogleSubmitting(true);
-      gAccounts.initialize({
+      const tokenClient = googleOauth.initTokenClient({
         client_id: clientId,
-        callback: async (response: { credential: string }) => {
+        scope: 'openid email profile',
+        callback: async (response) => {
+          if (!response.access_token) {
+            setIsGoogleSubmitting(false);
+            if (response.error !== 'access_denied') setGeneralError('Google không trả về access token hợp lệ.');
+            return;
+          }
           try {
-            const res = await loginWithGoogle(response.credential, formData.rememberMe);
+            const res = await loginWithGoogle(response.access_token, formData.rememberMe);
             if (res.success && res.data) {
               completeLogin(res.data?.role);
             } else {
@@ -168,18 +178,12 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
             setIsGoogleSubmitting(false);
           }
         },
-      });
-
-      gAccounts.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        error_callback: () => {
           setIsGoogleSubmitting(false);
-          const reason = notification.getNotDisplayedReason?.() || 'bị chặn hoặc đang trong thời gian chờ';
-          console.warn('[GSI] One Tap not displayed:', reason);
-          if (reason === 'suppressed_by_user') {
-            setGeneralError('Gợi ý Google One Tap tạm thời bị chặn do bạn từng đóng trước đó. Vui lòng bấm trực tiếp vào nút Google bên dưới.');
-          }
+          setGeneralError('Không thể mở cửa sổ đăng nhập Google. Vui lòng thử lại.');
         }
       });
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
     } catch (e: unknown) {
       setIsGoogleSubmitting(false);
       setGeneralError('Lỗi khởi tạo Google Auth: ' + (e instanceof Error ? e.message : 'Không xác định'));
@@ -379,10 +383,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
           {/* Social Buttons */}
           <div className="flex flex-col items-center justify-center mb-6 gap-2">
             {/* Google Official Button Container (Rendered by GSI - Opens direct OAuth popup on click) */}
-            <div ref={googleBtnContainerRef} className="flex justify-center items-center min-h-[44px]" />
+            <div ref={googleBtnContainerRef} className="hidden" aria-hidden="true" />
 
             {/* Fallback Custom Button if SDK takes time to mount */}
-            {!googleSdkReady && (
+            {(googleSdkReady || !googleSdkReady) && (
               <button
                 type="button"
                 onClick={handleGoogleLogin}

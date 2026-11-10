@@ -4,6 +4,7 @@ import { AuthProvider } from './store/AuthContext';
 import { PersonalFeatureBoundary } from './components/PersonalFeatureBoundary';
 import { AdminFeatureBoundary } from './components/AdminFeatureBoundary';
 import { GuestOnlyBoundary } from './components/GuestOnlyBoundary';
+import { CustomerOnlyBoundary } from './components/CustomerOnlyBoundary';
 import { useAuth } from './hooks/useAuth';
 
 const LoginPage = lazy(() => import('./pages/LoginPage').then(module => ({ default: module.LoginPage })));
@@ -67,7 +68,7 @@ export const App: React.FC = () => {
             <Route path="/recipe/:id" element={<RecipeDetailPage />} />
             <Route path="/dashboard" element={<DashboardRoute />} />
             <Route path="/forbidden" element={<ForbiddenPage />} />
-            <Route path="/settings" element={<PersonalFeatureBoundary><AccountSettingsPage /></PersonalFeatureBoundary>} />
+            <Route path="/settings" element={<CustomerOnlyBoundary><AccountSettingsPage /></CustomerOnlyBoundary>} />
             <Route path="/login" element={<GuestOnlyBoundary><LoginPage /></GuestOnlyBoundary>} />
             <Route path="/register" element={<GuestOnlyBoundary><RegisterPage /></GuestOnlyBoundary>} />
             <Route path="/forgot-password" element={<GuestOnlyBoundary><ForgotPasswordPage /></GuestOnlyBoundary>} />
@@ -75,8 +76,8 @@ export const App: React.FC = () => {
             <Route path="/change-password" element={<Navigate to="/settings?tab=security" replace />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/ai-chef" element={<AiChatPage />} />
-            <Route path="/fridge-scan" element={<PersonalFeatureBoundary><FridgeScanPage /></PersonalFeatureBoundary>} />
-            <Route path="/fridge" element={<PersonalFeatureBoundary><FridgeInventoryPage /></PersonalFeatureBoundary>} />
+            <Route path="/fridge-scan" element={<CustomerOnlyBoundary><FridgeScanPage /></CustomerOnlyBoundary>} />
+            <Route path="/fridge" element={<CustomerOnlyBoundary><FridgeInventoryPage /></CustomerOnlyBoundary>} />
             <Route path="/nutrition" element={<Navigate to="/settings?tab=profile" replace />} />
             {/* Meal planning now lives on the 30-day calendar; old links keep working. */}
             <Route path="/meal-plans" element={<Navigate to="/settings?tab=calendar" replace />} />

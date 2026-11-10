@@ -43,7 +43,7 @@ export function VerifyEmailPage() {
     <h1 className="text-3xl font-extrabold mb-4 text-gray-900 dark:text-white">Xác minh email</h1>
     <p className="text-sm text-gray-600 dark:text-slate-400 mb-5" role="status">{message}</p>
     {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>}
-    {verified ? <Link to="/login"><Button fullWidth>Đăng nhập</Button></Link> : <form onSubmit={submit} className="space-y-4">
+    {verified ? <Link to="/login"><Button fullWidth>Đăng nhập</Button></Link> : <form onSubmit={submit} noValidate className="space-y-4">
       <Input label="Email đăng ký" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
       <Input label="Mã OTP" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={e => setOtp(e.target.value)} required />
       <Button type="submit" fullWidth isLoading={busy}>Xác minh</Button>

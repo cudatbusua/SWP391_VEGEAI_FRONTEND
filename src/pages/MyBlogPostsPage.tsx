@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, Plus, FilePenLine, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, FilePenLine, RefreshCw, Archive, RotateCcw, Trash2 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { BlogAccess, BlogBadge, BlogCover, BlogError, BlogPagination, blogDate } from '../components/BlogUi';
 import { blogService } from '../services/blogService';
@@ -19,6 +19,20 @@ export function MyBlogPostsPage() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
+  const runAction = async (post: BlogPost, action: 'archive' | 'restore' | 'delete') => {
+    if (actionBusy) return;
+    const destructive = action === 'delete';
+    if (!window.confirm(destructive ? 'Xóa vĩnh viễn bài viết này?' : action === 'archive' ? 'Ẩn bài viết này khỏi cộng đồng?' : 'Khôi phục bài viết này?')) return;
+    setActionBusy(post.postId); setError('');
+    try {
+      if (action === 'archive') await blogService.archive(post.postId, post.version);
+      else if (action === 'restore') await blogService.restore(post.postId, post.version);
+      else await blogService.deletePermanent(post.postId, post.version);
+      setReload(value => value + 1);
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { setActionBusy(null); }
+  };
   useEffect(() => {
     if (!isAuthenticated) return;
     const controller = new AbortController(); setBusy(true); setError('');
@@ -32,7 +46,7 @@ export function MyBlogPostsPage() {
     {error && <BlogError message={error} retry={() => setReload(value => value + 1)} />}
     {busy && <p role="status" className="blog-empty">Đang tải bài viết...</p>}
     {!busy && !error && !data?.items.length && <div className="blog-empty"><FilePenLine size={32} /><h2>Chưa có bài viết ở mục này</h2><p>Câu chuyện tiếp theo bắt đầu từ căn bếp của bạn.</p><Link className="blog-button" to="/blog/write"><Plus size={16} /> Viết bài</Link></div>}
-    {!busy && !error && <div className="blog-own-list">{data?.items.map(post => <article key={post.postId} className="blog-own-row"><Link to={'/blog/my-posts/' + post.postId} className="blog-own-image"><BlogCover post={{ ...post, postId: post.postId }} /></Link><div className="blog-own-info"><div className="blog-own-meta"><BlogBadge status={post.status} /><span>{blogCategories[post.category]}</span></div><Link to={'/blog/my-posts/' + post.postId}><h2>{post.title}</h2></Link><p>Cập nhật {blogDate(post.updatedAt)}</p>{post.status === 'REJECTED' && post.moderationReason && <p className="blog-rejection-preview">{post.moderationReason}</p>}</div><div className="blog-row-actions"><Link to={'/blog/my-posts/' + post.postId} className="blog-icon-button" title="Xem trạng thái" aria-label={'Xem trạng thái ' + post.title}><ArrowUpRight size={18} /></Link>{['DRAFT', 'REJECTED', 'PUBLISHED'].includes(post.status) && <Link to={'/blog/my-posts/' + post.postId + '/edit'} className="blog-icon-button" title="Chỉnh sửa" aria-label={'Chỉnh sửa ' + post.title}><FilePenLine size={17} /></Link>}</div></article>)}</div>}
+    {!busy && !error && <div className="blog-own-list">{data?.items.map(post => <article key={post.postId} className="blog-own-row"><Link to={'/blog/my-posts/' + post.postId} className="blog-own-image"><BlogCover post={{ ...post, postId: post.postId }} /></Link><div className="blog-own-info"><div className="blog-own-meta"><BlogBadge status={post.status} /><span>{blogCategories[post.category]}</span></div><Link to={'/blog/my-posts/' + post.postId}><h2>{post.title}</h2></Link><p>Cập nhật {blogDate(post.updatedAt)}</p>{post.status === 'REJECTED' && post.moderationReason && <p className="blog-rejection-preview">{post.moderationReason}</p>}</div><div className="blog-row-actions owner-management-actions"><Link to={'/blog/my-posts/' + post.postId + '/edit'} className="owner-action edit" title="Chỉnh sửa bài viết"><FilePenLine size={16} /> Chỉnh sửa</Link>{post.status === 'ARCHIVED' && <button className="owner-action restore" disabled={actionBusy === post.postId} onClick={() => runAction(post, 'restore')} title="Hiện lại bài viết"><RotateCcw size={16} /> Hiện lại</button>}{post.status === 'PUBLISHED' && <button className="owner-action hide" disabled={actionBusy === post.postId} onClick={() => runAction(post, 'archive')} title="Ẩn bài viết"><Archive size={16} /> Ẩn</button>}<button className="owner-action delete" disabled={actionBusy === post.postId} onClick={() => runAction(post, 'delete')} title="Xóa vĩnh viễn bài viết"><Trash2 size={16} /> Xóa</button></div></article>)}</div>}
     <BlogPagination data={data} busy={busy} change={setPage} />
   </BlogAccess></div></MainLayout>;
 }

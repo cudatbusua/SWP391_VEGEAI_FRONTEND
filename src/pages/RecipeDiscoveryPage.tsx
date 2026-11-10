@@ -17,6 +17,8 @@ import {
   Play,
   MessageCircle,
   BookOpen,
+  MapPin,
+  Sparkles,
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
@@ -154,9 +156,9 @@ export function RecipeDiscoveryPage() {
             <span className="discovery-eyebrow">
               <Leaf size={17} /> BẾP XANH MỖI NGÀY
             </span>
-            <h1>VEGEAI</h1>
+            <h1>Khám phá công thức chay</h1>
             <p>
-              Món chay ngon, bữa ăn lành.
+              Món ngon dễ nấu, bữa ăn lành mạnh.
               <br />
               Cảm hứng từ căn bếp Việt của bạn.
             </p>
@@ -165,7 +167,7 @@ export function RecipeDiscoveryPage() {
                 Khám phá công thức <ArrowUpRight size={18} />
               </a>
               <Link to="/blog" className="discovery-hero-secondary">
-                <BookOpen size={18} /> Bảng tin Cộng đồng (AI)
+                <BookOpen size={18} /> Blog
               </Link>
               {isAuthenticated && (
                 <Link to="/fridge-scan" className="discovery-hero-secondary">
@@ -177,6 +179,46 @@ export function RecipeDiscoveryPage() {
         </section>
 
         <div className="discovery-shell">
+          {/* Recipe discovery introduction */}
+          <div className="mb-6 grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-4">
+            <div className="flex items-start sm:items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                <Sparkles size={18} />
+              </span>
+              <div>
+                <h2 className="text-sm font-black text-slate-900">Chọn món hợp khẩu vị</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Lọc nhanh theo thời gian, dinh dưỡng và độ khó.</p>
+              </div>
+            </div>
+            </div>
+            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4">
+              <Link
+                to="/blog"
+                className="flex items-center gap-3 text-slate-900"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700"><BookOpen size={18} /></span>
+                <span><strong className="block text-sm">Đọc chuyện từ cộng đồng</strong><small className="mt-1 block text-xs leading-5 text-slate-500">Công thức thật và trải nghiệm sống xanh.</small></span>
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4">
+              {isAuthenticated ? (
+                <Link
+                  to="/fridge-scan"
+                  className="flex items-center gap-3 text-slate-900"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><Camera size={18} /></span>
+                  <span><strong className="block text-sm">Có gì nấu nấy</strong><small className="mt-1 block text-xs leading-5 text-slate-500">Quét nguyên liệu và tìm món phù hợp.</small></span>
+                </Link>
+              ) : (
+                <Link to="/smart-market" className="flex items-center gap-3 text-slate-900">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><MapPin size={18} /></span>
+                  <span><strong className="block text-sm">Tìm nguyên liệu gần bạn</strong><small className="mt-1 block text-xs leading-5 text-slate-500">Xem điểm bán và quán chay trên bản đồ.</small></span>
+                </Link>
+              )}
+              </div>
+          </div>
+
           <div className="discovery-toolbar" id="cong-thuc">
             <label className="discovery-search">
               <Search size={20} />
@@ -443,8 +485,8 @@ export function RecipeDiscoveryPage() {
               )}
               {!error && (
                 <div className={'recipe-grid ' + (loading && data ? 'is-loading' : '')}>
-                  {data?.items.map((recipe) => (
-                    <RecipeCard key={recipe.recipeId} recipe={recipe} />
+                  {data?.items.map((recipe, index) => (
+                    <RecipeCard key={recipe.recipeId} recipe={recipe} className={index === 0 ? 'recipe-featured' : ''} />
                   ))}
                 </div>
               )}

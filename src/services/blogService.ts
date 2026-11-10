@@ -1,6 +1,6 @@
 import { apiRequest } from './apiClient';
 import type { ApiResponse, PageResponse } from '../types/api';
-import type { BlogCategory, BlogComment, BlogInput, BlogPost, BlogStatus } from '../types/blog';
+import type { BlogCategory, BlogInput, BlogPost, BlogStatus } from '../types/blog';
 
 function data<T>(response: ApiResponse<T>): T {
   if (!response.data) throw new Error('Máy chủ không trả về dữ liệu bài viết.');
@@ -34,6 +34,9 @@ export const blogService = {
   async withdraw(id: string, version: number) {
     return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/withdraw', { method: 'POST', body: { version } }));
   },
+  async remove(id: string, version: number) {
+    await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '?version=' + version, { method: 'DELETE' });
+  },
   async archive(id: string, version: number) {
     return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/archive', { method: 'POST', body: { version } }));
   },
@@ -42,9 +45,6 @@ export const blogService = {
   },
   async requestPublishedEdit(id: string, input: BlogInput) {
     return data(await apiRequest<BlogPost>('/blog/my-posts/' + encodeURIComponent(id) + '/request-review', { method: 'PUT', body: input }));
-  },
-  async remove(id: string, version: number) {
-    await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '?version=' + version, { method: 'DELETE' });
   },
   async deletePermanent(id: string, version: number) {
     await apiRequest('/blog/my-posts/' + encodeURIComponent(id) + '/permanent?version=' + version, { method: 'DELETE' });
@@ -68,17 +68,5 @@ export const blogService = {
   },
   async adminDelete(id: string, version: number) {
     await apiRequest('/admin/blog/posts/' + encodeURIComponent(id) + '?version=' + version, { method: 'DELETE' });
-  },
-
-  // ── Comments & 5-Star Ratings ──────────────────────────────────────────────
-  async getComments(postId: string, signal?: AbortSignal): Promise<BlogComment[]> {
-    try {
-      return data(await apiRequest<BlogComment[]>('/blog/posts/' + encodeURIComponent(postId) + '/comments', { auth: 'none', signal }));
-    } catch {
-      return [];
-    }
-  },
-  async addComment(postId: string, input: { content: string; rating: number }): Promise<BlogComment> {
-    return data(await apiRequest<BlogComment>('/blog/posts/' + encodeURIComponent(postId) + '/comments', { method: 'POST', body: input }));
   }
 };

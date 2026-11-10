@@ -164,6 +164,13 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
     setStatusMessage('Đã ngắt liên kết và đặt lại dữ liệu thiết bị.');
   };
 
+  const handleSelectPreset = (preset: 'light' | 'moderate' | 'intense') => {
+    sfx.playTap();
+    const updated = wearableService.setPreset(preset);
+    setMetrics(updated);
+    setStatusMessage(`Đã áp dụng dữ liệu mô phỏng ${preset === 'light' ? 'nhẹ nhàng' : preset === 'moderate' ? 'tiêu chuẩn' : 'cường độ cao'}.`);
+  };
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
       
@@ -415,6 +422,15 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         </div>
       )}
 
+
+      <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <span className="flex items-center gap-2 font-bold text-slate-700 dark:text-slate-300"><Sparkles className="w-4 h-4 text-amber-500" /> Chế độ mô phỏng dữ liệu</span>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => handleSelectPreset('light')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold">Nhẹ nhàng</button>
+          <button type="button" onClick={() => handleSelectPreset('moderate')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold">Tiêu chuẩn</button>
+          <button type="button" onClick={() => handleSelectPreset('intense')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold">Cường độ cao</button>
+        </div>
+      </div>
 
       {/* Metric Cards Grid: only metrics that Google Fit actually shares from Mi Fitness */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

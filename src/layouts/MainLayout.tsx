@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sun, Moon } from 'lucide-react';
+import { BookOpen, CirclePlay, MapPin, Menu, MessageCircle, Moon, PenLine, Sun, UtensilsCrossed, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../store/ThemeContext';
 import '../styles/navigation.css';
@@ -92,7 +92,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           <div className="flex items-center gap-3 lg:gap-8">
             <button
               type="button"
-              className="sm:hidden p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+              className="lg:hidden p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
               title={mobileMenu ? 'Đóng menu' : 'Mở menu'}
               aria-label={mobileMenu ? 'Đóng menu' : 'Mở menu'}
               aria-expanded={mobileMenu}
@@ -167,7 +167,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
         {/* Primary Desktop Nav Strip (5 Core Groups) */}
         <nav
           aria-label="Điều hướng chính"
-          className={`site-navigation max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 border-t border-[#e6e5de] dark:border-[#212c3b] ${
+          className={`site-navigation hidden lg:flex max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 border-t border-[#e6e5de] dark:border-[#212c3b] ${
             mobileMenu ? 'is-collapsed' : ''
           }`}
         >
@@ -204,70 +204,76 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
         {/* Sub-Navigation Strip (Contextual secondary tabs per functional group) */}
         {!isAuthenticated && isDiscoverActive && (
-          <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
-            <div className="max-w-[1440px] mx-auto flex items-center gap-2 overflow-x-auto">
-              <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">Khám phá & Cộng đồng:</span>
-              <Link to="/explore" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>🍲 Công thức món chay</Link>
-              <Link to="/blog" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname.startsWith('/blog') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>📰 Bảng tin &amp; Video Bếp Chay</Link>
-              <Link to="/videos" className={`px-3 py-1 rounded-lg transition shrink-0 ${pathname.startsWith('/videos') ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold' : 'hover:text-emerald-700 dark:hover:text-emerald-400'}`}>🎬 Kho Video</Link>
+          <div className="border-t border-[#e6e5de] bg-[#f5f4ef] px-4 py-1.5 text-xs dark:border-[#212c3b] dark:bg-[#161f2b] sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-[1440px] items-center gap-3 overflow-x-auto">
+              <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-400">Khám phá:</span>
+              <Link to="/explore" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><UtensilsCrossed size={14} /> Công thức</Link>
+              <Link to="/blog" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/blog') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><BookOpen size={14} /> Blog</Link>
+              <Link to="/videos" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/videos') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><CirclePlay size={14} /> Video</Link>
+              <Link to="/smart-market#map-section" className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold text-slate-600 transition hover:text-emerald-700 dark:text-slate-400"><MapPin size={14} /> Bản đồ quán chay</Link>
             </div>
           </div>
         )}
         {isAuthenticated && (
           <>
             {isDiscoverActive && (
-              <div className="bg-[#f5f4ef] dark:bg-[#161f2b] border-t border-[#e6e5de] dark:border-[#212c3b] py-1.5 px-4 sm:px-6 lg:px-8 text-xs font-semibold text-slate-600 dark:text-slate-400 transition-colors">
-                <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-2 overflow-x-auto">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold mr-1 shrink-0">
-                      Khám phá & Cộng đồng:
-                    </span>
+              <div className="border-t border-[#e6e5de] bg-[#f5f4ef] px-4 py-1.5 text-xs dark:border-[#212c3b] dark:bg-[#161f2b] sm:px-6 lg:px-8">
+                <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 overflow-x-auto">
+                  <div className="flex items-center gap-1">
+                    <span className="mr-2 shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-400">Khám phá:</span>
                     <Link
                       to="/explore"
-                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${
                         pathname === '/explore' || pathname.startsWith('/recipe')
-                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                          ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300'
+                          : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'
                       }`}
                     >
-                      🍲 Công thức món chay
+                      <UtensilsCrossed size={15} /> Công thức
                     </Link>
                     <Link
                       to="/blog"
-                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${
                         pathname.startsWith('/blog') && pathname !== '/blog/write'
-                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                          ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300'
+                          : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'
                       }`}
                     >
-                      📰 Bảng tin &amp; Video Bếp Chay
+                      <BookOpen size={15} /> Blog
                     </Link>
                     <Link
                       to="/videos"
-                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${
                         pathname.startsWith('/videos')
-                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                          ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300'
+                          : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'
                       }`}
                     >
-                      🎬 Kho Video
+                      <CirclePlay size={15} /> Video
                     </Link>
+                    <span className="mx-1 h-5 w-px shrink-0 bg-slate-300 dark:bg-slate-700" />
                     <Link
                       to="/questions"
-                      className={`px-3 py-1 rounded-lg transition shrink-0 ${
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${
                         pathname.startsWith('/questions')
-                          ? 'bg-white dark:bg-[#121922] text-emerald-800 dark:text-emerald-300 shadow-2xs font-bold'
-                          : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+                          ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300'
+                          : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'
                       }`}
                     >
-                      💬 Hỏi đáp chuyên gia
+                      <MessageCircle size={15} /> Hỏi đáp
+                    </Link>
+                    <Link
+                      to="/smart-market"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold text-slate-600 transition hover:text-emerald-700 dark:text-slate-400"
+                    >
+                      <MapPin size={15} /> Bản đồ quán chay
                     </Link>
                   </div>
                   <Link
                     to="/blog/write"
-                    className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] shrink-0 transition shadow-2xs"
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3.5 py-1.5 font-bold text-emerald-800 shadow-xs transition hover:bg-emerald-50 dark:bg-[#0f1720] dark:text-emerald-300"
                   >
-                    ✍️ Đăng bài chia sẻ
+                    <PenLine size={15} /> Đăng bài
                   </Link>
                 </div>
               </div>
@@ -424,7 +430,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             </Link>
             </> : <>
             <Link to="/smart-market" className="hover:text-emerald-700 dark:hover:text-emerald-400">Đi chợ & Bản đồ</Link>
-            <Link to="/restaurants" className="hover:text-emerald-700 dark:hover:text-emerald-400">Quán chay gần đây</Link>
+            <Link to="/smart-market#map-section" className="hover:text-emerald-700 dark:hover:text-emerald-400">Quán chay gần đây</Link>
             </>}
             <Link to="/blog" className="hover:text-emerald-700 dark:hover:text-emerald-400">
               Cộng đồng

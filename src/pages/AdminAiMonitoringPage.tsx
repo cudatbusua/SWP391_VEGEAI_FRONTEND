@@ -350,7 +350,7 @@ export function AdminAiMonitoringPage() {
               const health = svcData?.health || 'NO_DATA';
 
               return (
-                <div key={svcMeta.id} className="p-4 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-850 space-y-2">
+                <div key={svcMeta.id} className="p-4 rounded-xl border border-slate-200/70 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
                       {svcMeta.label}

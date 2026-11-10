@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Watch,
   Flame,
@@ -42,7 +42,7 @@ interface MetricCardProps {
 }
 
 const MetricCard: React.FC<MetricCardProps> = ({ title, icon, value, unit, valueClass, note, children }) => (
-  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 space-y-2">
+  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#182230] border border-slate-200/80 dark:border-slate-800 space-y-2">
     <div className="flex items-center justify-between text-slate-500">
       <span className="text-xs font-bold">{title}</span>
       {icon}
@@ -513,7 +513,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
       </div>
 
       {/* Heart rate (bpm): not shared by Mi Fitness to Google Fit, so be explicit and offer manual entry */}
-      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#182230] border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Heart className={`w-5 h-5 text-rose-500 ${metrics.avgHeartRate > 0 ? 'fill-rose-500/20' : ''}`} />
           <div>
@@ -589,7 +589,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         </button>
 
         {showArchitectureGuide && (
-          <div className="mt-4 p-5 rounded-2xl bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 space-y-4 text-xs text-slate-600 dark:text-slate-300 animate-in fade-in">
+          <div className="mt-4 p-5 rounded-2xl bg-slate-50 dark:bg-[#182230] border border-slate-200 dark:border-slate-700 space-y-4 text-xs text-slate-600 dark:text-slate-300 animate-in fade-in">
             <h4 className="font-bold text-slate-900 dark:text-white text-sm">
               Sơ đồ luồng dữ liệu thiết bị đeo đa nền tảng (Cross-Platform Wearables Flow):
             </h4>

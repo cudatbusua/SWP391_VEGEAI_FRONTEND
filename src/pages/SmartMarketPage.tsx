@@ -289,7 +289,8 @@ export function SmartMarketPage() {
     return [];
   });
   const [loadingStores, setLoadingStores] = useState(false);
-  const [storeTypeFilter, setStoreTypeFilter] = useState<string>('ALL');
+  const [storeCategoryFilter, setStoreCategoryFilter] = useState<string>('ALL');
+  const [storeDistanceRadius, setStoreDistanceRadius] = useState<'ALL' | '3KM' | '5KM'>('ALL');
   const [selectedStore, setSelectedStore] = useState<SmartMarketStore | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
   const [locationStatus, setLocationStatus] = useState<'default' | 'requesting' | 'granted' | 'denied'>('default');
@@ -850,19 +851,22 @@ export function SmartMarketPage() {
     });
   }, [items, statusFilter, categoryFilter]);
 
-  // Filter stores
+  // Filter stores by category, distance radius, and search query
   const filteredStores = useMemo(() => {
     return stores.filter(store => {
-      if (storeTypeFilter === 'NEAR' && (store.distanceKm ?? 0) > 3) return false;
-      if (storeTypeFilter === 'MED' && (store.distanceKm ?? 0) > 5) return false;
-      if (storeTypeFilter !== 'ALL' && storeTypeFilter !== 'NEAR' && storeTypeFilter !== 'MED' && store.category !== storeTypeFilter) return false;
+      // 1. Category filter
+      if (storeCategoryFilter !== 'ALL' && store.category !== storeCategoryFilter) return false;
+      // 2. Distance radius filter (GPS-based)
+      if (storeDistanceRadius === '3KM' && (store.distanceKm ?? 0) > 3) return false;
+      if (storeDistanceRadius === '5KM' && (store.distanceKm ?? 0) > 5) return false;
+      // 3. Search query
       if (storeSearch.trim()) {
         const q = storeSearch.toLowerCase();
         return store.name.toLowerCase().includes(q) || store.address.toLowerCase().includes(q);
       }
       return true;
     });
-  }, [stores, storeTypeFilter, storeSearch]);
+  }, [stores, storeCategoryFilter, storeDistanceRadius, storeSearch]);
 
   // Multi-Store Cart Actions
   const handleUpdateMultiCart = (item: StoreCatalogItem, store: SmartMarketStore, delta: number) => {
@@ -1047,7 +1051,7 @@ export function SmartMarketPage() {
         </div>
 
         {/* Real GPS Location Bar (Session-Persistent) */}
-        <div id="location-bar" className="bg-emerald-50/80 dark:bg-slate-900/90 rounded-2xl border border-emerald-200/70 dark:border-slate-800 p-4 mb-6 shadow-2xs">
+        <div id="location-bar" className="bg-white dark:bg-[#121922] rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 mb-6 shadow-xs">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
@@ -1061,12 +1065,12 @@ export function SmartMarketPage() {
                     Vị trí hiện tại:
                   </span>
                   {isAddressConfirmed ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-                      <Check className="w-3 h-3" /> Đã cập nhật
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/60 px-2.5 py-0.5 rounded-full">
+                      <Check className="w-3 h-3" /> Đã cập nhật (Toạ độ GPS)
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">
-                      Cần cập nhật để tiếp tục
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-0.5 rounded-full">
+                      Cần cập nhật GPS để quét điểm bán
                     </span>
                   )}
                 </div>
@@ -1078,41 +1082,17 @@ export function SmartMarketPage() {
                 type="button"
                 onClick={handleRequestLocation}
                 disabled={locationStatus === 'requesting'}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-2xs cursor-pointer"
               >
                 <Navigation className="w-3.5 h-3.5" />
                 <span>{locationStatus === 'requesting' ? 'Đang định vị GPS...' : '📍 Định vị GPS tự động'}</span>
               </button>
 
               {isAddressConfirmed && (
-                <div className="flex items-center gap-1 text-xs">
-                  <span className="text-slate-400 hidden sm:inline">Phạm vi tìm kiếm:</span>
-                  {[
-                    { label: 'Gần nhất (< 3km)', type: 'NEAR' },
-                    { label: 'Trong 5km', type: 'MED' },
-                    { label: 'Tất cả điểm gần', type: 'ALL' }
-                  ].map(filter => (
-                    <button
-                      key={filter.type}
-                      type="button"
-                      onClick={() => setStoreTypeFilter(filter.type)}
-                      className={`px-2.5 py-1.5 rounded-lg font-semibold text-[11px] transition cursor-pointer ${
-                        storeTypeFilter === filter.type
-                          ? 'bg-emerald-700 text-white font-bold'
-                          : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      {filter.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {isAddressConfirmed && (
                 <button
                   type="button"
                   onClick={() => setIsAddressConfirmed(false)}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                  className="px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                   title="Thay đổi vị trí hiện tại"
                 >
                   Đổi địa chỉ
@@ -1186,20 +1166,20 @@ export function SmartMarketPage() {
             </div>
 
             {/* BÁCH HÓA XANH: HÔM NAY ĂN GÌ? - MUA NGUYÊN LIỆU THEO MÓN */}
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs space-y-4">
+            <div className="bg-white dark:bg-[#121922] rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 uppercase">
                       Bách Hóa Xanh Online
                     </span>
-                    <span className="text-xs text-slate-400">· Chuẩn bị bữa ăn gia đình tiện lợi</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">· Chuẩn bị bữa ăn gia đình tiện lợi</span>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white mt-1 flex items-center gap-2">
-                    <Utensils className="w-5 h-5 text-emerald-600" />
+                  <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-slate-100 mt-1 flex items-center gap-2">
+                    <Utensils className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                     Hôm Nay Ăn Gì? — Mua Trọn Combo Nguyên Liệu Theo Món
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                     1-Click thêm đầy đủ nguyên liệu tươi ngon đã sơ chế sẵn vào giỏ đi chợ và danh sách cần mua.
                   </p>
                 </div>
@@ -1210,51 +1190,51 @@ export function SmartMarketPage() {
                 {MEAL_COMBOS.map(combo => (
                   <div
                     key={combo.id}
-                    className="flex flex-col justify-between p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 bg-slate-50/50 dark:bg-slate-850 hover:bg-white dark:hover:bg-slate-800 transition shadow-2xs group"
+                    className="flex flex-col justify-between p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 dark:hover:border-emerald-500/50 bg-slate-50 dark:bg-[#182230] hover:bg-white dark:hover:bg-[#1f2c3e] transition shadow-xs group"
                   >
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-3xl p-2 rounded-xl bg-white dark:bg-slate-700 shadow-2xs">{combo.emoji}</span>
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">Combo nguyên liệu</span>
+                        <span className="text-3xl p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50 shadow-2xs">{combo.emoji}</span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/80">Combo nguyên liệu</span>
                       </div>
 
-                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white line-clamp-1 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 transition">
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition">
                         {combo.name}
                       </h4>
 
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-1 leading-snug">
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 mt-1 leading-relaxed">
                         {combo.tagline}
                       </p>
 
-                      <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800 space-y-1.5">
+                      <div className="mt-3 pt-2.5 border-t border-slate-200/80 dark:border-slate-800 space-y-1.5">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="font-bold text-emerald-800 dark:text-emerald-300">
+                          <span className="font-bold text-emerald-700 dark:text-emerald-400">
                             🌿 {combo.ingredients.length} nguyên liệu tươi
                           </span>
-                          <span className="text-[10px] text-slate-400">
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
                             {combo.prepTime} · {combo.calories}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 py-1 px-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/80">
+                        <div className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200/60 dark:border-slate-700/60">
                           <div className="flex items-center -space-x-1 shrink-0">
                             {combo.ingredients.map(ing => (
                               <span
                                 key={ing.name}
                                 title={`${ing.name} (${ing.amount})`}
-                                className="w-5 h-5 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-[10px] shadow-2xs"
+                                className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center text-[10px] shadow-2xs"
                               >
                                 {ing.emoji}
                               </span>
                             ))}
                           </div>
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                          <span className="text-[10px] text-slate-700 dark:text-slate-300 font-medium truncate">
                             {combo.ingredients.map(i => i.name).slice(0, 2).join(', ')}...
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <div className="mt-4 pt-3 border-t border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2">
                       <button
                         type="button"
                         onClick={() => handleAddComboToCart(combo)}
@@ -1316,7 +1296,7 @@ export function SmartMarketPage() {
                   </div>
 
                   {/* Category Filter Tabs */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold mb-2.5">
                     {[
                       { id: 'ALL', label: 'Tất cả' },
                       { id: 'VEGAN_STORE', label: '🌱 Quán Chay' },
@@ -1325,17 +1305,42 @@ export function SmartMarketPage() {
                     ].map(tab => (
                       <button
                         key={tab.id}
-                        onClick={() => { sfx.playTap(); setStoreTypeFilter(tab.id); }}
+                        onClick={() => { sfx.playTap(); setStoreCategoryFilter(tab.id); }}
                         className={`py-1.5 px-1 rounded-lg text-center transition cursor-pointer text-[10px] sm:text-[11px] truncate ${
-                          storeTypeFilter === tab.id
+                          storeCategoryFilter === tab.id
                             ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-2xs font-bold'
-                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
                         {tab.label}
                       </button>
                     ))}
                   </div>
+
+                  {/* Distance Radius Filter (GPS) */}
+                  {isAddressConfirmed && (
+                    <div className="flex items-center gap-1.5 text-xs pb-1 mb-1">
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 shrink-0">Bán kính:</span>
+                      {[
+                        { label: 'Tất cả', radius: 'ALL' },
+                        { label: 'Gần nhất (< 3km)', radius: '3KM' },
+                        { label: 'Trong 5km', radius: '5KM' }
+                      ].map(r => (
+                        <button
+                          key={r.radius}
+                          type="button"
+                          onClick={() => { sfx.playTap(); setStoreDistanceRadius(r.radius as any); }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                            storeDistanceRadius === r.radius
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Stores Scrollable List */}
@@ -1350,8 +1355,8 @@ export function SmartMarketPage() {
                         onClick={() => { sfx.playTap(); setSelectedStore(store); }}
                         className={`p-3.5 rounded-xl border transition cursor-pointer text-left relative overflow-hidden ${
                           isSelected
-                            ? 'bg-emerald-50/90 dark:bg-slate-800 border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-200 dark:ring-emerald-900 shadow-xs'
-                            : 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800 hover:border-slate-300 hover:bg-white dark:hover:bg-slate-800'
+                            ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-900 shadow-xs'
+                            : 'bg-white dark:bg-[#182230] border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-600 hover:bg-slate-50 dark:hover:bg-[#1e2a3b]'
                         }`}
                       >
                         {/* Promoted Ribbon */}
@@ -1400,7 +1405,7 @@ export function SmartMarketPage() {
 
               {/* Right Column: Interactive Map */}
               <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs h-[680px] flex flex-col">
-                <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-850">
+                <div className="p-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-emerald-600" />
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
@@ -1518,7 +1523,7 @@ export function SmartMarketPage() {
                         return (
                           <div
                             key={catItem.id}
-                            className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 bg-white dark:bg-slate-850 flex items-center justify-between gap-3 transition shadow-2xs"
+                            className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700 bg-white dark:bg-[#182230] flex items-center justify-between gap-3 transition shadow-2xs"
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <span className="text-3xl shrink-0 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800">

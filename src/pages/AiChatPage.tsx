@@ -1026,7 +1026,7 @@ export function AiChatPage() {
           <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs flex flex-col h-[720px]">
             
             {/* Chat Session Header */}
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-850">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-xl text-white ${
                   currentSession?.category === 'fridge-scan' ? 'bg-emerald-600' : 'bg-teal-700'

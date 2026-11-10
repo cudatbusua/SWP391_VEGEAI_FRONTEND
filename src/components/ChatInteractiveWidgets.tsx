@@ -89,7 +89,7 @@ export const ChatMealScheduleCardView: React.FC<ChatMealScheduleCardViewProps> =
   };
 
   return (
-    <div className="mt-3.5 rounded-2xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-850 p-4 sm:p-5 shadow-sm space-y-4 text-slate-800 dark:text-slate-100 animate-in fade-in">
+    <div className="mt-3.5 rounded-2xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-[#182230] p-4 sm:p-5 shadow-sm space-y-4 text-slate-800 dark:text-slate-100 animate-in fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-emerald-100 dark:border-emerald-800">
         <div className="flex items-center gap-2.5">
@@ -368,7 +368,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
   };
 
   return (
-    <div className="mt-3.5 rounded-2xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-850 p-4 sm:p-5 shadow-sm space-y-4 text-slate-800 dark:text-slate-100 animate-in fade-in">
+    <div className="mt-3.5 rounded-2xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-[#182230] p-4 sm:p-5 shadow-sm space-y-4 text-slate-800 dark:text-slate-100 animate-in fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-emerald-100 dark:border-emerald-800">
         <div className="flex items-center gap-2.5">
@@ -425,7 +425,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
       </div>
 
       {/* Wearable Live Metrics Strip */}
-      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 text-white border border-emerald-500/30 space-y-3">
+      <div className="p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border border-emerald-500/30 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
             <Watch className="w-4 h-4 text-emerald-400" />

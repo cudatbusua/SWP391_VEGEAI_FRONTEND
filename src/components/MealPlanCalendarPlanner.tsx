@@ -851,7 +851,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                   return (
                     <div
                       key={meal.slot + ':' + meal.recipeId}
-                      className={`p-5 rounded-2xl border bg-white dark:bg-slate-850 shadow-2xs space-y-3 ${
+                      className={`p-5 rounded-2xl border bg-white dark:bg-[#182230] shadow-2xs space-y-3 ${
                         draftDay ? 'border-amber-200 dark:border-amber-900' : 'border-slate-200/80 dark:border-slate-800'
                       }`}
                     >
@@ -959,7 +959,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                     return (
                       <div
                         key={meal.slot + ':' + meal.recipeId}
-                        className={`p-5 rounded-2xl border bg-teal-50/20 dark:bg-slate-850 shadow-2xs space-y-3 ${
+                        className={`p-5 rounded-2xl border bg-teal-50/20 dark:bg-[#182230] shadow-2xs space-y-3 ${
                           draftDay ? 'border-amber-200 dark:border-amber-900' : 'border-teal-200/80 dark:border-slate-800'
                         }`}
                       >

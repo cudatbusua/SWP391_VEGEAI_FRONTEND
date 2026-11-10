@@ -116,43 +116,48 @@ function ModerationInfoBadge({ label }: { label?: string }) {
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition cursor-pointer shadow-2xs"
-        title="Quy trình kiểm duyệt 2 lớp: AI lọc trước, Admin duyệt sau"
+        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition cursor-pointer shadow-2xs"
+        title="Quy trình kiểm duyệt bài đăng 2 lớp (AI-First & Admin Verified)"
         aria-label="Thông tin quy trình kiểm duyệt bài đăng"
       >
         <span className="w-4 h-4 rounded-full bg-emerald-700 text-white flex items-center justify-center text-[10px] font-serif font-black italic">
           i
         </span>
-        {label && <span className="text-[11px] font-semibold">{label}</span>}
+        {label ? <span className="text-[11px] font-semibold">{label}</span> : <span className="text-[11px] font-semibold">Quy trình duyệt</span>}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 shadow-2xl z-50 text-left text-xs space-y-2 pointer-events-auto">
-          <div className="flex items-center justify-between border-b border-emerald-100 dark:border-slate-800 pb-2">
-            <span className="font-extrabold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
-              <CheckCircle2 size={14} className="text-emerald-600" />
-              Quy trình kiểm duyệt 2 lớp
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-extrabold">
-              AI-First
-            </span>
-          </div>
-          <div className="space-y-1.5 text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
-            <div className="flex items-start gap-1.5">
-              <span className="text-emerald-600 font-bold shrink-0">1.</span>
-              <span><strong>AI sơ duyệt tự động:</strong> NLP quét từ khóa độc hại/quảng cáo rác, Vision phát hiện ảnh thịt hoặc nội dung vi phạm.</span>
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 bottom-full mb-2.5 w-72 sm:w-80 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 shadow-2xl z-50 text-left text-xs space-y-2 pointer-events-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-emerald-100 dark:border-slate-800 pb-2">
+              <span className="font-extrabold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-emerald-600" />
+                Quy trình kiểm duyệt 2 lớp
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X size={14} />
+              </button>
             </div>
-            <div className="flex items-start gap-1.5">
-              <span className="text-emerald-600 font-bold shrink-0">2.</span>
-              <span><strong>Admin xác thực &amp; cấp Tích Xanh:</strong> Ban quản trị thẩm định dinh dưỡng trước khi xuất bản công khai.</span>
+            <div className="space-y-1.5 text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 font-bold shrink-0">1.</span>
+                <span><strong>AI sơ duyệt tự động:</strong> NLP lọc từ ngữ phản cảm/quảng cáo rác, Computer Vision kiểm duyệt ảnh thịt &amp; vi phạm.</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-emerald-600 font-bold shrink-0">2.</span>
+                <span><strong>Admin duyệt &amp; cấp Tích Xanh:</strong> Ban quản trị thẩm định dinh dưỡng trước khi bài đăng hiển thị công khai.</span>
+              </div>
             </div>
+            <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold italic border-t border-slate-100 dark:border-slate-800 pt-1.5">
+              ✓ Giúp bài đăng luôn đạt chuẩn an toàn, thuần chay và hữu ích.
+            </p>
           </div>
-          <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold italic border-t border-slate-100 dark:border-slate-800 pt-1.5">
-            ✓ Bài đăng công khai đã được xác thực an toàn, không có spam hay nội dung phản cảm.
-          </p>
-        </div>
+        </>
       )}
     </div>
   );
@@ -422,7 +427,6 @@ export function BlogPage() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <ModerationInfoBadge label="Kiểm duyệt 2 lớp" />
             {user?.role === 'admin' && (
               <Link className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20" to="/admin/blog">
                 <ClipboardCheck size={16} /> Duyệt bài đăng
@@ -565,13 +569,16 @@ export function BlogPage() {
               }
               className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-100/90 dark:bg-slate-800 hover:bg-slate-100 border border-slate-200/80 dark:border-slate-700 text-xs sm:text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
-            <button
-              type="button"
-              onClick={() => handleStartComposer(quickCategory)}
-              className="px-4 py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-2xs cursor-pointer shrink-0"
-            >
-              Soạn bài đăng
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <ModerationInfoBadge />
+              <button
+                type="button"
+                onClick={() => handleStartComposer(quickCategory)}
+                className="px-4 py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-2xs cursor-pointer shrink-0"
+              >
+                Soạn bài đăng
+              </button>
+            </div>
           </div>
 
           {/* 4 Classification Rules & Media Quick Actions */}

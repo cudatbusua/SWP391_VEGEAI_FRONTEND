@@ -190,3 +190,311 @@
   .recipe-grid > .recipe-featured > div:first-child > div { min-height: 100%; }
   .recipe-grid > .recipe-featured h3 { font-size: 24px; }
 }
+
+/* ========================================================
+   VEGEAI DISCOVERY & EXPLORE DARK THEME OVERRIDES
+   ======================================================== */
+html.dark .discovery-page {
+  color: #f1f5f9;
+  background: #0b1118;
+}
+
+html.dark .discovery-cover-shade {
+  background: linear-gradient(90deg, rgba(11, 17, 24, 0.95), rgba(11, 17, 24, 0.75) 50%, rgba(11, 17, 24, 0.45) 100%);
+}
+
+html.dark .discovery-scan {
+  background: #059669;
+  color: #ffffff;
+  border: 1px solid #10b981;
+}
+
+html.dark .discovery-scan:hover {
+  background: #047857;
+}
+
+html.dark .discovery-hero-secondary {
+  color: #f1f5f9;
+  background: rgba(18, 25, 34, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  padding: 10px 16px;
+}
+
+html.dark .discovery-hero-secondary:hover {
+  background: rgba(30, 41, 59, 0.85);
+  color: #34d399;
+}
+
+html.dark .discovery-shell {
+  background: #0b1118;
+}
+
+html.dark .discovery-search {
+  background: #121922;
+  border-color: #212c3b;
+  color: #cbd5e1;
+}
+
+html.dark .discovery-search:focus-within {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+html.dark .discovery-search input {
+  color: #f1f5f9;
+}
+
+html.dark .discovery-search input::placeholder {
+  color: #64748b;
+}
+
+html.dark .discovery-search button {
+  color: #94a3b8;
+}
+
+html.dark .discovery-chef {
+  background: #13221b;
+  border-color: #1e3a2b;
+  color: #34d399;
+}
+
+html.dark .discovery-chef:hover {
+  background: #193125;
+  border-color: #274d39;
+}
+
+html.dark .discovery-quick-filters {
+  border-bottom-color: #212c3b;
+}
+
+html.dark .discovery-quick-filters button {
+  background: #121922;
+  border-color: #212c3b;
+  color: #cbd5e1;
+}
+
+html.dark .discovery-quick-filters button:hover {
+  background: #1a2432;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+html.dark .discovery-quick-filters button.is-active {
+  background: #059669;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+html.dark .discovery-filter-toggle {
+  color: #34d399;
+}
+
+html.dark .discovery-filter-toggle > span {
+  background: #14281f;
+  color: #34d399;
+}
+
+html.dark .discovery-filters {
+  border-right-color: #212c3b;
+  border-bottom-color: #212c3b;
+}
+
+html.dark .discovery-filter-heading h2 {
+  color: #f1f5f9;
+}
+
+html.dark .discovery-filter-heading button {
+  color: #34d399;
+}
+
+html.dark .discovery-filter-group {
+  border-bottom-color: #212c3b;
+}
+
+html.dark .discovery-filter-group summary {
+  color: #f1f5f9;
+}
+
+html.dark .discovery-filter-group summary span {
+  color: #94a3b8;
+}
+
+html.dark .discovery-field {
+  color: #94a3b8;
+}
+
+html.dark .discovery-field select,
+html.dark .discovery-field input {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+  color-scheme: dark;
+}
+
+html.dark .discovery-checkbox {
+  color: #cbd5e1;
+}
+
+html.dark .discovery-sidebar-note {
+  background: #121e18;
+  border-color: #1b3528;
+  color: #a7f3d0;
+}
+
+html.dark .discovery-sidebar-note strong {
+  color: #34d399;
+}
+
+html.dark .discovery-sidebar-note p {
+  color: #94a3b8;
+}
+
+html.dark .discovery-section-label {
+  color: #34d399;
+}
+
+html.dark .discovery-results-heading h2 {
+  color: #f1f5f9;
+}
+
+html.dark .discovery-results-heading h2 > span {
+  background: #16251e;
+  color: #34d399;
+  border: 1px solid #1e3a2b;
+}
+
+html.dark .discovery-results-heading select {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+  color-scheme: dark;
+}
+
+html.dark .discovery-active-tags button {
+  background: #14221a;
+  border-color: #1e3b2b;
+  color: #6ee7b7;
+}
+
+html.dark .recipe-card {
+  background: #121922;
+  border-color: #212c3b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .recipe-card:hover {
+  border-color: #059669;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+html.dark .recipe-card-badge {
+  background: rgba(11, 17, 24, 0.9);
+  border-color: #212c3b;
+  color: #34d399;
+}
+
+html.dark .recipe-card-verified {
+  background: rgba(11, 17, 24, 0.9);
+  border-color: #212c3b;
+  color: #10b981;
+}
+
+html.dark .recipe-card h3 {
+  color: #f1f5f9;
+}
+
+html.dark .recipe-card-kicker {
+  color: #34d399;
+}
+
+html.dark .recipe-card-kicker > span:last-child {
+  color: #94a3b8;
+}
+
+html.dark .recipe-card-tags {
+  color: #94a3b8;
+}
+
+html.dark .recipe-card-meta {
+  border-top-color: #212c3b;
+  color: #cbd5e1;
+}
+
+html.dark .discovery-empty {
+  background: #121922;
+  border-color: #212c3b;
+  color: #94a3b8;
+}
+
+html.dark .discovery-empty h3 {
+  color: #f1f5f9;
+}
+
+html.dark .discovery-empty p {
+  color: #94a3b8;
+}
+
+html.dark .discovery-empty button {
+  background: #059669;
+  color: #ffffff;
+}
+
+html.dark .discovery-empty button:hover {
+  background: #047857;
+}
+
+html.dark .recipe-skeleton {
+  background: #121922;
+  border-color: #212c3b;
+}
+
+html.dark .recipe-skeleton > div,
+html.dark .recipe-skeleton > span {
+  background: #1a2533;
+}
+
+html.dark .discovery-pagination button {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+
+html.dark .discovery-pagination button:hover:not(:disabled) {
+  background: #1c2736;
+  border-color: #334155;
+}
+
+html.dark .discovery-journal {
+  border-top-color: #212c3b;
+}
+
+html.dark .discovery-journal-heading h2 {
+  color: #f1f5f9;
+}
+
+html.dark .discovery-journal-heading p {
+  color: #94a3b8;
+}
+
+html.dark .discovery-journal-grid small {
+  color: #34d399;
+}
+
+html.dark .discovery-journal-grid h3 {
+  color: #f1f5f9;
+}
+
+html.dark .discovery-journal-grid p {
+  color: #94a3b8;
+}
+
+html.dark .discovery-journal-photo {
+  background: #121922;
+}
+
+html.dark .discovery-journal-photo > span {
+  background: #121922;
+  color: #34d399;
+  border: 1px solid #212c3b;
+}

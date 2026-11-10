@@ -65,6 +65,16 @@
   html.dark body {
     @apply bg-[#0b1118] text-[#f1f5f9];
   }
+
+  html.dark input,
+  html.dark textarea,
+  html.dark select {
+    color-scheme: dark;
+  }
+
+  html.dark ::placeholder {
+    color: #64748b;
+  }
 }
 
 /* Global Navigation Styling & Sub-nav Bar */
@@ -352,34 +362,34 @@ html.dark .planned-details ul li {
   border-color: #212c3b !important;
 }
 
-/* General surface adaptations for dark mode */
-html.dark .bg-white:not(.keep-light) {
-  background-color: #121922 !important;
+/* General surface adaptations for dark mode — scoped so explicit dark: variants are never overridden */
+html.dark .bg-white:not(.keep-light):not([class*="dark:bg-"]) {
+  background-color: #121922;
 }
-html.dark .bg-slate-50:not(.keep-light),
-html.dark .bg-gray-50:not(.keep-light) {
-  background-color: #17212d !important;
+html.dark .bg-slate-50:not(.keep-light):not([class*="dark:bg-"]),
+html.dark .bg-gray-50:not(.keep-light):not([class*="dark:bg-"]) {
+  background-color: #17212d;
 }
-html.dark .text-slate-900,
-html.dark .text-gray-900,
-html.dark .text-slate-800 {
-  color: #f8fafc !important;
+html.dark .text-slate-900:not([class*="dark:text-"]),
+html.dark .text-gray-900:not([class*="dark:text-"]),
+html.dark .text-slate-800:not([class*="dark:text-"]) {
+  color: #f8fafc;
 }
-html.dark .text-slate-700,
-html.dark .text-gray-700 {
-  color: #cbd5e1 !important;
+html.dark .text-slate-700:not([class*="dark:text-"]),
+html.dark .text-gray-700:not([class*="dark:text-"]) {
+  color: #cbd5e1;
 }
-html.dark .text-slate-600,
-html.dark .text-gray-600,
-html.dark .text-slate-500,
-html.dark .text-gray-500 {
-  color: #94a3b8 !important;
+html.dark .text-slate-600:not([class*="dark:text-"]),
+html.dark .text-gray-600:not([class*="dark:text-"]),
+html.dark .text-slate-500:not([class*="dark:text-"]),
+html.dark .text-gray-500:not([class*="dark:text-"]) {
+  color: #94a3b8;
 }
-html.dark .border-slate-200,
-html.dark .border-gray-200,
-html.dark .border-slate-100,
-html.dark .border-gray-100 {
-  border-color: #212c3b !important;
+html.dark .border-slate-200:not([class*="dark:border-"]),
+html.dark .border-gray-200:not([class*="dark:border-"]),
+html.dark .border-slate-100:not([class*="dark:border-"]),
+html.dark .border-gray-100:not([class*="dark:border-"]) {
+  border-color: #212c3b;
 }
 
 /* Leaflet Popup Dark Mode Compatibility */

@@ -186,7 +186,7 @@ export const RegisterForm: React.FC = () => {
                 ))}
               </div>
               <div className="flex justify-between items-center text-[10px] text-gray-400">
-                <span>Độ mạnh: <strong className="text-gray-600">{strength.label}</strong></span>
+                <span>Độ mạnh: <strong className="text-gray-600 dark:text-gray-300">{strength.label}</strong></span>
                 <span>Tối thiểu 8 ký tự (chữ & số)</span>
               </div>
             </div>

@@ -59,7 +59,7 @@ export const App: React.FC = () => {
       <AuthProvider>
         <BrowserRouter>
           {/* Defer each route bundle until navigation so maps, admin tools and editors stay off the initial download. */}
-          <Suspense fallback={<main className="min-h-[60vh] p-10 text-center text-sm font-medium text-slate-600" role="status">Đang tải trang...</main>}>
+          <Suspense fallback={<main className="min-h-[60vh] p-10 text-center text-sm font-medium text-slate-600 dark:text-slate-400" role="status">Đang tải trang...</main>}>
           <Routes>
             <Route path="/" element={<DashboardRoute />} />
             <Route path="/explore" element={<RecipeDiscoveryPage />} />

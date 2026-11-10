@@ -645,7 +645,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
               <button
                 type="button"
                 onClick={() => setShowManualHrModal(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold cursor-pointer"
               >
                 ✕
               </button>

@@ -3,3 +3,18 @@
 .cm-video-engagement{display:flex;align-items:center;gap:8px;width:fit-content;margin:8px 0 12px;padding:8px 11px;border:1px solid #cfe5d8;border-radius:7px;background:#eff8f2;color:#176b4c;font-size:12px;font-weight:700;text-decoration:none}
 .cm-video-engagement svg:first-child{color:#21845d}.cm-video-engagement svg:last-child{margin-left:5px}.cm-video-engagement:hover,.recipe-card-engagement:hover{background:#e4f2e9}
 @media(max-width:600px){.cm-video-engagement{width:100%;justify-content:center}}
+
+/* ========================================================
+   ENGAGEMENT BADGES DARK THEME OVERRIDES
+   ======================================================== */
+html.dark .recipe-card-engagement,
+html.dark .cm-video-engagement {
+  border-color: #212c3b;
+  background: #14281f;
+  color: #34d399;
+}
+html.dark .recipe-card-engagement:hover,
+html.dark .cm-video-engagement:hover {
+  background: #1a3b2c;
+  color: #6ee7b7;
+}

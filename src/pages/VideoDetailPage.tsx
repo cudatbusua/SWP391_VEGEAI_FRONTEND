@@ -124,7 +124,7 @@ function VideoAiRecipeCopilot({
             <button
               type="button"
               onClick={handleExtractRecipe}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 underline cursor-pointer"
+              className="text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300 underline cursor-pointer"
             >
               Phân tích lại công thức từ video
             </button>
@@ -248,7 +248,7 @@ function VideoDetail({ videoId }: { videoId: string }) {
         title={query.data.title}
         description={query.data.description}
         videoUrl={query.data.videoUrl}
-      /> : <div className="my-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-slate-700"><strong>Tóm tắt công thức từ video</strong><p className="mt-1">Tính năng phân tích âm thanh và hình ảnh dành cho thành viên.</p><Link className="cm-button secondary mt-3" to="/login" state={{ from: '/videos/' + videoId }}>Đăng nhập để phân tích</Link></div>}
+      /> : <div className="my-6 rounded-2xl border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50 dark:bg-emerald-950/40 p-5 text-sm text-slate-700 dark:text-emerald-200"><strong>Tóm tắt công thức từ video</strong><p className="mt-1">Tính năng phân tích âm thanh và hình ảnh dành cho thành viên.</p><Link className="cm-button secondary mt-3" to="/login" state={{ from: '/videos/' + videoId }}>Đăng nhập để phân tích</Link></div>}
 
       {error && <CommunityError message={error} />}
       {favoriteQuery.error && <CommunityError message={favoriteQuery.error} retry={favoriteQuery.refresh} />}

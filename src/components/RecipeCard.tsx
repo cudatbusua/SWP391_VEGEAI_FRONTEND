@@ -24,10 +24,10 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, className = '' }
   return (
     <Link
       to={'/recipe/' + recipe.recipeId}
-      className={`group flex flex-col overflow-hidden rounded-2xl bg-white dark:bg-[#131d27] border border-stone-200/80 dark:border-slate-800/80 hover:border-emerald-500/70 dark:hover:border-emerald-500/60 shadow-xs hover:shadow-lg transition-all duration-300 ${className}`}
+      className={`group flex flex-col overflow-hidden rounded-2xl bg-white dark:bg-[#121922] border border-stone-200/80 dark:border-[#212c3b] hover:border-emerald-500/70 dark:hover:border-emerald-500/60 shadow-xs hover:shadow-lg transition-all duration-300 ${className}`}
     >
       {/* Food Photography Container */}
-      <div className="relative aspect-[16/11] w-full overflow-hidden bg-stone-100 dark:bg-slate-800">
+      <div className="relative aspect-[16/11] w-full overflow-hidden bg-stone-100 dark:bg-[#0b1118]">
         <div className="w-full h-full transform transition-transform duration-500 ease-out group-hover:scale-105">
           <RecipeImage src={recipe.imageUrl} title={recipe.title} />
         </div>
@@ -83,7 +83,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, className = '' }
         </div>
 
         {/* Nutrition Footer Meta */}
-        <div className="pt-3 border-t border-stone-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-stone-600 dark:text-slate-300 font-medium">
+        <div className="pt-3 border-t border-stone-100 dark:border-[#212c3b] flex items-center justify-between text-xs text-stone-600 dark:text-slate-300 font-medium">
           <span className="flex items-center gap-1">
             <Flame className="w-3.5 h-3.5 text-amber-500" />
             <strong className="font-bold text-stone-800 dark:text-slate-200">{recipe.calories ?? '--'}</strong> kcal

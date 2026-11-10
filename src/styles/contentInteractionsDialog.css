@@ -6,3 +6,54 @@
 .ci-dialog-content .content-interactions{max-width:none;margin:0;padding:22px;border:0;border-radius:0;box-shadow:none}.ci-dialog-content .ci-rating-panel{padding-bottom:18px}.ci-dialog-content .ci-comment:last-child{border-bottom:0}
 .ci-video-rating{display:flex;align-items:center;flex-wrap:wrap;gap:18px;padding:18px 22px;border-bottom:1px solid #e5ece7;background:#f8fbf9}.ci-video-rating>div:first-child{flex:1;min-width:210px}.ci-video-rating h3{margin:5px 0;font-size:17px;font-weight:750}.ci-video-rating p{margin:0;color:#718277;font-size:13px}.ci-video-rating>.ci-message{flex-basis:100%}
 @media(max-width:600px){.ci-launcher{align-items:stretch;flex-direction:column;margin:24px 12px 18px;padding:17px;border-radius:12px}.ci-launcher-button{width:100%}.ci-dialog{width:calc(100vw - 16px);max-height:90dvh;border-radius:12px}.ci-dialog-heading{padding:14px 16px}.ci-dialog-content .content-interactions{padding:17px}.ci-video-rating{padding:16px;gap:12px}}
+
+/* ========================================================
+   CONTENT INTERACTIONS DIALOG DARK THEME OVERRIDES
+   ======================================================== */
+html.dark .ci-launcher {
+  background: linear-gradient(115deg, #121f19, #121922);
+  border-color: #212c3b;
+  color: #f1f5f9;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+}
+html.dark .ci-launcher-copy h2 {
+  color: #f1f5f9;
+}
+html.dark .ci-launcher-copy p {
+  color: #94a3b8;
+}
+html.dark .ci-dialog {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
+}
+html.dark .ci-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+}
+html.dark .ci-dialog-heading {
+  background: #121922;
+  border-bottom-color: #212c3b;
+}
+html.dark .ci-dialog-heading h2 {
+  color: #f1f5f9;
+}
+html.dark .ci-dialog-close {
+  background: #1e293b;
+  border-color: #212c3b;
+  color: #cbd5e1;
+}
+html.dark .ci-dialog-close:hover {
+  background: #28374a;
+  color: #f1f5f9;
+}
+html.dark .ci-video-rating {
+  background: #16202c;
+  border-bottom-color: #212c3b;
+}
+html.dark .ci-video-rating h3 {
+  color: #f1f5f9;
+}
+html.dark .ci-video-rating p {
+  color: #94a3b8;
+}

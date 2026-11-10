@@ -70,4 +70,184 @@
 .ci-signin{padding:12px 0;font-size:13px;color:#718277}
 .ci-signin a{font-size:12px;color:#137b56;font-weight:650}
 @media(max-width:600px){.content-interactions{padding:18px 16px 16px}.ci-review-heading h2{font-size:16px}.ci-review-rating{align-items:flex-start}.ci-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ci-review-actions{margin:0 -16px -16px;padding:12px 16px}.ci-comment{gap:8px}.ci-comment-avatar{width:30px;height:30px}.ci-comment-actions{flex-direction:column}}
-.ci-expand-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid #dce8e1;border-radius:14px;background:#f7fbf8;color:#315b49;font-size:13px;font-weight:700;cursor:pointer}.ci-expand-trigger>span{display:flex;align-items:center;gap:8px}.ci-expand-trigger svg{color:#d09a24;transition:transform .2s}.ci-expand-trigger svg.is-open{transform:rotate(180deg)}html.dark .ci-expand-trigger{border-color:#33443d;background:#14231d;color:#d8eee4}
+.ci-expand-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid #dce8e1;border-radius:14px;background:#f7fbf8;color:#315b49;font-size:13px;font-weight:700;cursor:pointer}.ci-expand-trigger>span{display:flex;align-items:center;gap:8px}.ci-expand-trigger svg{color:#d09a24;transition:transform .2s}.ci-expand-trigger svg.is-open{transform:rotate(180deg)}
+
+/* ========================================================
+   CONTENT INTERACTIONS DARK THEME OVERRIDES
+   ======================================================== */
+html.dark .content-interactions {
+  color: #f1f5f9;
+}
+
+html.dark .ci-expand-trigger {
+  border-color: #212c3b;
+  background: #121922;
+  color: #f1f5f9;
+}
+
+html.dark .ci-review-heading h2 {
+  color: #f1f5f9;
+}
+
+html.dark .ci-review-heading p {
+  color: #94a3b8;
+}
+
+html.dark .ci-review-rating {
+  background: #16202c;
+  border: 1px solid #212c3b;
+}
+
+html.dark .ci-review-rating-copy strong {
+  color: #f1f5f9;
+}
+
+html.dark .ci-review-rating-copy span {
+  color: #94a3b8;
+}
+
+html.dark .ci-rating-phrase {
+  background: #2b1f09;
+  color: #fcd34d;
+  border: 1px solid #78350f;
+}
+
+html.dark .ci-review-label-row label,
+html.dark .ci-review-label-row strong {
+  color: #f1f5f9;
+}
+
+html.dark .ci-review-label-row span {
+  color: #94a3b8;
+}
+
+html.dark .ci-review-form > textarea {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+
+html.dark .ci-review-form > textarea:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+html.dark .ci-review-quick-tags button,
+html.dark .ci-comment-tags span {
+  background: #16202c;
+  border-color: #212c3b;
+  color: #cbd5e1;
+}
+
+html.dark .ci-review-quick-tags button.is-selected {
+  background: #064e3b;
+  border-color: #059669;
+  color: #6ee7b7;
+}
+
+html.dark .ci-photo-preview,
+html.dark .ci-photo-add,
+html.dark .ci-photo-empty {
+  background: #16202c;
+  border: 1px dashed #2a3a4c;
+}
+
+html.dark .ci-photo-add {
+  color: #34d399;
+}
+
+html.dark .ci-photo-hint {
+  background: #16202c;
+  color: #94a3b8;
+  border: 1px solid #212c3b;
+}
+
+html.dark .ci-public-name {
+  color: #cbd5e1;
+}
+
+html.dark .ci-public-name strong {
+  color: #34d399;
+}
+
+html.dark .ci-review-actions {
+  background: #121922;
+  border-top: 1px solid #212c3b;
+}
+
+html.dark .ci-cancel {
+  color: #94a3b8;
+}
+
+html.dark .ci-cancel:hover {
+  color: #f1f5f9;
+}
+
+html.dark .ci-comments-heading h2 {
+  color: #f1f5f9;
+}
+
+html.dark .ci-comments-heading > span {
+  background: #16251e;
+  color: #34d399;
+}
+
+html.dark .ci-message {
+  background: #14231b;
+  color: #6ee7b7;
+  border: 1px solid #1e3a2b;
+}
+
+html.dark .ci-message.is-error {
+  background: #311311;
+  color: #fca5a5;
+  border: 1px solid #7f1d1d;
+}
+
+html.dark .ci-comment {
+  border-bottom-color: #212c3b;
+}
+
+html.dark .ci-comment-avatar {
+  background: #16281e;
+  color: #34d399;
+}
+
+html.dark .ci-comment-byline strong {
+  color: #f1f5f9;
+}
+
+html.dark .ci-comment-byline time {
+  color: #94a3b8;
+}
+
+html.dark .ci-comment-content > p {
+  color: #e2e8f0;
+}
+
+html.dark .ci-comment-actions button {
+  color: #94a3b8;
+}
+
+html.dark .ci-comment-actions button:hover {
+  background: #192433;
+  color: #34d399;
+}
+
+html.dark .ci-empty {
+  color: #94a3b8;
+}
+
+html.dark .ci-pagination button {
+  background: #121922;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+
+html.dark .ci-signin {
+  color: #94a3b8;
+}
+
+html.dark .ci-signin a {
+  color: #34d399;
+}

@@ -328,10 +328,10 @@ function ScanReview(props: ScanReviewProps) {
               <Sparkles size={16} />
             </span>
             <div>
-              <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800">
+              <h3 className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
                 Tóm tắt kết quả phân tích AI Vision
               </h3>
-              <p className="mt-0.5 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
+              <p className="mt-0.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
                 {result.summary}
               </p>
             </div>
@@ -341,14 +341,14 @@ function ScanReview(props: ScanReviewProps) {
 
       {/* Banner AI Warnings & Safety Notes */}
       {result.warnings && result.warnings.length > 0 && (
-        <div className="mb-4 rounded-2xl border border-amber-200/90 bg-amber-50/90 p-4 text-amber-950 shadow-xs space-y-2">
-          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-800">
-            <AlertCircle size={15} className="text-amber-600 shrink-0" />
+        <div className="mb-4 rounded-2xl border border-amber-200/90 dark:border-amber-800/80 bg-amber-50/90 dark:bg-amber-950/40 p-4 text-amber-950 dark:text-amber-200 shadow-xs space-y-2">
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
+            <AlertCircle size={15} className="text-amber-600 dark:text-amber-400 shrink-0" />
             <span>Cảnh báo an toàn &amp; Dị ứng từ AI ({result.warnings.length})</span>
           </div>
-          <ul className="space-y-1 pl-5 list-disc text-xs text-amber-900 leading-normal">
+          <ul className="space-y-1 pl-5 list-disc text-xs text-amber-900 dark:text-amber-200 leading-normal">
             {result.warnings.map((w, idx) => (
-              <li key={idx} className={w.includes('DỊ ỨNG') ? 'font-bold text-rose-700' : ''}>
+              <li key={idx} className={w.includes('DỊ ỨNG') ? 'font-bold text-rose-700 dark:text-rose-400' : ''}>
                 {w}
               </li>
             ))}
@@ -358,14 +358,14 @@ function ScanReview(props: ScanReviewProps) {
 
       {/* Banner notification for Unreliable Images */}
       {unreliableCount > 0 && (
-        <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50/90 p-4 text-rose-900 shadow-xs">
+        <div className="mb-4 rounded-2xl border border-rose-200 dark:border-rose-800/80 bg-rose-50/90 dark:bg-rose-950/40 p-4 text-rose-900 dark:text-rose-200 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-600 text-white font-black text-sm">
                 !
               </span>
               <div>
-                <p className="text-sm font-bold text-rose-900">
+                <p className="text-sm font-bold text-rose-900 dark:text-rose-200">
                   Phát hiện {unreliableCount} ảnh không đáng tin cậy (cành cây, đống lá hoặc vật phẩm không ăn được)
                 </p>
                 <p className="mt-0.5 text-xs text-rose-800/90">
@@ -385,15 +385,15 @@ function ScanReview(props: ScanReviewProps) {
         </div>
       )}
 
-      <section aria-live="polite" className="fridge-review-card rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6">
+      <section aria-live="polite" className="fridge-review-card rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm sm:p-6">
         <div className="grid items-start gap-4 lg:grid-cols-12 lg:gap-5">
           <div className="space-y-3 lg:col-span-5">
-            <div className="fridge-review-photo rounded-xl bg-slate-50 p-3">
+            <div className="fridge-review-photo rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3">
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                  <ScanLine size={16} className="text-emerald-700" /> Ảnh quét từ AI
+                <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-white">
+                  <ScanLine size={16} className="text-emerald-700 dark:text-emerald-400" /> Ảnh quét từ AI
                 </h2>
-                <span className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-slate-500">
+                <span className="rounded-full bg-white dark:bg-slate-800 px-2 py-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                   Ngăn {String(activeImageIndex + 1).padStart(2, '0')}
                 </span>
               </div>
@@ -403,10 +403,10 @@ function ScanReview(props: ScanReviewProps) {
                   <img
                     src={currentImage.preview}
                     alt={`Ảnh nguyên liệu ngăn ${activeImageIndex + 1}`}
-                    className="fridge-review-image h-[260px] w-full rounded-lg bg-white object-contain sm:h-[300px]"
+                    className="fridge-review-image h-[260px] w-full rounded-lg bg-white dark:bg-slate-800 object-contain sm:h-[300px]"
                   />
                 ) : (
-                  <div className="fridge-review-image flex h-[260px] flex-col items-center justify-center rounded-lg bg-white text-slate-400 sm:h-[300px]">
+                  <div className="fridge-review-image flex h-[260px] flex-col items-center justify-center rounded-lg bg-white dark:bg-slate-800 text-slate-400 sm:h-[300px]">
                     <ImagePlus size={32} className="mb-2" />
                     <p className="text-sm">Nguyên liệu nhập thủ công</p>
                   </div>
@@ -443,16 +443,16 @@ function ScanReview(props: ScanReviewProps) {
                         onClick={() => onSelectImage(index)}
                         className={`relative group flex min-w-0 flex-1 items-center gap-2 rounded-lg border p-1.5 text-left cursor-pointer transition ${
                           isSelected
-                            ? 'border-emerald-500 bg-emerald-50 shadow-2xs'
+                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 shadow-2xs'
                             : rel.isReliable
-                            ? 'border-slate-200 bg-white hover:bg-slate-50'
-                            : 'border-rose-300 bg-rose-50/70 hover:bg-rose-50'
+                            ? 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'
+                            : 'border-rose-300 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/40 hover:bg-rose-50'
                         }`}
                       >
                         <img src={image.preview} alt="" className="h-8 w-10 shrink-0 rounded object-cover" />
                         <div className="min-w-0 flex-1">
-                          <span className="block truncate text-[10px] font-bold text-slate-700">Ảnh {index + 1}</span>
-                          <span className={`block text-[9px] ${rel.isReliable ? 'text-emerald-700 font-semibold' : 'text-rose-600 font-bold'}`}>
+                          <span className="block truncate text-[10px] font-bold text-slate-700 dark:text-slate-200">Ảnh {index + 1}</span>
+                          <span className={`block text-[9px] ${rel.isReliable ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-bold'}`}>
                             {rel.isReliable ? 'Đạt chuẩn' : 'Không tin cậy'}
                           </span>
                         </div>
@@ -464,7 +464,7 @@ function ScanReview(props: ScanReviewProps) {
                             e.stopPropagation();
                             onRemoveImageAtIndex(index);
                           }}
-                          className="p-1 rounded-full bg-white/90 hover:bg-rose-100 text-slate-400 hover:text-rose-600 shadow-2xs transition"
+                          className="p-1 rounded-full bg-white/90 dark:bg-slate-700 hover:bg-rose-100 text-slate-400 hover:text-rose-600 shadow-2xs transition"
                           title="Xóa ảnh này"
                         >
                           <X size={12} />
@@ -478,27 +478,27 @@ function ScanReview(props: ScanReviewProps) {
               <button
                 type="button"
                 onClick={onUploadMore}
-                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-slate-600 shadow-sm hover:text-emerald-700 cursor-pointer"
+                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-300 shadow-sm hover:text-emerald-700 dark:hover:text-emerald-400 cursor-pointer"
               >
                 <Camera size={15} /> Chụp lại / Tải thêm ảnh khác
               </button>
             </div>
 
-            <div className="rounded-xl border border-slate-100 bg-white px-3 py-3">
+            <div className="rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
                     <ShieldCheck size={16} />
                   </span>
                   <div>
-                    <p className="text-xs font-bold text-slate-800">Phân tích hình ảnh hoàn tất</p>
-                    <p className="mt-0.5 text-[10px] text-slate-500">
+                    <p className="text-xs font-bold text-slate-800 dark:text-white">Phân tích hình ảnh hoàn tất</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
                       {images.length ? `${images.length} ảnh đã được xử lý` : 'Danh sách được nhập bằng tay'}
                     </p>
                   </div>
                 </div>
                 {imageConfidence != null && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">
+                  <span className="rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-1 text-[10px] font-semibold text-emerald-800 dark:text-emerald-300">
                     {imageConfidence}% tin cậy
                   </span>
                 )}
@@ -507,17 +507,17 @@ function ScanReview(props: ScanReviewProps) {
           </div>
 
           {/* Right column: Ingredient Review & Selection */}
-          <div className="fridge-review-list rounded-xl border border-slate-100 p-3 sm:p-4 lg:col-span-7">
+          <div className="fridge-review-list rounded-xl border border-slate-100 dark:border-slate-800 dark:bg-slate-900 p-3 sm:p-4 lg:col-span-7">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900">
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
                   Danh Sách Nguyên Liệu Suy Ra Từ Ảnh Quét
                 </h2>
-                <p className="mt-0.5 text-[11px] text-slate-500">
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                   Tick chọn nguyên liệu muốn nạp vào Kho Tủ Lạnh (/fridge), điều chỉnh số lượng hoặc thêm món còn thiếu
                 </p>
               </div>
-              <span className="shrink-0 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[11px] text-emerald-800 font-bold">
+              <span className="shrink-0 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-3 py-1 text-[11px] text-emerald-800 dark:text-emerald-300 font-bold">
                 Đã chọn {selectedIngredientsToSave.length} / {ingredients.length} món để thêm vào Tủ lạnh
               </span>
             </div>
@@ -530,8 +530,8 @@ function ScanReview(props: ScanReviewProps) {
                     key={`${item.name}-${index}`}
                     className={`flex items-center gap-2 rounded-xl border p-2.5 transition ${
                       isSelected
-                        ? 'border-emerald-200 bg-emerald-50/40'
-                        : 'border-slate-200 bg-slate-50 opacity-70'
+                        ? 'border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/40 dark:bg-emerald-950/30'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 opacity-70'
                     }`}
                   >
                     <input
@@ -540,43 +540,43 @@ function ScanReview(props: ScanReviewProps) {
                       disabled={!item.isVegetarian || item.freshness === 'SPOILED'}
                       onChange={() => toggleSelectIngredient(index)}
                       aria-label={`Chọn ${item.name} để thêm vào tủ lạnh`}
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                     />
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-xl">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-xl">
                       {ingredientIllustration(item.name)}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="truncate text-xs font-bold text-slate-800">{item.name}</p>
+                        <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-200">{item.name}</p>
                         {item.shelfLifeEstimate && (
-                          <span className="inline-flex items-center gap-0.5 font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded text-[9px]">
+                          <span className="inline-flex items-center gap-0.5 font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded text-[9px]">
                             ⏳ {item.shelfLifeEstimate}
                           </span>
                         )}
                         {item.isPreviouslyTracked && (
-                          <span className="inline-flex items-center gap-0.5 font-semibold text-blue-800 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded text-[9px]">
+                          <span className="inline-flex items-center gap-0.5 font-semibold text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 rounded text-[9px]">
                             🔄 Đã có trong tủ {item.previousDaysInFridge ?? 0} ngày
                           </span>
                         )}
                         {item.rejectionReason && (
-                          <span className="inline-flex items-center gap-0.5 font-semibold text-rose-800 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded text-[9px]">
+                          <span className="inline-flex items-center gap-0.5 font-semibold text-rose-800 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-1.5 py-0.5 rounded text-[9px]">
                             🚫 {item.rejectionReason}
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-[10px] text-slate-500">
+                      <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
                         {item.isVegetarian ? '🌱 Thuần chay' : '⚠️ Cần kiểm tra'} · {freshness[item.freshness] ?? item.freshness}
                         {item.confidence != null
                           ? ` · AI ${Math.round(item.confidence <= 1 ? item.confidence * 100 : item.confidence)}%`
                           : ''}
                       </p>
                       {item.visualSigns && (
-                        <p className="text-[10px] text-slate-500 italic mt-0.5 line-clamp-1" title={item.visualSigns}>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-0.5 line-clamp-1" title={item.visualSigns}>
                           👁️ {item.visualSigns}
                         </p>
                       )}
                       {item.storageTip && (
-                        <p className="text-[10px] text-emerald-700 font-medium mt-0.5 line-clamp-1" title={item.storageTip}>
+                        <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium mt-0.5 line-clamp-1" title={item.storageTip}>
                           💡 {item.storageTip}
                         </p>
                       )}
@@ -589,7 +589,7 @@ function ScanReview(props: ScanReviewProps) {
                           freshness: e.target.value as 'FRESH' | 'USABLE' | 'SPOILED',
                         })
                       }
-                      className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-[10px] font-semibold text-slate-700 outline-none focus:border-emerald-500"
+                      className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-2 text-[10px] font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-emerald-500"
                     >
                       <option value="FRESH">Tươi mới</option>
                       <option value="USABLE">Dùng sớm</option>
@@ -604,13 +604,13 @@ function ScanReview(props: ScanReviewProps) {
                       onChange={(event) =>
                         updateIngredient(index, { quantity: Math.max(0.1, Number(event.target.value)) })
                       }
-                      className="w-14 rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-center text-xs font-bold outline-none focus:border-emerald-500"
+                      className="w-14 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-2 text-center text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-emerald-500"
                     />
                     <select
                       aria-label={`Đơn vị ${item.name}`}
                       value={item.unit ?? 'phần'}
                       onChange={(event) => updateIngredient(index, { unit: event.target.value })}
-                      className="max-w-20 rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-[10px] outline-none focus:border-emerald-500"
+                      className="max-w-20 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-2 text-[10px] text-slate-800 dark:text-white outline-none focus:border-emerald-500"
                     >
                       <option>phần</option>
                       <option>cái</option>
@@ -628,7 +628,7 @@ function ScanReview(props: ScanReviewProps) {
                         setExcludedIndices((prev) => new Set([...prev].filter((i) => i !== index).map((i) => (i > index ? i - 1 : i))));
                         removeIngredient(index);
                       }}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition cursor-pointer"
+                      className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600 transition cursor-pointer"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -648,12 +648,12 @@ function ScanReview(props: ScanReviewProps) {
                 value={newIngredientName}
                 onChange={(event) => setNewIngredientName(event.target.value)}
                 placeholder="Bổ sung thêm nguyên liệu khác bằng tay..."
-                className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-500"
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:border-emerald-500"
               />
               <button
                 type="submit"
                 disabled={!newIngredientName.trim()}
-                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 transition cursor-pointer"
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 disabled:opacity-50 transition cursor-pointer"
               >
                 <Plus size={14} /> Thêm vào danh sách
               </button>
@@ -662,13 +662,13 @@ function ScanReview(props: ScanReviewProps) {
         </div>
 
         {result.hasNonVegetarianItem && (
-          <p className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          <p className="mt-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
             Một số nguyên liệu có thể không phù hợp với chế độ ăn thuần chay và đã được bỏ chọn tự động.
           </p>
         )}
 
         {error && (
-          <p role="alert" className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold">
+          <p role="alert" className="mt-3 rounded-lg bg-red-50 dark:bg-rose-950/50 border border-red-200 dark:border-rose-800 px-4 py-3 text-sm text-red-700 dark:text-rose-300 font-semibold">
             {error}
           </p>
         )}
@@ -677,14 +677,14 @@ function ScanReview(props: ScanReviewProps) {
         {message && (
           <div
             role="status"
-            className="mt-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-4 sm:p-5 text-emerald-950 shadow-xs"
+            className="mt-4 rounded-2xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/90 dark:bg-emerald-950/40 p-4 sm:p-5 text-emerald-950 dark:text-emerald-100 shadow-xs"
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-start gap-3">
-                <CheckCircle2 size={22} className="mt-0.5 shrink-0 text-emerald-600" />
+                <CheckCircle2 size={22} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 <div>
-                  <p className="text-sm font-black text-emerald-950">{message}</p>
-                  <p className="mt-1 text-xs text-emerald-800">
+                  <p className="text-sm font-black text-emerald-950 dark:text-white">{message}</p>
+                  <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-300">
                     Nguyên liệu đã được đồng bộ vào Kho Tủ Lạnh (/fridge). Bạn có thể kiểm tra tủ lạnh, lên thực đơn tuần hoặc định vị cửa hàng gần bạn để mua thêm nguyên liệu còn thiếu.
                   </p>
                 </div>
@@ -704,7 +704,7 @@ function ScanReview(props: ScanReviewProps) {
                       (i) => `${i.name}: ${i.quantity ?? 1} ${i.unit ?? 'phần'}`
                     ),
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-white hover:bg-emerald-100 border border-emerald-300 px-3.5 py-2.5 text-xs font-bold text-emerald-900 transition"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-emerald-100 dark:hover:bg-slate-700 border border-emerald-300 dark:border-emerald-700 px-3.5 py-2.5 text-xs font-bold text-emerald-900 dark:text-emerald-300 transition"
                 >
                   <MapPin size={15} /> Định vị điểm bán gần tôi (GPS)
                 </Link>
@@ -714,11 +714,11 @@ function ScanReview(props: ScanReviewProps) {
         )}
 
         {/* Action Buttons Bar */}
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-4">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
           >
             <ArrowLeft size={16} /> Quay lại
           </button>
@@ -743,7 +743,7 @@ function ScanReview(props: ScanReviewProps) {
                   recipeTitle: `Nguyên liệu từ Quét Tủ Lạnh (${usableItems.length} món)`,
                   ingredients: usableItems.map((item) => `${item.name}: ${item.quantity ?? 1} ${item.unit ?? 'phần'}`),
                 }}
-                className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 px-4 py-3 text-sm font-bold transition"
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-900 dark:text-emerald-300 px-4 py-3 text-sm font-bold transition"
               >
                 <MapPin size={16} /> Tìm điểm bán nguyên liệu gần đây (GPS)
               </Link>
@@ -768,7 +768,7 @@ function ScanReview(props: ScanReviewProps) {
           </div>
 
           {!isAuthenticated && (
-            <Link to="/login" className="text-xs font-semibold text-emerald-700 hover:underline">
+            <Link to="/login" className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
               Đăng nhập để lưu nguyên liệu vào Kho Tủ Lạnh
             </Link>
           )}
@@ -777,18 +777,18 @@ function ScanReview(props: ScanReviewProps) {
 
       {/* Confirmation Modal Before Adding Ingredients to Fridge */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-3xl border border-emerald-200 bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-3xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
                   <Refrigerator size={22} />
                 </span>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white">
                     Xác nhận thêm nguyên liệu vào Tủ lạnh
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Kiểm tra lại {selectedIngredientsToSave.length} nguyên liệu trước khi lưu vào Kho Tủ Lạnh (/fridge)
                   </p>
                 </div>
@@ -796,7 +796,7 @@ function ScanReview(props: ScanReviewProps) {
               <button
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -806,25 +806,25 @@ function ScanReview(props: ScanReviewProps) {
               {selectedIngredientsToSave.map((item, idx) => (
                 <div
                   key={`${item.name}-${idx}`}
-                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-xs"
+                  className="flex items-center justify-between rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-2.5 text-xs"
                 >
                   <div className="flex items-center gap-2.5">
                     <span className="text-base">{ingredientIllustration(item.name)}</span>
                     <div>
-                      <span className="font-bold text-slate-900">{item.name}</span>
-                      <span className="ml-2 rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                      <span className="font-bold text-slate-900 dark:text-white">{item.name}</span>
+                      <span className="ml-2 rounded-md bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-300">
                         {freshness[item.freshness] ?? item.freshness}
                       </span>
                     </div>
                   </div>
-                  <span className="font-extrabold text-emerald-700">
+                  <span className="font-extrabold text-emerald-700 dark:text-emerald-400">
                     {item.quantity ?? 1} {item.unit ?? 'phần'}
                   </span>
                 </div>
               ))}
             </div>
 
-            <div className="rounded-xl bg-emerald-50/80 p-3 text-xs text-emerald-900 mb-5">
+            <div className="rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-900/40 p-3 text-xs text-emerald-900 dark:text-emerald-200 mb-5">
               💡 Nếu nguyên liệu đã tồn tại trong tủ lạnh, hệ thống sẽ tự động cập nhật số lượng và độ tươi mới nhất.
             </div>
 
@@ -832,7 +832,7 @@ function ScanReview(props: ScanReviewProps) {
               <button
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                className="rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Kiểm tra lại
               </button>
@@ -854,16 +854,16 @@ function ScanReview(props: ScanReviewProps) {
       )}
 
       {/* Suggested Recipes */}
-      <section className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5 shadow-sm mt-5">
+      <section className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-sm mt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900">
-              <ChefHat size={17} className="text-emerald-700" />
+            <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+              <ChefHat size={17} className="text-emerald-700 dark:text-emerald-400" />
               Dự kiến {result.suggestedRecipes?.length ?? 0} công thức thuần chay phù hợp
             </h2>
-            <p className="mt-1 text-[11px] text-slate-500">Gợi ý dựa trên nguyên liệu vừa được AI nhận diện</p>
+            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Gợi ý dựa trên nguyên liệu vừa được AI nhận diện</p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-semibold text-slate-600">
+          <span className="rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
             Thời gian chuẩn bị: 15–25 phút
           </span>
         </div>
@@ -1222,7 +1222,7 @@ export function FridgeScanPage() {
             </div>
             <Link
               to="/fridge"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:border-emerald-400 hover:text-emerald-700 transition"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:border-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-400 transition"
             >
               <Refrigerator size={14} /> Xem Kho Tủ Lạnh hiện tại
             </Link>
@@ -1233,21 +1233,21 @@ export function FridgeScanPage() {
           {result ? (
             <div className="mb-5 grid items-end gap-3 lg:grid-cols-12">
               <div className="lg:col-span-8">
-                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
                   Kiểm tra &amp; Xác nhận thêm vào Tủ lạnh
                 </h1>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
                   AI đã suy ra {ingredients.length} nguyên liệu từ ảnh quét. Hãy kiểm tra lại danh sách, điều chỉnh định lượng và bấm <strong>Xác nhận thêm vào Tủ lạnh</strong>.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 lg:col-span-4 lg:justify-end">
                 {averageConfidence != null && (
-                  <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                  <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300/40 dark:border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                     <CheckCircle2 size={13} className="mr-1 inline" />
                     Độ chuẩn xác AI: {averageConfidence}%
                   </span>
                 )}
-                <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                <span className="rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300/40 dark:border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                   <Leaf size={13} className="mr-1 inline" />
                   {usableItems.length} thực phẩm khả dụng
                 </span>
@@ -1257,14 +1257,14 @@ export function FridgeScanPage() {
             !busy && (
               <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+                  <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
                     Quét Tủ Lạnh &amp; Thêm Nguyên Liệu Tự Động
                   </h1>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
                     Tải ảnh ngăn tủ lạnh hoặc chụp nguyên liệu để AI nhận diện, đánh giá độ tươi, nạp vào Kho Tủ Lạnh (/fridge) và gợi ý món chay phù hợp.
                   </p>
                 </div>
-                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300/40 dark:border-emerald-800/60 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
                   <Sparkles size={14} /> Chế độ phân tích thị giác 2.4
                 </span>
               </div>
@@ -1281,27 +1281,27 @@ export function FridgeScanPage() {
                 <section
                   role="status"
                   aria-live="polite"
-                  className="mx-auto max-w-xl rounded-2xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8"
+                  className="mx-auto max-w-xl rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm sm:p-8"
                 >
-                  <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-sm">
-                      <LoaderCircle size={30} className="animate-spin text-emerald-600" />
+                  <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white dark:bg-slate-800 shadow-sm">
+                      <LoaderCircle size={30} className="animate-spin text-emerald-600 dark:text-emerald-400" />
                     </div>
                   </div>
-                  <h1 className="text-center text-xl font-bold text-emerald-950">
+                  <h1 className="text-center text-xl font-bold text-emerald-950 dark:text-emerald-300">
                     AI Bếp Trưởng đang quét tủ lạnh của bạn...
                   </h1>
-                  <p className="mt-2 text-center text-sm text-slate-500">
+                  <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
                     Hệ thống đang nhận diện nguyên liệu từ {images.length} ảnh bạn đã chọn.
                   </p>
-                  <div className="mt-5 rounded-xl bg-slate-50 p-4">
+                  <div className="mt-5 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-4 border border-slate-100 dark:border-slate-800">
                     <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="font-semibold text-slate-700">Tiến độ phân tích ảnh</span>
-                      <span className="font-bold text-emerald-700">{progress}%</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">Tiến độ phân tích ảnh</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400">{progress}%</span>
                     </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                       <div
-                        className="h-full rounded-full bg-emerald-600 transition-all duration-500"
+                        className="h-full rounded-full bg-emerald-600 dark:bg-emerald-500 transition-all duration-500"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -1341,7 +1341,7 @@ export function FridgeScanPage() {
                 <>
                   <form
                     onSubmit={scan}
-                    className="fridge-scan-upload-card rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6"
+                    className="fridge-scan-upload-card rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm sm:p-6"
                   >
                     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(230px,0.8fr)]">
                       <div>
@@ -1361,29 +1361,29 @@ export function FridgeScanPage() {
                           }}
                           className={`fridge-scan-dropzone flex min-h-40 w-full flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 text-center transition ${
                             dragging
-                              ? 'border-emerald-500 bg-emerald-50'
-                              : 'border-slate-200 bg-white hover:border-emerald-400 hover:bg-emerald-50/40'
+                              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60'
+                              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 hover:border-emerald-400 dark:hover:border-emerald-500 hover:bg-emerald-50/40 dark:hover:bg-slate-800'
                           }`}
                         >
-                          <span className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                          <span className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
                             <CloudUpload size={23} />
                           </span>
-                          <span className="text-sm font-bold text-slate-800">
+                          <span className="text-sm font-bold text-slate-800 dark:text-white">
                             Kéo thả ảnh tủ lạnh vào đây hoặc{' '}
-                            <span className="text-emerald-700 underline underline-offset-2">chọn ảnh từ máy tính</span>
+                            <span className="text-emerald-700 dark:text-emerald-400 underline underline-offset-2">chọn ảnh từ máy tính</span>
                           </span>
-                          <span className="mt-1 text-xs text-slate-500">
+                          <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                             Hỗ trợ JPG, PNG hoặc WEBP tối đa 5 MB mỗi ảnh
                           </span>
                         </button>
 
                         {images.length > 0 && (
-                          <section className="mt-3 rounded-xl bg-slate-50 p-3">
+                          <section className="mt-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-3">
                             <div className="mb-2 flex items-center justify-between">
-                              <h2 className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                                <ImagePlus size={15} className="text-emerald-700" /> Hình ảnh đã tải lên
+                              <h2 className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200">
+                                <ImagePlus size={15} className="text-emerald-700 dark:text-emerald-400" /> Hình ảnh đã tải lên
                               </h2>
-                              <span className="rounded-full bg-white px-2 py-1 text-[10px] text-slate-500">
+                              <span className="rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2 py-1 text-[10px] text-slate-500 dark:text-slate-400">
                                 {images.length}/{MAX_IMAGES} ảnh
                               </span>
                             </div>
@@ -1393,7 +1393,7 @@ export function FridgeScanPage() {
                                 return (
                                   <article
                                     key={image.id}
-                                    className="relative overflow-hidden rounded-lg bg-white border border-slate-200"
+                                    className="relative overflow-hidden rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
                                   >
                                     <img
                                       src={image.preview}
@@ -1412,21 +1412,21 @@ export function FridgeScanPage() {
                                       type="button"
                                       aria-label={`Xóa ảnh ${image.file.name}`}
                                       onClick={() => removeImage(image.id)}
-                                      className="absolute right-1.5 top-1.5 rounded-full bg-white/95 p-1 text-slate-500 shadow hover:text-red-600 cursor-pointer"
+                                      className="absolute right-1.5 top-1.5 rounded-full bg-white/95 dark:bg-slate-700 p-1 text-slate-500 dark:text-slate-300 shadow hover:text-red-600 cursor-pointer"
                                       title="Xóa ảnh này"
                                     >
                                       <X size={14} />
                                     </button>
                                     <div className="flex items-center justify-between gap-1 px-2 py-2">
                                       <div className="min-w-0">
-                                        <p className="truncate text-[10px] font-semibold text-slate-700">
+                                        <p className="truncate text-[10px] font-semibold text-slate-700 dark:text-slate-200">
                                           {image.file.name}
                                         </p>
                                         <p className="text-[10px] text-slate-400">
                                           {(image.file.size / 1024 / 1024).toFixed(1)} MB
                                         </p>
                                       </div>
-                                      <CheckCircle2 size={14} className="shrink-0 text-emerald-600" />
+                                      <CheckCircle2 size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
                                     </div>
                                   </article>
                                 );
@@ -1435,9 +1435,9 @@ export function FridgeScanPage() {
                                 <button
                                   type="button"
                                   onClick={() => inputRef.current?.click()}
-                                  className="flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white text-center text-[10px] text-slate-500 hover:border-emerald-400 cursor-pointer"
+                                  className="flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center text-[10px] text-slate-500 dark:text-slate-400 hover:border-emerald-400 cursor-pointer"
                                 >
-                                  <Plus size={20} className="mb-1 text-emerald-700" />
+                                  <Plus size={20} className="mb-1 text-emerald-700 dark:text-emerald-400" />
                                   Thêm ảnh ngăn khác
                                 </button>
                               )}
@@ -1446,24 +1446,24 @@ export function FridgeScanPage() {
                         )}
 
                         {error && (
-                          <div role="alert" className="mt-3 rounded-xl border border-orange-100 bg-orange-50 p-4">
+                          <div role="alert" className="mt-3 rounded-xl border border-orange-100 dark:border-orange-900/60 bg-orange-50 dark:bg-orange-950/40 p-4">
                             <div className="flex gap-2.5">
-                              <AlertCircle size={17} className="mt-0.5 shrink-0 text-orange-600" />
+                              <AlertCircle size={17} className="mt-0.5 shrink-0 text-orange-600 dark:text-orange-400" />
                               <div>
-                                <p className="text-sm font-bold text-orange-900">
+                                <p className="text-sm font-bold text-orange-900 dark:text-orange-200">
                                   Không thể nhận diện nguyên liệu từ ảnh vừa tải lên
                                 </p>
-                                <p className="mt-1 text-xs leading-5 text-orange-900/80">{error}</p>
+                                <p className="mt-1 text-xs leading-5 text-orange-900/80 dark:text-orange-300/80">{error}</p>
                               </div>
                             </div>
                           </div>
                         )}
 
-                        <div className="mt-3 flex flex-wrap justify-between gap-3 border-t border-slate-100 pt-3">
+                        <div className="mt-3 flex flex-wrap justify-between gap-3 border-t border-slate-100 dark:border-slate-800 pt-3">
                           <button
                             type="button"
                             onClick={() => cameraRef.current?.click()}
-                            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                           >
                             <Camera size={15} /> Chụp bằng camera
                           </button>
@@ -1471,7 +1471,7 @@ export function FridgeScanPage() {
                             <button
                               type="button"
                               onClick={startManualEntry}
-                              className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                              className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                             >
                               Nhập nguyên liệu bằng tay
                             </button>
@@ -1488,9 +1488,9 @@ export function FridgeScanPage() {
                         </div>
                       </div>
 
-                      <aside className="rounded-xl bg-slate-50 p-4">
-                        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                      <aside className="rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 p-4">
+                        <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-white">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
                             <Camera size={15} />
                           </span>
                           Quy trình Quét &amp; Nạp Tủ Lạnh
@@ -1506,8 +1506,8 @@ export function FridgeScanPage() {
                                 {index + 1}
                               </span>
                               <div>
-                                <p className="text-xs font-semibold text-slate-800">{title}</p>
-                                <p className="mt-0.5 text-[10px] leading-4 text-slate-500">{desc}</p>
+                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{title}</p>
+                                <p className="mt-0.5 text-[10px] leading-4 text-slate-500 dark:text-slate-400">{desc}</p>
                               </div>
                             </div>
                           ))}
@@ -1521,27 +1521,27 @@ export function FridgeScanPage() {
 
             {!result && !busy && (
               <aside className="space-y-4">
-                <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-                  <h2 className="flex items-center gap-2 font-bold text-slate-900">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                <section className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
+                  <h2 className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
                       <Sparkles size={16} />
                     </span>
                     Gợi ý quét tủ lạnh tốt nhất
                   </h2>
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                  <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
                     Chỉ tải từ 1 đến 5 ảnh để AI nhận diện chuẩn xác nhất.
                   </p>
-                  <div className="mt-4 rounded-lg bg-emerald-50 p-3 text-[10px] leading-4 text-emerald-900">
+                  <div className="mt-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-900/50 p-3 text-[10px] leading-4 text-emerald-900 dark:text-emerald-200">
                     <Sparkles size={14} className="mr-1 inline" />
                     Độ chính xác sẽ tốt nhất khi chụp ảnh đủ sáng và thấy rõ từng loại thực phẩm.
                   </div>
                 </section>
-                <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                  <p className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-                    <CircleHelp size={15} className="text-emerald-700" />
+                <section className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm">
+                  <p className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    <CircleHelp size={15} className="text-emerald-700 dark:text-emerald-400" />
                     Dữ liệu tủ lạnh của bạn được bảo mật
                   </p>
-                  <p className="mt-2 pl-6 text-[11px] leading-5 text-slate-500">
+                  <p className="mt-2 pl-6 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
                     Ảnh chỉ dùng để phân tích trong lượt quét. Bạn có thể nhập nguyên liệu bằng tay nếu không muốn tải ảnh.
                   </p>
                 </section>

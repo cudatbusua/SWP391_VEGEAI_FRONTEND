@@ -764,7 +764,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
           </details>
         )}
 
-        {savedDay?.needsReview && !draft && <p role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">Hồ sơ dinh dưỡng đã thay đổi. Kế hoạch đã lưu cần xem lại; hãy tạo thực đơn mới trước khi dùng hoặc đổi món.</p>}
+        {savedDay?.needsReview && !draft && <p role="alert" className="rounded-xl border border-amber-300 dark:border-amber-800/80 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm font-semibold text-amber-900 dark:text-amber-200">Hồ sơ dinh dưỡng đã thay đổi. Kế hoạch đã lưu cần xem lại; hãy tạo thực đơn mới trước khi dùng hoặc đổi món.</p>}
         {error && swapping === null && (
           <div
             role="alert"
@@ -803,11 +803,11 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                 {sideAndSnackMealsShown.length > 0 ? ` + ${sideAndSnackMealsShown.length} Món phụ & Món dặm` : ''})
               </h3>
               <div className="flex flex-wrap gap-1.5 text-[11px] font-bold">
-                <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900">
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/70 border border-emerald-300/40 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-300">
                   🍽️ {mainMealsShown.length} Bữa chính
                 </span>
                 {sideAndSnackMealsShown.length > 0 && (
-                  <span className="px-2.5 py-1 rounded-full bg-amber-100 text-amber-900">
+                  <span className="px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/70 border border-amber-300/40 dark:border-amber-800/60 text-amber-900 dark:text-amber-300">
                     🥗🍵 {sideAndSnackMealsShown.length} Món phụ &amp; Món dặm
                   </span>
                 )}
@@ -1038,17 +1038,17 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
       {/* MODAL XÁC NHẬN TRƯỚC KHI LƯU THỰC ĐƠN VÀO LỊCH BIỂU */}
       {showSaveConfirmModal && draft && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-2xl rounded-3xl border border-emerald-200 bg-white dark:bg-slate-900 p-6 sm:p-7 shadow-2xl">
+          <div className="w-full max-w-2xl rounded-3xl border border-emerald-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 sm:p-7 shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
                   <CalendarDays className="w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-slate-900 dark:text-white">
                     Xác nhận lưu Thực đơn vào Lịch biểu cá nhân
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     Khoảng thời gian: <strong>{shortDate(draft.plan.startDate)}</strong> đến{' '}
                     <strong>{shortDate(draft.plan.endDate)}</strong> ({draft.plan.days.length} ngày)
                   </p>
@@ -1057,7 +1057,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               <button
                 type="button"
                 onClick={() => setShowSaveConfirmModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 cursor-pointer"
+                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1065,10 +1065,10 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
 
             <div className="my-4 space-y-3">
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">
+                <span className="px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300 font-bold">
                   🎯 Mục tiêu: ~{Math.round(draft.plan.targets.dailyCaloriesTarget)} kcal/ngày
                 </span>
-                <span className="px-3 py-1 rounded-full bg-teal-50 border border-teal-200 text-teal-800 font-bold">
+                <span className="px-3 py-1 rounded-full bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800/80 text-teal-800 dark:text-teal-300 font-bold">
                   🍽️ Cấu trúc:{' '}
                   {draft.plan.mealsPerDay <= 3
                     ? `${draft.plan.mealsPerDay} Bữa chính/ngày`
@@ -1077,7 +1077,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               </div>
 
               {overlapsSaved > 0 && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/80 text-amber-900 dark:text-amber-200 text-xs font-semibold">
                   ⚠️ Kế hoạch này sẽ ghi đè thực đơn cũ của <strong>{overlapsSaved} ngày</strong> bị trùng trên lịch.
                 </div>
               )}
@@ -1118,7 +1118,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               <button
                 type="button"
                 onClick={() => setShowSaveConfirmModal(false)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Xem &amp; Đổi món tiếp
               </button>

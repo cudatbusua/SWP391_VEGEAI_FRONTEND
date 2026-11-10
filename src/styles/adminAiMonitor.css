@@ -139,3 +139,76 @@
   .aim-tiles{gap:6px;padding:12px}.aim-tiles dd{font-size:13px}.aim-health{padding:14px}
   .aim-inspector-actions,.aim-inspector-actions .admin-btn{width:100%}
 }
+
+/* ========================================================
+   ADMIN AI MONITORING DARK THEME OVERRIDES
+   ======================================================== */
+html.dark .aim-page {
+  --aim-soft: #16202c;
+}
+
+html.dark .aim-hero {
+  background: #121922;
+  border-color: #212c3b;
+}
+
+html.dark .aim-hero h1 {
+  color: #f1f5f9;
+}
+
+html.dark .aim-kpi {
+  background: #121922;
+  border-color: #212c3b;
+}
+
+html.dark .aim-kpi dd {
+  color: #f1f5f9;
+}
+
+html.dark .aim-tabs {
+  background: #16202c;
+}
+
+html.dark .aim-tabs button {
+  color: #94a3b8;
+}
+
+html.dark .aim-tabs button.active {
+  background: #1e293b;
+  color: #34d399;
+}
+
+html.dark .aim-filters {
+  background: #121922;
+  border-color: #212c3b;
+}
+
+html.dark .aim-filters select {
+  background: #16202c;
+  border-color: #212c3b;
+  color: #f1f5f9;
+}
+
+html.dark .aim-service-card {
+  background: #16202c;
+  border-color: #212c3b;
+}
+
+html.dark .aim-service-card h3 {
+  color: #f1f5f9;
+}
+
+html.dark .aim-bar {
+  background: #1e293b;
+}
+
+html.dark .aim-inspector {
+  background: #121922;
+  border-color: #212c3b;
+}
+
+html.dark .aim-payload {
+  background: #0b1118;
+  border-color: #212c3b;
+  color: #cbd5e1;
+}

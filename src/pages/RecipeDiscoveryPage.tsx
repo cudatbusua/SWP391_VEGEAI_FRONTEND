@@ -181,42 +181,42 @@ export function RecipeDiscoveryPage() {
         <div className="discovery-shell">
           {/* Recipe discovery introduction */}
           <div className="mb-6 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 p-4">
-            <div className="flex items-start sm:items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                <Sparkles size={18} />
-              </span>
-              <div>
-                <h2 className="text-sm font-black text-slate-900">Chọn món hợp khẩu vị</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Lọc nhanh theo thời gian, dinh dưỡng và độ khó.</p>
+            <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-800/60 bg-emerald-50/70 dark:bg-[#121922] p-4">
+              <div className="flex items-start sm:items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400">
+                  <Sparkles size={18} />
+                </span>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 dark:text-white">Chọn món hợp khẩu vị</h2>
+                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-300">Lọc nhanh theo thời gian, dinh dưỡng và độ khó.</p>
+                </div>
               </div>
             </div>
-            </div>
-            <div className="rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4">
+            <div className="rounded-2xl border border-sky-200/80 dark:border-sky-800/60 bg-sky-50/70 dark:bg-[#121922] p-4">
               <Link
                 to="/blog"
-                className="flex items-center gap-3 text-slate-900"
+                className="flex items-center gap-3 text-slate-900 dark:text-white"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700"><BookOpen size={18} /></span>
-                <span><strong className="block text-sm">Đọc chuyện từ cộng đồng</strong><small className="mt-1 block text-xs leading-5 text-slate-500">Công thức thật và trải nghiệm sống xanh.</small></span>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 dark:bg-sky-950/80 text-sky-700 dark:text-sky-400"><BookOpen size={18} /></span>
+                <span><strong className="block text-sm">Đọc chuyện từ cộng đồng</strong><small className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-300">Công thức thật và trải nghiệm sống xanh.</small></span>
               </Link>
             </div>
-            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4">
+            <div className="rounded-2xl border border-amber-200/80 dark:border-amber-800/60 bg-amber-50/70 dark:bg-[#121922] p-4">
               {isAuthenticated ? (
                 <Link
                   to="/fridge-scan"
-                  className="flex items-center gap-3 text-slate-900"
+                  className="flex items-center gap-3 text-slate-900 dark:text-white"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><Camera size={18} /></span>
-                  <span><strong className="block text-sm">Có gì nấu nấy</strong><small className="mt-1 block text-xs leading-5 text-slate-500">Quét nguyên liệu và tìm món phù hợp.</small></span>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400"><Camera size={18} /></span>
+                  <span><strong className="block text-sm">Có gì nấu nấy</strong><small className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-300">Quét nguyên liệu và tìm món phù hợp.</small></span>
                 </Link>
               ) : (
-                <Link to="/smart-market" className="flex items-center gap-3 text-slate-900">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><MapPin size={18} /></span>
-                  <span><strong className="block text-sm">Tìm nguyên liệu gần bạn</strong><small className="mt-1 block text-xs leading-5 text-slate-500">Xem điểm bán và quán chay trên bản đồ.</small></span>
+                <Link to="/smart-market" className="flex items-center gap-3 text-slate-900 dark:text-white">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400"><MapPin size={18} /></span>
+                  <span><strong className="block text-sm">Tìm nguyên liệu gần bạn</strong><small className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-300">Xem điểm bán và quán chay trên bản đồ.</small></span>
                 </Link>
               )}
-              </div>
+            </div>
           </div>
 
           <div className="discovery-toolbar" id="cong-thuc">

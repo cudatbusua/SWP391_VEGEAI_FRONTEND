@@ -322,7 +322,7 @@ function ScanReview(props: ScanReviewProps) {
     <>
       {/* Banner AI Summary */}
       {result.summary && (
-        <div className="mb-4 rounded-2xl border border-emerald-200/90 bg-linear-to-r from-emerald-50 to-teal-50/80 p-4 text-emerald-950 shadow-xs">
+        <div className="mb-4 rounded-2xl border border-emerald-200/90 dark:border-emerald-800/80 bg-emerald-50/90 dark:bg-emerald-950/40 p-4 text-emerald-950 dark:text-emerald-100 shadow-xs">
           <div className="flex items-start gap-3">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-white font-bold shadow-2xs">
               <Sparkles size={16} />
@@ -368,7 +368,7 @@ function ScanReview(props: ScanReviewProps) {
                 <p className="text-sm font-bold text-rose-900 dark:text-rose-200">
                   Phát hiện {unreliableCount} ảnh không đáng tin cậy (cành cây, đống lá hoặc vật phẩm không ăn được)
                 </p>
-                <p className="mt-0.5 text-xs text-rose-800/90">
+                <p className="mt-0.5 text-xs text-rose-800/90 dark:text-rose-300">
                   Hệ thống đã đánh dấu đỏ (!) và tự động loại trừ khỏi danh sách nguyên liệu. Bạn có thể xóa từng ảnh hoặc bấm nút để tự động dọn sạch.
                 </p>
               </div>

@@ -73,13 +73,13 @@ export function DailyIntakeCard({ date, day, targets }: {
         {target != null && target > 0 && <div className="mt-2 h-1.5 rounded-full bg-emerald-100 dark:bg-slate-700"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${Math.min(100, actual / target * 100)}%` }} /></div>}
       </div>)}
     </div>
-    {(wearable.steps > 0 || wearable.activeCalories > 0) && goals?.dailyCaloriesTarget ? (
+    {wearable.isTodayData && (wearable.steps > 0 || wearable.todayActiveCalories > 0) && goals?.dailyCaloriesTarget ? (
       <div className="mb-5 rounded-2xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/60 p-3.5 text-xs text-sky-900 dark:text-sky-200 flex flex-wrap items-center justify-between gap-2">
         <span>
-          <strong>Thiết bị đeo hôm nay:</strong> +{Math.round(wearable.activeCalories)} kcal ({wearable.steps.toLocaleString('vi-VN')} bước) · Ngân sách điều chỉnh:{' '}
-          <strong>{Math.round(goals.dailyCaloriesTarget + wearable.activeCalories).toLocaleString('vi-VN')} kcal</strong>
+          <strong>Thiết bị đeo hôm nay:</strong> +{Math.round(wearable.todayActiveCalories)} kcal ({wearable.steps.toLocaleString('vi-VN')} bước) · Ngân sách điều chỉnh:{' '}
+          <strong>{Math.round(goals.dailyCaloriesTarget + wearable.todayActiveCalories).toLocaleString('vi-VN')} kcal</strong>
           {' '}(còn lại{' '}
-          <strong>{Math.max(0, Math.round(goals.dailyCaloriesTarget + wearable.activeCalories - totals.calories)).toLocaleString('vi-VN')} kcal</strong>)
+          <strong>{Math.max(0, Math.round(goals.dailyCaloriesTarget + wearable.todayActiveCalories - totals.calories)).toLocaleString('vi-VN')} kcal</strong>)
         </span>
         <Link to="/settings?tab=calendar" className="font-extrabold text-sky-700 dark:text-sky-300 hover:underline">
           Điều chỉnh thực đơn →

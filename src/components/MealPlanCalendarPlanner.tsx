@@ -163,13 +163,13 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [wearable, setWearable] = useState<WearableMetrics>(() => wearableService.getMetrics());
-  const [applyWearableBonus, setApplyWearableBonus] = useState<boolean>(() => wearableService.getMetrics().activeCalories > 0);
+  const [applyWearableBonus, setApplyWearableBonus] = useState<boolean>(() => wearableService.getMetrics().todayActiveCalories > 0);
 
   useEffect(() => {
     const refreshWearable = () => {
       const next = wearableService.getMetrics();
       setWearable(next);
-      if (next.activeCalories > 0) setApplyWearableBonus(true);
+      setApplyWearableBonus(next.todayActiveCalories > 0);
     };
     window.addEventListener('wearable_sync_updated', refreshWearable);
     window.addEventListener('storage', refreshWearable);
@@ -251,8 +251,8 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     setMessage('');
     const bonusCalories = overrideWearableCalories !== undefined
       ? overrideWearableCalories
-      : applyWearableBonus && wearable.activeCalories > 0
-      ? Math.round(wearable.activeCalories)
+      : applyWearableBonus && wearable.todayActiveCalories > 0
+      ? Math.round(wearable.todayActiveCalories)
       : undefined;
     try {
       const result = await mealPlanService.generate({
@@ -727,7 +727,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                 </button>
               </div>
             </div>
-            {wearable.activeCalories > 0 && (
+            {wearable.todayActiveCalories > 0 && (
               <label className="flex items-center gap-2 text-xs font-semibold text-emerald-900 dark:text-emerald-200 cursor-pointer pt-1">
                 <input
                   type="checkbox"
@@ -736,7 +736,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                   className="rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500"
                 />
                 <span>
-                  Tự động cộng bù <strong>+{Math.round(wearable.activeCalories)} kcal</strong> vận động từ{' '}
+                  Tự động cộng bù <strong>+{Math.round(wearable.todayActiveCalories)} kcal</strong> vận động từ{' '}
                   {wearable.deviceModel || 'thiết bị đeo'} vào ngân sách năng lượng (tận dụng sẵn nguyên liệu tủ lạnh)
                 </span>
               </label>
@@ -876,9 +876,9 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               ))}
             </dl>
 
-            {(wearable.steps > 0 || wearable.activeCalories > 0) && (() => {
+            {wearable.isTodayData && (wearable.steps > 0 || wearable.todayActiveCalories > 0) && (() => {
               const baseCalorieTarget = dailyCalorieTarget ?? shown.targets.dailyCaloriesTarget;
-              const adjustedCalorieBudget = Math.round(baseCalorieTarget + wearable.activeCalories);
+              const adjustedCalorieBudget = Math.round(baseCalorieTarget + wearable.todayActiveCalories);
               const plannedCalories = Math.round(shown.totals.calories);
               const calorieDelta = plannedCalories - adjustedCalorieBudget;
               const isDeficit = calorieDelta < -120;
@@ -891,7 +891,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                       Đối chiếu Menu AI &amp; Thiết bị đeo (Thời gian thực)
                     </span>
                     <span className="text-[11px] font-bold text-sky-700 dark:text-sky-300">
-                      {wearable.steps.toLocaleString('vi-VN')} bước · +{Math.round(wearable.activeCalories)} kcal tiêu hao
+                      {wearable.steps.toLocaleString('vi-VN')} bước · +{Math.round(wearable.todayActiveCalories)} kcal tiêu hao
                     </span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-xs">
@@ -922,11 +922,11 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => void generate(Math.round(wearable.activeCalories))}
+                        onClick={() => void generate(Math.round(wearable.todayActiveCalories))}
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white text-[11px] font-extrabold transition shrink-0 cursor-pointer"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
-                        Điều chỉnh thực đơn (+{Math.round(wearable.activeCalories)} kcal)
+                        Điều chỉnh thực đơn (+{Math.round(wearable.todayActiveCalories)} kcal)
                       </button>
                     )}
                   </div>

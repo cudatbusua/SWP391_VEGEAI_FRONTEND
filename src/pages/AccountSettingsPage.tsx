@@ -33,6 +33,7 @@ import { CookbookTab } from '../components/CookbookTab';
 import { sfx } from '../utils/soundEffects';
 import { HealthActivityRings } from '../components/HealthActivityRings';
 import { WearableGoogleFitTracker } from '../components/WearableGoogleFitTracker';
+import { wearableService } from '../utils/wearableService';
 import { dietLabels, calculateBmr, calculateTdee, calculateExactAge } from '../utils/nutritionProfile';
 import type { UserProfile, UpdateUserProfile, NutritionProfile } from '../types/api';
 import { errorMessage } from '../services/apiClient';
@@ -466,18 +467,12 @@ export const AccountSettingsPage: React.FC = () => {
   const calorieInput = effectiveCalorieTarget;
   const isUsingDefaultCalorie = dailyCalorieTarget === '' || Number(dailyCalorieTarget) === defaultScientificCalorie;
 
-  const [wearableKcal, setWearableKcal] = useState<number>(() => {
-    const k = localStorage.getItem('wearable_kcal');
-    return k ? Number(k) : 0;
-  });
+  const [wearableKcal, setWearableKcal] = useState<number>(() => wearableService.getMetrics().todayActiveCalories);
 
   // Reactive listener so wearable sync immediately propagates to Zen Rings & Calculations
   useEffect(() => {
     const handleWearableUpdate = () => {
-      const stored = localStorage.getItem('wearable_kcal');
-      if (stored) {
-        setWearableKcal(Number(stored));
-      }
+      setWearableKcal(wearableService.getMetrics().todayActiveCalories);
     };
     window.addEventListener('wearable_sync_updated', handleWearableUpdate);
     return () => window.removeEventListener('wearable_sync_updated', handleWearableUpdate);

@@ -747,7 +747,7 @@ export function AiChatPage() {
         const w = wearableService.getMetrics();
 
         attachedRingsCard = {
-          calories: w.activeCalories > 0 ? w.activeCalories : 0,
+          calories: w.todayActiveCalories > 0 ? w.todayActiveCalories : 0,
           calorieTarget: effectiveCalorieTarget,
           proteinGrams: 0,
           proteinTarget: effectiveProteinTarget,
@@ -758,7 +758,7 @@ export function AiChatPage() {
           age: age,
           gender: gender,
           steps: w.steps,
-          wearableKcal: w.activeCalories,
+          wearableKcal: w.todayActiveCalories,
           heartRate: w.avgHeartRate,
           sleepHours: w.sleepHours,
           isConnected: w.isConnected,

@@ -630,7 +630,7 @@ export const DashboardPage: React.FC = () => {
                 /* Authenticated Profile exists: Apple Watch Concentric Activity Rings Snapshot */
                 <div className="space-y-4">
                   <HealthActivityRings
-                    calories={wearableService.getMetrics().activeCalories || 0}
+                    calories={wearableService.getMetrics().todayActiveCalories || 0}
                     calorieTarget={Math.round(nutrition.targets.dailyCaloriesTarget)}
                     proteinGrams={0}
                     proteinTarget={Math.round(nutrition.targets.proteinTargetG)}

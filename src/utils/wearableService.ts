@@ -19,8 +19,15 @@ export interface WearableMetrics {
   steps: number;
   stepTarget: number;
   activeCalories: number;
+  /** Calo vận động được tính cho ngân sách hôm nay (0 nếu dữ liệu chỉ là lịch sử ngày trước) */
+  todayActiveCalories: number;
+  /** true nếu dữ liệu vận động thuộc ngày hôm nay (hoặc kịch bản mô phỏng) */
+  isTodayData: boolean;
   activeMinutes: number;
   avgHeartRate: number;
+  /** Ghi chú chi tiết về nhịp tim (ví dụ: TB hôm nay, thời gian đo, hoặc nhập tay) */
+  heartRateNote?: string;
+  heartRateSource?: 'google-fit' | 'google-fit-resting' | 'manual' | 'simulator' | 'none';
   /** Quãng đường hôm nay (km), 0 nếu chưa có dữ liệu */
   distanceKm: number;
   /** Tổng năng lượng tiêu hao Google Fit ghi nhận (đã gồm trao đổi chất cơ bản), 0 nếu chưa có */
@@ -45,6 +52,8 @@ const STORAGE_KEYS = {
   STEPS: 'wearable_steps',
   KCAL: 'wearable_kcal',
   HEART_RATE: 'wearable_heart_rate',
+  HEART_RATE_NOTE: 'wearable_heart_rate_note',
+  HEART_RATE_SOURCE: 'wearable_heart_rate_source',
   ACTIVE_MINUTES: 'wearable_active_minutes',
   SLEEP: 'wearable_sleep',
   KCAL_TOTAL: 'wearable_kcal_total',
@@ -53,55 +62,79 @@ const STORAGE_KEYS = {
   HEART_POINTS: 'wearable_heart_points',
   SPO2: 'wearable_spo2',
   DATA_DATE: 'wearable_data_date',
+  IS_TODAY: 'wearable_is_today',
+  SYNC_DATE_KEY: 'wearable_sync_date_key',
+  LAST_SYNC_MS: 'wearable_last_sync_ms',
   SOURCE: 'wearable_source',
   SYNC_TIME: 'wearable_last_synced',
   PRESET: 'wearable_preset',
   DEVICE: 'wearable_device'
 };
 
-export const WEARABLE_PRESETS = {
-  light: {
-    steps: 3850,
-    stepTarget: 10000,
-    activeCalories: 180,
-    totalCaloriesExpended: 1480,
-    activeMinutes: 24,
-    distanceKm: 2.8,
-    heartPoints: 12,
-    spo2: 98,
-    avgHeartRate: 68,
-    sleepHours: '6h 45m',
-    aiAdvice: 'Hôm nay mức vận động nhẹ nhàng (3.850 bước, +180 kcal). Đề xuất đi bộ thư giãn thêm 20 phút vào buổi chiều tối và ưu tiên thực đơn thanh đạm, giàu chất xơ.',
-    recommendedSnack: 'Nước ép cần tây dưa leo hạt chia (85 kcal)'
-  },
-  moderate: {
-    steps: 8420,
-    stepTarget: 10000,
-    activeCalories: 485,
-    totalCaloriesExpended: 1820,
-    activeMinutes: 52,
-    distanceKm: 6.1,
-    heartPoints: 34,
-    spo2: 98,
-    avgHeartRate: 74,
-    sleepHours: '7h 35m',
-    aiAdvice: 'Bạn đã tiêu hao khoảng 485 kcal từ 8.420 bước chân (6,1 km). Đề xuất bổ sung thêm bữa phụ giàu đạm thực vật để hồi phục cơ bắp và bù nước điện giải.',
-    recommendedSnack: 'Sinh tố bơ chuối sữa hạt sen (195 kcal · 7g protein)'
-  },
-  intense: {
-    steps: 13600,
-    stepTarget: 10000,
-    activeCalories: 760,
-    totalCaloriesExpended: 2150,
-    activeMinutes: 85,
-    distanceKm: 9.8,
-    heartPoints: 62,
-    spo2: 99,
-    avgHeartRate: 82,
-    sleepHours: '8h 10m',
-    aiAdvice: 'Cường độ vận động cao (13.600 bước, +760 kcal, 9,8 km)! Hãy tăng khẩu phần bữa tối hoặc bổ sung nước dừa tươi và yến mạch giàu đạm thực vật để bù khoáng chất.',
-    recommendedSnack: 'Bát yến mạch ngâm sữa đậu nành & hạt óc chó (280 kcal · 12g protein)'
+const LOOKBACK_DAYS = 7;
+const AUTO_SYNC_COOLDOWN_MS = 5 * 60 * 1000;
+let inFlightSync: Promise<{ steps: number; calories: number; heartRate: number }> | null = null;
+
+function formatLocalDateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatTimeHHMM(ms: number): string {
+  return new Date(ms).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDayLabel(ms: number, now: Date): string {
+  const d = new Date(ms);
+  return formatLocalDateKey(d) === formatLocalDateKey(now)
+    ? 'hôm nay'
+    : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+}
+
+interface HeartRateSummary {
+  bpm: number;
+  note: string;
+  source: 'google-fit' | 'google-fit-resting';
+}
+
+/**
+ * Aggregate raw Google Fit heart rate samples by local calendar day and return
+ * the daily average on the most recent day with valid samples (30–220 bpm),
+ * accompanied by a transparent timestamp/sample-count note.
+ */
+function summarizeHeartRatePoints(points: any[], now: Date): HeartRateSummary | null {
+  const byDay: Record<string, { sum: number; count: number; latestEndMs: number }> = {};
+  for (const pt of points) {
+    const bpm = pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal || 0;
+    if (bpm < 30 || bpm > 220) continue;
+    const endMs = Number(pt.endTimeNanos || pt.startTimeNanos || 0) / 1e6;
+    if (endMs <= 0) continue;
+    const key = formatLocalDateKey(new Date(endMs));
+    if (!byDay[key]) {
+      byDay[key] = { sum: 0, count: 0, latestEndMs: endMs };
+    }
+    byDay[key].sum += bpm;
+    byDay[key].count += 1;
+    byDay[key].latestEndMs = Math.max(byDay[key].latestEndMs, endMs);
   }
+  const latest = Object.values(byDay).sort((a, b) => b.latestEndMs - a.latestEndMs)[0];
+  if (!latest || latest.count === 0) return null;
+
+  const avgBpm = Math.round(latest.sum / latest.count);
+  const dayLabel = formatDayLabel(latest.latestEndMs, now);
+  const timeStr = formatTimeHHMM(latest.latestEndMs);
+  const note = latest.count > 1
+    ? `TB ${dayLabel} · cập nhật ${timeStr} (${latest.count} mẫu)`
+    : `Đo lúc ${timeStr} ${dayLabel} (1 mẫu)`;
+  return { bpm: avgBpm, note, source: 'google-fit' };
+}
+
+const RECOVERY_SNACK_SUGGESTIONS = {
+  light: 'Nước ép cần tây dưa leo hạt chia (85 kcal)',
+  moderate: 'Sinh tố bơ chuối sữa hạt sen (195 kcal · 7g protein)',
+  intense: 'Bát yến mạch ngâm sữa đậu nành & hạt óc chó (280 kcal · 12g protein)'
 };
 
 export const wearableService = {
@@ -109,27 +142,45 @@ export const wearableService = {
     return localStorage.getItem(STORAGE_KEYS.TOKEN) || '';
   },
 
+  shouldAutoSync(cooldownMs: number = AUTO_SYNC_COOLDOWN_MS): boolean {
+    if (!this.getStoredToken()) return false;
+    const lastMs = Number(localStorage.getItem(STORAGE_KEYS.LAST_SYNC_MS) || 0);
+    return !lastMs || Date.now() - lastMs >= cooldownMs;
+  },
+
   getMetrics(): WearableMetrics {
     const token = this.getStoredToken();
-    const storedSteps = localStorage.getItem(STORAGE_KEYS.STEPS);
-    const storedKcal = localStorage.getItem(STORAGE_KEYS.KCAL);
-    const storedHeartRate = localStorage.getItem(STORAGE_KEYS.HEART_RATE);
-    const storedActiveMinutes = localStorage.getItem(STORAGE_KEYS.ACTIVE_MINUTES);
-    const storedSleep = localStorage.getItem(STORAGE_KEYS.SLEEP);
-    const storedDataDate = localStorage.getItem(STORAGE_KEYS.DATA_DATE) || undefined;
     const storedSource = localStorage.getItem(STORAGE_KEYS.SOURCE);
-    const storedSync = localStorage.getItem(STORAGE_KEYS.SYNC_TIME);
-    const storedDevice = localStorage.getItem(STORAGE_KEYS.DEVICE);
-    const presetKey = localStorage.getItem(STORAGE_KEYS.PRESET) as keyof typeof WEARABLE_PRESETS | null;
+    const isStaleSimulator = storedSource === 'simulator' || Boolean(localStorage.getItem(STORAGE_KEYS.PRESET));
+    const storedSteps = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.STEPS);
+    const storedKcal = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.KCAL);
+    const storedHeartRate = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.HEART_RATE);
+    const storedHeartRateNote = isStaleSimulator ? undefined : (localStorage.getItem(STORAGE_KEYS.HEART_RATE_NOTE) || undefined);
+    const storedHeartRateSource = isStaleSimulator
+      ? undefined
+      : ((localStorage.getItem(STORAGE_KEYS.HEART_RATE_SOURCE) as WearableMetrics['heartRateSource']) || undefined);
+    const storedActiveMinutes = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.ACTIVE_MINUTES);
+    const storedSleep = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.SLEEP);
+    const storedDataDate = isStaleSimulator ? undefined : (localStorage.getItem(STORAGE_KEYS.DATA_DATE) || undefined);
+    const storedIsToday = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.IS_TODAY);
+    const storedSyncDateKey = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.SYNC_DATE_KEY);
+    const storedSync = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.SYNC_TIME);
+    const storedDevice = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.DEVICE);
 
-    // Clean empty state if not linked to Google Fit and no simulator preset chosen
-    if (!token && !storedSteps && !presetKey) {
+    const hasManualHeartRate = Boolean(storedHeartRate && Number(storedHeartRate) > 0);
+
+    // Clean empty state if not linked to Google Fit and no real/manual metrics stored
+    if (!token && !storedSteps && !hasManualHeartRate) {
       return {
         steps: 0,
         stepTarget: 10000,
         activeCalories: 0,
+        todayActiveCalories: 0,
+        isTodayData: false,
         activeMinutes: 0,
         avgHeartRate: 0,
+        heartRateNote: undefined,
+        heartRateSource: 'none',
         distanceKm: 0,
         totalCaloriesExpended: 0,
         heartPoints: 0,
@@ -140,31 +191,34 @@ export const wearableService = {
         lastSyncedAt: 'Chưa liên kết thiết bị',
         isConnected: false,
         deviceModel: 'Chưa kết nối',
-        aiAdvice: 'Bạn chưa liên kết Google Fit hoặc thiết bị đeo. Hãy kết nối Google Fit hoặc chọn kịch bản mô phỏng để VEGEAI đồng bộ chỉ số và tự động cân đối năng lượng.',
+        aiAdvice: 'Bạn chưa liên kết Google Fit hoặc thiết bị đeo. Hãy bấm "Liên kết Google Fit" để VEGEAI đồng bộ chỉ số vận động thực tế và tự động cân đối năng lượng.',
         recommendedSnack: 'Chưa có dữ liệu vận động'
       };
     }
 
-    const preset = presetKey && WEARABLE_PRESETS[presetKey] ? WEARABLE_PRESETS[presetKey] : null;
-    const steps = storedSteps !== null ? Number(storedSteps) : (preset?.steps || 0);
-    const activeCalories = storedKcal !== null ? Number(storedKcal) : (preset?.activeCalories || 0);
-    const avgHeartRate = storedHeartRate !== null ? Number(storedHeartRate) : (preset?.avgHeartRate || 0);
-    const activeMinutes = storedActiveMinutes !== null ? Number(storedActiveMinutes) : (preset?.activeMinutes || 0);
-    const distanceKm = Number(localStorage.getItem(STORAGE_KEYS.DISTANCE)) || (preset?.distanceKm || (steps > 0 ? Math.round((steps * 0.72) / 10) / 100 : 0));
-    const totalCaloriesExpended = Number(localStorage.getItem(STORAGE_KEYS.KCAL_TOTAL)) || (preset?.totalCaloriesExpended || 0);
-    const heartPoints = Number(localStorage.getItem(STORAGE_KEYS.HEART_POINTS)) || (preset?.heartPoints || 0);
-    const spo2 = Number(localStorage.getItem(STORAGE_KEYS.SPO2)) || (preset?.spo2 || 0);
+    const steps = storedSteps !== null ? Number(storedSteps) : 0;
+    const activeCalories = storedKcal !== null ? Number(storedKcal) : 0;
+    const avgHeartRate = storedHeartRate !== null ? Number(storedHeartRate) : 0;
+    const activeMinutes = storedActiveMinutes !== null ? Number(storedActiveMinutes) : 0;
+    const distanceKm = isStaleSimulator ? 0 : (Number(localStorage.getItem(STORAGE_KEYS.DISTANCE)) || (steps > 0 ? Math.round((steps * 0.72) / 10) / 100 : 0));
+    const totalCaloriesExpended = isStaleSimulator ? 0 : (Number(localStorage.getItem(STORAGE_KEYS.KCAL_TOTAL)) || 0);
+    const heartPoints = isStaleSimulator ? 0 : (Number(localStorage.getItem(STORAGE_KEYS.HEART_POINTS)) || 0);
+    const spo2 = isStaleSimulator ? 0 : (Number(localStorage.getItem(STORAGE_KEYS.SPO2)) || 0);
+
+    const todayKey = formatLocalDateKey(new Date());
+    const isTodayData = (storedIsToday === 'true' && (!storedSyncDateKey || storedSyncDateKey === todayKey)) || (storedIsToday === null && storedDataDate === 'Hôm nay');
+    const todayActiveCalories = isTodayData ? activeCalories : 0;
 
     let adviceText = '';
-    if (preset && storedSource === 'simulator') {
-      adviceText = preset.aiAdvice;
-    } else if (steps > 0) {
+    if (steps > 0) {
       const activeStr = activeCalories > 0 ? `+${activeCalories.toLocaleString('vi-VN')} kcal vận động` : '';
       const totalStr = totalCaloriesExpended > 0 ? ` (tổng tiêu hao ${totalCaloriesExpended.toLocaleString('vi-VN')} kcal)` : '';
-      const dateStr = storedDataDate && storedDataDate !== 'Hôm nay' ? ` [${storedDataDate}]` : '';
-      adviceText = `Đã đồng bộ thực tế từ ${storedDevice || 'Google Fit'}${dateStr}: ${steps.toLocaleString('vi-VN')} bước chân${activeStr ? ', ' + activeStr : ''}${totalStr}. Hệ thống AI đã tự động điều chỉnh ngân sách năng lượng và gợi ý bữa phụ phù hợp.`;
+      const dateStr = !isTodayData && storedDataDate ? ` [${storedDataDate}]` : '';
+      adviceText = isTodayData
+        ? `Đã đồng bộ thực tế từ ${storedDevice || 'Google Fit'}: ${steps.toLocaleString('vi-VN')} bước chân${activeStr ? ', ' + activeStr : ''}${totalStr}. Hệ thống AI đã tự động điều chỉnh ngân sách năng lượng và gợi ý bữa phụ phù hợp.`
+        : `Hiển thị dữ liệu gần nhất từ ${storedDevice || 'Google Fit'}${dateStr}: ${steps.toLocaleString('vi-VN')} bước chân${activeStr ? ', ' + activeStr : ''}. Hôm nay chưa có đồng bộ mới nên calo ngày cũ không cộng vào ngân sách hôm nay.`;
     } else if (token) {
-      adviceText = `Đã liên kết Google Fit (${storedDevice || 'Thiết bị đeo'}). Hôm nay trên Google Fit Cloud chưa ghi nhận bước chân mới từ điện thoại/vòng đeo. Hãy mở ứng dụng Mi Fitness / Google Fit trên điện thoại để đẩy dữ liệu lên đám mây rồi nhấn "Đồng bộ lại", hoặc chọn kịch bản mô phỏng bên dưới.`;
+      adviceText = `Đã liên kết Google Fit (${storedDevice || 'Thiết bị đeo'}). Hôm nay trên Google Fit Cloud chưa ghi nhận bước chân mới từ điện thoại/vòng đeo. Hãy mở ứng dụng sức khỏe trên điện thoại (Google Fit, Apple Health, Samsung Health, Mi Fitness, Huawei Health...) để đẩy dữ liệu lên đám mây rồi nhấn "Đồng bộ lại".`;
     } else {
       adviceText = 'Bạn chưa liên kết Google Fit hoặc thiết bị đeo. Hãy bấm "Liên kết Google Fit" ở trên để kết nối theo dõi sức khỏe.';
     }
@@ -173,51 +227,33 @@ export const wearableService = {
       steps,
       stepTarget: 10000,
       activeCalories,
+      todayActiveCalories,
+      isTodayData,
       activeMinutes,
       avgHeartRate,
+      heartRateNote: avgHeartRate > 0 ? (storedHeartRateNote || 'Giá trị gần nhất (đồng bộ hoặc nhập tay)') : undefined,
+      heartRateSource: avgHeartRate > 0 ? (storedHeartRateSource || 'google-fit') : 'none',
       distanceKm,
       totalCaloriesExpended,
       heartPoints,
       spo2,
-      sleepHours: storedSleep || preset?.sleepHours || '—',
+      sleepHours: storedSleep || '—',
       dataDateLabel: storedDataDate,
-      source: (storedSource as any) || (token ? 'google-fit' : (preset ? 'simulator' : 'none')),
+      source: (!isStaleSimulator && (storedSource as any)) || (token ? 'google-fit' : 'none'),
       lastSyncedAt: storedSync || (token ? 'Đã liên kết tài khoản' : 'Chưa đồng bộ'),
       isConnected: Boolean(token),
       deviceModel: token
-        ? (storedDevice || 'Xiaomi Smart Band (Mi Fitness qua Google Fit)')
-        : (preset ? (storedDevice || 'Mô phỏng Thiết bị đeo (Smart Band / Watch)') : 'Chưa kết nối thiết bị'),
+        ? (storedDevice || 'Thiết bị đồng bộ qua Google Fit')
+        : 'Chưa kết nối thiết bị',
       aiAdvice: adviceText,
       recommendedSnack: steps > 11000
-        ? WEARABLE_PRESETS.intense.recommendedSnack
+        ? RECOVERY_SNACK_SUGGESTIONS.intense
         : steps > 6000
-        ? WEARABLE_PRESETS.moderate.recommendedSnack
+        ? RECOVERY_SNACK_SUGGESTIONS.moderate
         : steps > 0
-        ? WEARABLE_PRESETS.light.recommendedSnack
+        ? RECOVERY_SNACK_SUGGESTIONS.light
         : 'Rau củ quả tươi giàu vitamin & khoáng chất'
     };
-  },
-
-  setPreset(key: 'light' | 'moderate' | 'intense'): WearableMetrics {
-    localStorage.setItem(STORAGE_KEYS.PRESET, key);
-    const p = WEARABLE_PRESETS[key];
-    localStorage.setItem(STORAGE_KEYS.STEPS, String(p.steps));
-    localStorage.setItem(STORAGE_KEYS.KCAL, String(p.activeCalories));
-    localStorage.setItem(STORAGE_KEYS.KCAL_TOTAL, String(p.totalCaloriesExpended));
-    localStorage.setItem(STORAGE_KEYS.HEART_RATE, String(p.avgHeartRate));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_MINUTES, String(p.activeMinutes));
-    localStorage.setItem(STORAGE_KEYS.DISTANCE, String(p.distanceKm));
-    localStorage.setItem(STORAGE_KEYS.HEART_POINTS, String(p.heartPoints));
-    localStorage.setItem(STORAGE_KEYS.SPO2, String(p.spo2));
-    localStorage.setItem(STORAGE_KEYS.SLEEP, p.sleepHours);
-    localStorage.setItem(STORAGE_KEYS.DATA_DATE, 'Kịch bản mô phỏng');
-    localStorage.setItem(STORAGE_KEYS.SYNC_TIME, `Mô phỏng (${key === 'light' ? 'Nhẹ' : key === 'moderate' ? 'Tiêu chuẩn' : 'Cường độ cao'})`);
-    localStorage.setItem(STORAGE_KEYS.SOURCE, 'simulator');
-    if (!localStorage.getItem(STORAGE_KEYS.DEVICE)) {
-      localStorage.setItem(STORAGE_KEYS.DEVICE, 'Xiaomi Smart Band (Chế độ mô phỏng)');
-    }
-    window.dispatchEvent(new Event('wearable_sync_updated'));
-    return this.getMetrics();
   },
 
   disconnect() {
@@ -225,6 +261,8 @@ export const wearableService = {
     localStorage.removeItem(STORAGE_KEYS.STEPS);
     localStorage.removeItem(STORAGE_KEYS.KCAL);
     localStorage.removeItem(STORAGE_KEYS.HEART_RATE);
+    localStorage.removeItem(STORAGE_KEYS.HEART_RATE_NOTE);
+    localStorage.removeItem(STORAGE_KEYS.HEART_RATE_SOURCE);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_MINUTES);
     localStorage.removeItem(STORAGE_KEYS.SLEEP);
     localStorage.removeItem(STORAGE_KEYS.DISTANCE);
@@ -232,6 +270,9 @@ export const wearableService = {
     localStorage.removeItem(STORAGE_KEYS.SPO2);
     localStorage.removeItem(STORAGE_KEYS.KCAL_TOTAL);
     localStorage.removeItem(STORAGE_KEYS.DATA_DATE);
+    localStorage.removeItem(STORAGE_KEYS.IS_TODAY);
+    localStorage.removeItem(STORAGE_KEYS.SYNC_DATE_KEY);
+    localStorage.removeItem(STORAGE_KEYS.LAST_SYNC_MS);
     localStorage.removeItem(STORAGE_KEYS.PRESET);
     localStorage.removeItem(STORAGE_KEYS.SOURCE);
     localStorage.removeItem(STORAGE_KEYS.SYNC_TIME);
@@ -239,12 +280,22 @@ export const wearableService = {
     window.dispatchEvent(new Event('wearable_sync_updated'));
   },
 
-  async fetchGoogleFitLive(token: string): Promise<{ steps: number; calories: number; heartRate: number }> {
+  fetchGoogleFitLive(token: string): Promise<{ steps: number; calories: number; heartRate: number }> {
+    if (inFlightSync) {
+      return inFlightSync;
+    }
+    inFlightSync = this._performGoogleFitSync(token).finally(() => {
+      inFlightSync = null;
+    });
+    return inFlightSync;
+  },
+
+  async _performGoogleFitSync(token: string): Promise<{ steps: number; calories: number; heartRate: number }> {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const startTimeMillis = startOfDay.getTime();
     const endTimeMillis = now.getTime();
-    const lookbackDays = 30;
+    const lookbackDays = LOOKBACK_DAYS;
     const lookbackStartMillis = startTimeMillis - lookbackDays * 86400000;
 
     // Helper functions to distinguish wearable devices (Mi Band, Apple Watch, Garmin, Galaxy Watch)
@@ -516,7 +567,7 @@ export const wearableService = {
     let distanceMeters = chosenSummary.distanceMeters;
     let heartPoints = chosenSummary.heartPoints;
     let detectedDevice = chosenSummary.detectedDevice;
-    let detectedWearableFromAnyStream = chosenSummary.hasWearable;
+    let detectedWearableLabel = chosenSummary.hasWearable ? chosenSummary.detectedDevice : '';
 
     // 1c. Raw dataSources fallback for steps if aggregate returned 0
     if (steps === 0) {
@@ -532,7 +583,7 @@ export const wearableService = {
             const streamId: string = ds.dataStreamId || '';
             if (!streamId) continue;
             if (isWearableStream(streamId)) {
-              detectedWearableFromAnyStream = true;
+              detectedWearableLabel = detectedWearableLabel || formatDeviceLabel(streamId);
             }
             const dsUrl = `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(streamId)}/datasets/${winStartNanos}-${winEndNanos}`;
             const dsRes = await fetch(dsUrl, { headers: { Authorization: `Bearer ${token}` } });
@@ -686,7 +737,7 @@ export const wearableService = {
             const streamId: string = ds.dataStreamId || '';
             if (!streamId) continue;
             if (isWearableStream(streamId)) {
-              detectedWearableFromAnyStream = true;
+              detectedWearableLabel = detectedWearableLabel || formatDeviceLabel(streamId);
             }
             const rawRes = await fetch(
               `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(streamId)}/datasets/${winStartNanos}-${winEndNanos}`,
@@ -708,8 +759,10 @@ export const wearableService = {
       }
     }
 
-    // 2. SMART MULTI-TIER HEART RATE INGESTION ENGINE (30-day window)
+    // 2. SMART MULTI-TIER HEART RATE INGESTION ENGINE (7-day window, daily average on latest active day)
     let heartRate = 0;
+    let heartRateNote = '';
+    let heartRateSource: 'google-fit' | 'google-fit-resting' = 'google-fit';
     let heartRateScopeMissing = false;
 
     const hrStartNanos = BigInt(lookbackStartMillis) * 1000000n;
@@ -726,12 +779,10 @@ export const wearableService = {
         heartRateScopeMissing = true;
       } else if (streamRes.ok) {
         const streamData = await streamRes.json();
-        if (streamData.point && streamData.point.length > 0) {
-          const latestPoint = streamData.point[streamData.point.length - 1];
-          const bpm = latestPoint.value?.[0]?.fpVal || latestPoint.value?.[0]?.intVal || 0;
-          if (bpm > 0) {
-            heartRate = Math.round(bpm);
-          }
+        const summary = streamData.point?.length ? summarizeHeartRatePoints(streamData.point, now) : null;
+        if (summary) {
+          heartRate = summary.bpm;
+          heartRateNote = summary.note;
         }
       }
     } catch (err) {
@@ -750,9 +801,8 @@ export const wearableService = {
             for (const ds of dsData.dataSource) {
               const streamId = ds.dataStreamId;
               if (!streamId) continue;
-              const sLower = streamId.toLowerCase();
-              if (sLower.includes('xiaomi') || sLower.includes('wearable') || sLower.includes('mi fitness')) {
-                detectedWearableFromAnyStream = true;
+              if (isWearableStream(streamId)) {
+                detectedWearableLabel = detectedWearableLabel || formatDeviceLabel(streamId);
               }
               const rawDsUrl = `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(streamId)}/datasets/${hrStartNanos}-${hrEndNanos}`;
               const rawRes = await fetch(rawDsUrl, {
@@ -760,16 +810,14 @@ export const wearableService = {
               });
               if (rawRes.ok) {
                 const rawJson = await rawRes.json();
-                if (rawJson.point && rawJson.point.length > 0) {
-                  const latest = rawJson.point[rawJson.point.length - 1];
-                  const bpm = latest.value?.[0]?.fpVal || latest.value?.[0]?.intVal || 0;
-                  if (bpm > 0) {
-                    heartRate = Math.round(bpm);
-                    if (sLower.includes('xiaomi') || sLower.includes('wearable') || sLower.includes('mi fitness')) {
-                      detectedDevice = 'Xiaomi Smart Band (Mi Fitness qua Google Fit)';
-                    }
-                    break;
+                const summary = rawJson.point?.length ? summarizeHeartRatePoints(rawJson.point, now) : null;
+                if (summary) {
+                  heartRate = summary.bpm;
+                  heartRateNote = summary.note;
+                  if (isWearableStream(streamId)) {
+                    detectedDevice = formatDeviceLabel(streamId);
                   }
+                  break;
                 }
               }
             }
@@ -801,20 +849,24 @@ export const wearableService = {
           heartRateScopeMissing = true;
         } else if (hrRes.ok) {
           const hrData = await hrRes.json();
-          if (hrData.bucket) {
-            for (const b of hrData.bucket) {
-              if (!b.dataset) continue;
-              for (const ds of b.dataset) {
-                if (!ds.point) continue;
-                for (const pt of ds.point) {
-                  if (pt.dataTypeName && pt.dataTypeName.includes('heart_rate')) {
-                    const bpm = pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal || 0;
-                    if (bpm > 0) {
-                      heartRate = Math.round(bpm);
-                    }
+          const buckets = hrData.bucket || [];
+          for (let i = buckets.length - 1; i >= 0 && heartRate === 0; i--) {
+            const b = buckets[i];
+            for (const ds of b.dataset || []) {
+              for (const pt of ds.point || []) {
+                if (pt.dataTypeName && pt.dataTypeName.includes('heart_rate')) {
+                  const bpm = pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal || 0;
+                  if (bpm >= 30 && bpm <= 220) {
+                    heartRate = Math.round(bpm);
+                    const bStartMs = Number(b.startTimeMillis || 0);
+                    heartRateNote = bStartMs > 0
+                      ? `TB ${formatDayLabel(bStartMs, now)} (tổng hợp Google Fit)`
+                      : 'TB ngày gần nhất (Google Fit)';
+                    break;
                   }
                 }
               }
+              if (heartRate > 0) break;
             }
           }
         }
@@ -835,8 +887,13 @@ export const wearableService = {
           if (restData.point && restData.point.length > 0) {
             const latestRest = restData.point[restData.point.length - 1];
             const bpm = latestRest.value?.[0]?.fpVal || latestRest.value?.[0]?.intVal || 0;
-            if (bpm > 0) {
+            if (bpm >= 30 && bpm <= 220) {
               heartRate = Math.round(bpm);
+              heartRateSource = 'google-fit-resting';
+              const restEndMs = Number(latestRest.endTimeNanos || latestRest.startTimeNanos || 0) / 1e6;
+              heartRateNote = restEndMs > 0
+                ? `Nhịp tim nghỉ ngơi · ${formatTimeHHMM(restEndMs)} ${formatDayLabel(restEndMs, now)}`
+                : 'Nhịp tim nghỉ ngơi (Google Fit)';
             }
           }
         }
@@ -908,9 +965,8 @@ export const wearableService = {
           let latestNightEnd = 0;
           for (const ds of dsJson.dataSource || []) {
             if (!ds.dataStreamId) continue;
-            const dsLower = ds.dataStreamId.toLowerCase();
-            if (dsLower.includes('xiaomi') || dsLower.includes('wearable') || dsLower.includes('mi fitness')) {
-              detectedWearableFromAnyStream = true;
+            if (isWearableStream(ds.dataStreamId)) {
+              detectedWearableLabel = detectedWearableLabel || formatDeviceLabel(ds.dataStreamId);
             }
             const segRes = await fetch(
               `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(ds.dataStreamId)}/datasets/${segStartNanos}-${segEndNanos}`,
@@ -959,8 +1015,8 @@ export const wearableService = {
       }
     }
 
-    // Preserve previously stored steps/metrics if Google Fit Cloud returned 0 across all 30 days
-    if (steps === 0) {
+    // Preserve previously stored live metrics if Google Fit Cloud returned 0 across the 7-day window
+    if (steps === 0 && localStorage.getItem(STORAGE_KEYS.SOURCE) !== 'simulator') {
       const prevSteps = Number(localStorage.getItem(STORAGE_KEYS.STEPS)) || 0;
       if (prevSteps > 0) {
         steps = prevSteps;
@@ -968,8 +1024,19 @@ export const wearableService = {
         activeMinutes = Number(localStorage.getItem(STORAGE_KEYS.ACTIVE_MINUTES)) || 0;
         distanceMeters = (Number(localStorage.getItem(STORAGE_KEYS.DISTANCE)) || 0) * 1000;
         heartPoints = Number(localStorage.getItem(STORAGE_KEYS.HEART_POINTS)) || 0;
-        dataDateLabel = localStorage.getItem(STORAGE_KEYS.DATA_DATE) || 'Đã lưu gần nhất';
+        const prevSyncKey = localStorage.getItem(STORAGE_KEYS.SYNC_DATE_KEY);
+        const prevIsToday = localStorage.getItem(STORAGE_KEYS.IS_TODAY) === 'true';
+        const todayKey = formatLocalDateKey(now);
+        isFromToday = prevIsToday && prevSyncKey === todayKey;
+        const prevLabel = localStorage.getItem(STORAGE_KEYS.DATA_DATE);
+        dataDateLabel = isFromToday
+          ? 'Hôm nay'
+          : (prevLabel && prevLabel !== 'Hôm nay' ? prevLabel : 'Đã lưu gần nhất');
+      } else {
+        isFromToday = false;
       }
+    } else if (steps === 0) {
+      isFromToday = false;
     }
 
     // Physiological estimations when wearable stream only syncs step counts without GPS distance or active minutes
@@ -1008,11 +1075,19 @@ export const wearableService = {
 
     localStorage.setItem(STORAGE_KEYS.KCAL_TOTAL, String(totalKcal));
     localStorage.setItem(STORAGE_KEYS.DATA_DATE, dataDateLabel);
+    localStorage.setItem(STORAGE_KEYS.IS_TODAY, String(isFromToday));
+    localStorage.setItem(STORAGE_KEYS.SYNC_DATE_KEY, formatLocalDateKey(now));
+    localStorage.setItem(STORAGE_KEYS.LAST_SYNC_MS, String(Date.now()));
 
-    // If Xiaomi Band / Mi Fitness streams were detected across any metric (Sleep, SpO2, HR), attribute to Xiaomi Band
+    // Upgrade generic hub/phone label when a specific wearable stream was detected across Sleep, SpO2, or HR
     let deviceName = detectedDevice || 'Google Fit Hub (Đồng bộ trực tiếp)';
-    if (detectedWearableFromAnyStream && (!deviceName.toLowerCase().includes('xiaomi') || deviceName.toLowerCase().includes('cảm biến bước chân'))) {
-      deviceName = 'Xiaomi Smart Band (Mi Fitness qua Google Fit)';
+    const dLower = deviceName.toLowerCase();
+    const isGenericDevice =
+      dLower.includes('google fit') ||
+      dLower.includes('cảm biến bước chân') ||
+      dLower.includes('thiết bị đeo thông minh');
+    if (detectedWearableLabel && isGenericDevice) {
+      deviceName = detectedWearableLabel;
     }
 
     localStorage.setItem(STORAGE_KEYS.TOKEN, token);
@@ -1020,10 +1095,17 @@ export const wearableService = {
     localStorage.setItem(STORAGE_KEYS.KCAL, String(finalKcal));
     if (heartRate > 0) {
       localStorage.setItem(STORAGE_KEYS.HEART_RATE, String(heartRate));
+      localStorage.setItem(STORAGE_KEYS.HEART_RATE_NOTE, heartRateNote || 'TB gần nhất (Google Fit)');
+      localStorage.setItem(STORAGE_KEYS.HEART_RATE_SOURCE, heartRateSource);
     } else {
+      const prevHrSource = localStorage.getItem(STORAGE_KEYS.HEART_RATE_SOURCE);
       const stored = localStorage.getItem(STORAGE_KEYS.HEART_RATE);
-      if (stored && Number(stored) > 0) {
+      if (prevHrSource === 'manual' && stored && Number(stored) > 0) {
         heartRate = Number(stored);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.HEART_RATE);
+        localStorage.removeItem(STORAGE_KEYS.HEART_RATE_NOTE);
+        localStorage.removeItem(STORAGE_KEYS.HEART_RATE_SOURCE);
       }
     }
     localStorage.setItem(STORAGE_KEYS.ACTIVE_MINUTES, String(Math.round(activeMinutes)));
@@ -1040,18 +1122,21 @@ export const wearableService = {
     console.info('[wearable] sync result:', {
       steps: finalSteps,
       activeKcal: finalKcal,
+      todayActiveKcal: isFromToday ? finalKcal : 0,
+      isFromToday,
       totalKcal,
       activeMinutes,
       distanceMeters,
       heartPoints,
       spo2,
       heartRate,
+      heartRateNote,
       sleepHours,
       dataDateLabel
     });
 
     window.dispatchEvent(new Event('wearable_sync_updated'));
-    return { steps: finalSteps, calories: finalKcal, heartRate };
+    return { steps: finalSteps, calories: isFromToday ? finalKcal : 0, heartRate };
   },
 
   /** Remember the user's BMR so Google Fit total calories can be split into basal vs. active. */
@@ -1064,8 +1149,13 @@ export const wearableService = {
   setManualHeartRate(bpm: number): number {
     if (bpm > 0) {
       const val = Math.round(bpm);
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
       localStorage.setItem(STORAGE_KEYS.HEART_RATE, String(val));
-      localStorage.setItem(STORAGE_KEYS.SYNC_TIME, new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      localStorage.setItem(STORAGE_KEYS.HEART_RATE_NOTE, `Nhập tay lúc ${timeStr} (${dateStr})`);
+      localStorage.setItem(STORAGE_KEYS.HEART_RATE_SOURCE, 'manual');
+      localStorage.setItem(STORAGE_KEYS.SYNC_TIME, now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       window.dispatchEvent(new Event('wearable_sync_updated'));
       return val;
     }

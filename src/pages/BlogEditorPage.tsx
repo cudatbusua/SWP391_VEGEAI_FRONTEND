@@ -10,16 +10,18 @@ import { errorMessage } from '../services/apiClient';
 import { videoSource } from '../utils/communityVideo';
 import type { BlogCategory, BlogInput, BlogPost, PostClassificationTemplate } from '../types/blog';
 import { blogCategories, BLOG_POST_TEMPLATES } from '../types/blog';
+import {
+  DEFAULT_COOK_TIME,
+  DEFAULT_INGREDIENTS_TEXT,
+  DEFAULT_RECIPE_STEPS,
+  DEFAULT_SERVINGS,
+  generateRecipeMarkdown,
+  parseRecipeMarkdown,
+  type RecipeStepItem,
+} from '../utils/blogRecipeMarkdown';
 import '../styles/blog.css';
 
-interface RecipeStepItem {
-  id: string;
-  stepNumber: number;
-  title: string;
-  instruction: string;
-  durationMinutes?: number;
-  tip?: string;
-}
+export { parseRecipeMarkdown, generateRecipeMarkdown, type RecipeStepItem };
 
 const initial: BlogInput = {
   title: '',
@@ -107,37 +109,10 @@ export function BlogEditorPage() {
   const [editorMode, setEditorMode] = useState<'ARTICLE' | 'RECIPE'>(() => {
     return form.category === 'KITCHEN' ? 'RECIPE' : 'ARTICLE';
   });
-  const [servings, setServings] = useState('2-3 người');
-  const [cookTime, setCookTime] = useState('25');
-  const [ingredientsText, setIngredientsText] = useState(
-    '- 200g Nấm đùi gà (rửa sạch, cắt lát mỏng)\n- 2 miếng Đậu hũ trắng (chiên vàng đều)\n- 1 củ Cà rốt (thái sợi vừa ăn)\n- 2 thìa canh Nước tương tamari\n- 1 thìa cà phê Dầu mè nguyên chất & tiêu đen'
-  );
-  const [steps, setSteps] = useState<RecipeStepItem[]>([
-    {
-      id: 'step-1',
-      stepNumber: 1,
-      title: 'Sơ chế & Chuẩn bị nguyên liệu',
-      instruction: 'Nấm đùi gà ngâm nước muối loãng 5 phút rồi rửa sạch, để ráo và cắt lát mỏng. Đậu hũ cắt miếng vừa ăn và chiên vàng giòn.',
-      durationMinutes: 10,
-      tip: 'Ngâm nấm với muối loãng giúp nấm giòn ngọt tự nhiên và giữ màu trắng sáng.',
-    },
-    {
-      id: 'step-2',
-      stepNumber: 2,
-      title: 'Xào & Thấm vị nước sốt',
-      instruction: 'Làm nóng chảo với chút dầu mè, phi thơm hành boa-rô rồi cho nấm vào xào nhanh trên lửa lớn. Thêm cà rốt và đậu hũ vào, nêm nước tương tamari và tiêu đen.',
-      durationMinutes: 10,
-      tip: 'Xào lửa lớn trong 3 phút đầu để nấm giữ độ mọng nước, không bị dai.',
-    },
-    {
-      id: 'step-3',
-      stepNumber: 3,
-      title: 'Hoàn thiện & Thưởng thức',
-      instruction: 'Tắt bếp, rắc tiêu đen xay và thêm vài nhánh ngò rí lên trên. Dọn ra đĩa ăn kèm cơm nóng hoặc bún gạo lứt.',
-      durationMinutes: 5,
-      tip: 'Dùng ngay khi còn nóng để cảm nhận trọn vẹn hương vị tươi ngon.',
-    },
-  ]);
+  const [servings, setServings] = useState(DEFAULT_SERVINGS);
+  const [cookTime, setCookTime] = useState(DEFAULT_COOK_TIME);
+  const [ingredientsText, setIngredientsText] = useState(DEFAULT_INGREDIENTS_TEXT);
+  const [steps, setSteps] = useState<RecipeStepItem[]>(DEFAULT_RECIPE_STEPS);
 
   const handleAddStep = () => {
     const nextNum = steps.length + 1;
@@ -169,15 +144,6 @@ export function BlogEditorPage() {
     setDirty(true);
   };
 
-  const generateRecipeMarkdown = (
-    sServings: string,
-    sCookTime: string,
-    sIngredients: string,
-    sSteps: RecipeStepItem[]
-  ) => {
-    return `> Khẩu phần: ${sServings.trim() || '2-3 người'} | Thời gian nấu: ${sCookTime.trim() || '25'} phút\n\n### Danh sách nguyên liệu:\n${sIngredients.trim()}\n\n### Hướng dẫn thực hiện:\n${sSteps.map(s => `${s.stepNumber}. **${s.title.trim() || `Bước ${s.stepNumber}`}**${s.durationMinutes ? ` (${s.durationMinutes} phút)` : ''}: ${s.instruction.trim()}${s.tip?.trim() ? `\n   *Mẹo:* ${s.tip.trim()}` : ''}`).join('\n\n')}`;
-  };
-
   useEffect(() => {
     if (!isAuthenticated) return;
     if (!id) {
@@ -195,11 +161,22 @@ export function BlogEditorPage() {
       if (state?.recipeTitle || state?.recipeContent || state?.recipeCategory) {
         const selectedCat: BlogCategory = state.recipeCategory || 'KITCHEN';
         const tpl = BLOG_POST_TEMPLATES[selectedCat] || BLOG_POST_TEMPLATES.KITCHEN;
+        const incomingContent = state.recipeContent || '';
+        const parsedIncoming = incomingContent ? parseRecipeMarkdown(incomingContent) : null;
+        if (parsedIncoming) {
+          setServings(parsedIncoming.servings);
+          setCookTime(parsedIncoming.cookTime);
+          setIngredientsText(parsedIncoming.ingredientsText);
+          setSteps(parsedIncoming.steps);
+          setEditorMode('RECIPE');
+        } else {
+          setEditorMode(selectedCat === 'KITCHEN' && !incomingContent ? 'RECIPE' : 'ARTICLE');
+        }
         setForm({
           ...initial,
           title: state.recipeTitle || '',
           excerpt: state.recipeExcerpt || '',
-          content: state.recipeContent || tpl.contentTemplate,
+          content: incomingContent || tpl.contentTemplate,
           category: selectedCat,
           coverImage: state.coverImage || tpl.defaultCover,
           videoUrl: state.videoUrl || '',
@@ -211,6 +188,11 @@ export function BlogEditorPage() {
         setDirty(true);
       } else {
         setForm(initial);
+        setEditorMode('RECIPE');
+        setServings(DEFAULT_SERVINGS);
+        setCookTime(DEFAULT_COOK_TIME);
+        setIngredientsText(DEFAULT_INGREDIENTS_TEXT);
+        setSteps(DEFAULT_RECIPE_STEPS);
         setDirty(false);
       }
       setLoading(false);
@@ -223,6 +205,17 @@ export function BlogEditorPage() {
     blogService.ownPost(id, controller.signal).then(value => {
       if (controller.signal.aborted) return;
       setPost(value);
+      const parsed = parseRecipeMarkdown(value.content || '');
+      if (parsed) {
+        setServings(parsed.servings);
+        setCookTime(parsed.cookTime);
+        setIngredientsText(parsed.ingredientsText);
+        setSteps(parsed.steps);
+        setEditorMode('RECIPE');
+      } else {
+        // Preserve loaded free-form or AI-generated markdown instead of overwriting with hardcoded default recipe steps.
+        setEditorMode('ARTICLE');
+      }
       setForm({
         title: value.title,
         excerpt: value.excerpt,
@@ -477,6 +470,13 @@ export function BlogEditorPage() {
                       <button
                         type="button"
                         onClick={() => {
+                          const parsed = parseRecipeMarkdown(form.content || '');
+                          if (parsed) {
+                            setServings(parsed.servings);
+                            setCookTime(parsed.cookTime);
+                            setIngredientsText(parsed.ingredientsText);
+                            setSteps(parsed.steps);
+                          }
                           setEditorMode('RECIPE');
                           setForm(p => ({ ...p, category: 'KITCHEN' }));
                         }}
@@ -491,7 +491,13 @@ export function BlogEditorPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEditorMode('ARTICLE')}
+                        onClick={() => {
+                          if (editorMode === 'RECIPE') {
+                            const md = generateRecipeMarkdown(servings, cookTime, ingredientsText, steps);
+                            setForm(p => ({ ...p, content: md }));
+                          }
+                          setEditorMode('ARTICLE');
+                        }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer ${
                           editorMode === 'ARTICLE'
                             ? 'bg-emerald-700 text-white shadow-2xs'
@@ -784,11 +790,11 @@ export function BlogEditorPage() {
                             <Video size={15} /> Đường dẫn Video (YouTube, Shorts)
                           </span>
                           <input
-                            type="url"
+                            type="text"
                             value={form.videoUrl || ''}
                             maxLength={1000}
                             onChange={event => change('videoUrl', event.target.value)}
-                            placeholder="https://www.youtube.com/watch?v=..."
+                            placeholder="https://www.youtube.com/watch?v=... hoặc /api/public/community-media/..."
                           />
                         </label>
 

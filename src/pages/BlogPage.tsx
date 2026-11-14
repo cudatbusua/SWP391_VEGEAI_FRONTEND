@@ -25,6 +25,7 @@ import {
   Bookmark,
   TrendingUp,
   X,
+  AlertCircle,
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { blogService } from '../services/blogService';
@@ -37,43 +38,152 @@ import { videoSource } from '../utils/communityVideo';
 import { aiService } from '../services/aiService';
 import { blogCategories, BLOG_POST_TEMPLATES, resolvePostAiMode } from '../types/blog';
 import type { BlogCategory, BlogPost } from '../types/blog';
-import type { GeneratedRecipeAiResponse, PageResponse } from '../types/api';
+import type { BlogInsightAiResponse, GeneratedRecipeAiResponse, PageResponse } from '../types/api';
 import type { SmartMarketItem } from '../data/smartMarketData';
 import '../styles/blog.css';
 
-interface KnowledgeAiAnalysisResult {
-  headline: string;
-  categoryBadge: string;
-  keyTakeaways: string[];
-  scientificOrLifestyleInsight: string;
-  actionableSteps: string[];
-  suggestedFollowUpPrompt: string;
+function getBlogAiAccessError(isAuthenticated: boolean, role: string | undefined, mode: 'RECIPE_STEPS' | 'KNOWLEDGE_INSIGHT'): string | null {
+  if (!isAuthenticated) {
+    return mode === 'RECIPE_STEPS'
+      ? 'Vui lòng đăng nhập tài khoản thành viên để AI bóc tách công thức từ bài đăng.'
+      : 'Vui lòng đăng nhập tài khoản thành viên để Google Gemini AI phân tích bài đăng theo hồ sơ sức khỏe của bạn.';
+  }
+  if (role === 'admin' && mode === 'KNOWLEDGE_INSIGHT') {
+    return 'Tài khoản Quản trị viên không sử dụng trợ lý AI cá nhân. Vui lòng dùng tài khoản Thành viên để trải nghiệm.';
+  }
+  return null;
 }
 
-/**
- * Deterministic (non-AI) quick summary built only from the post's own text.
- * It never invents facts. Deeper analysis is delegated to the AI chef through the chat hand-off.
- */
-function buildKnowledgeFallback(post: BlogPost): KnowledgeAiAnalysisResult {
-  const tpl = BLOG_POST_TEMPLATES[post.category] || BLOG_POST_TEMPLATES.GREEN_LIVING;
-  const sentences = `${post.excerpt || ''}\n${post.content || ''}`
-    .split(/\n|(?<=[.!?])\s+/)
-    .map(line => line.replace(/^[#>\-*•\d.\s]+/, '').trim())
-    .filter(line => line.length >= 20 && line.length <= 220);
-  const keyTakeaways = [...new Set(sentences)].slice(0, 3);
-  return {
-    headline: `Tóm tắt nhanh: ${post.title}`,
-    categoryBadge: tpl.badgeLabel,
-    keyTakeaways: keyTakeaways.length ? keyTakeaways : ['Bài viết chưa có đủ nội dung văn bản để trích ý chính.'],
-    scientificOrLifestyleInsight:
-      'Phần tóm tắt trên được trích trực tiếp từ nội dung bài viết, không phải kết luận y khoa. Hãy chuyển sang AI Bếp Trưởng để được tư vấn dựa trên hồ sơ của bạn (thông tin chỉ mang tính tham khảo).',
-    actionableSteps: [
-      'Chuyển sang AI Bếp Trưởng để hỏi sâu hơn về chủ đề của bài viết.',
-      'Dùng bản đồ GPS của VEGEAI để tìm quán chay hoặc nơi bán nguyên liệu gần bạn.',
-      'Lên thực đơn tuần trong Lịch biểu nếu muốn áp dụng vào bữa ăn.'
-    ],
-    suggestedFollowUpPrompt: `Tôi vừa đọc bài đăng "${post.title}" (${post.excerpt || ''}). Hãy giải thích sâu hơn về chủ đề này và tư vấn cách áp dụng phù hợp với chế độ ăn chay của tôi, kèm lưu ý an toàn dinh dưỡng.`
-  };
+function BlogAiErrorBanner({ message, isAuthenticated }: { message: string; isAuthenticated: boolean }) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-700 dark:text-red-300 text-xs font-semibold"
+    >
+      <span className="flex items-start gap-2">
+        <AlertCircle size={15} className="shrink-0 mt-0.5" />
+        <span>{message}</span>
+      </span>
+      {!isAuthenticated && (
+        <Link
+          to="/login"
+          className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-extrabold transition shrink-0"
+        >
+          Đăng nhập ngay
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function BlogKnowledgeInsightCard({
+  knowledge,
+  postTitle,
+  compact = false,
+  onReanalyze,
+  reanalyzing = false,
+}: {
+  knowledge: BlogInsightAiResponse;
+  postTitle: string;
+  compact?: boolean;
+  onReanalyze?: () => void;
+  reanalyzing?: boolean;
+}) {
+  return (
+    <div className={compact ? 'space-y-4 text-xs' : 'p-5 rounded-2xl border border-teal-300 dark:border-teal-800 bg-white dark:bg-slate-900 space-y-4'}>
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400">
+              Kết quả AI phân tích Kiến thức &amp; Giá trị bài đăng
+            </span>
+            {knowledge.model && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-extrabold">
+                Gemini · {knowledge.model}
+              </span>
+            )}
+          </div>
+          <h3 className={compact ? 'text-sm font-black text-slate-900 dark:text-white mt-1' : 'text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5'}>
+            {knowledge.headline}
+          </h3>
+        </div>
+        <span className="px-2.5 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 text-xs font-bold">
+          {knowledge.categoryBadge}
+        </span>
+      </div>
+
+      <div className={compact ? 'space-y-3' : 'grid md:grid-cols-2 gap-4 text-xs'}>
+        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 space-y-2">
+          <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase flex items-center gap-1.5">
+            <Lightbulb size={14} className="text-amber-500" />
+            <span>Luận điểm cốt lõi AI tổng hợp:</span>
+          </h4>
+          <ul className="space-y-1.5 text-slate-700 dark:text-slate-300">
+            {knowledge.keyTakeaways.map((item, idx) => (
+              <li key={idx} className="flex items-start gap-2">
+                <CheckCircle2 size={13} className="text-teal-600 shrink-0 mt-0.5" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 space-y-2">
+          <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase flex items-center gap-1.5">
+            <Sparkles size={14} className="text-emerald-600" />
+            <span>Phân tích &amp; Gợi ý thực hành trên VEGEAI:</span>
+          </h4>
+          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+            {knowledge.scientificOrLifestyleInsight}
+          </p>
+          <ul className="space-y-1 text-emerald-800 dark:text-emerald-300 font-semibold pt-1">
+            {knowledge.actionableSteps.map((step, idx) => (
+              <li key={idx}>• {step}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {knowledge.personalizedNote && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/70 text-xs text-emerald-900 dark:text-emerald-200">
+          <span className="font-extrabold">🎯 Cá nhân hóa theo hồ sơ của bạn: </span>
+          <span>{knowledge.personalizedNote}</span>
+        </div>
+      )}
+
+      {knowledge.nutritionSafetyDisclaimer && (
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 italic leading-relaxed">
+          {knowledge.nutritionSafetyDisclaimer}
+        </p>
+      )}
+
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
+        {onReanalyze && (
+          <button
+            type="button"
+            onClick={onReanalyze}
+            disabled={reanalyzing}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 hover:bg-emerald-50 text-emerald-800 dark:text-emerald-300 text-xs font-bold transition cursor-pointer disabled:opacity-60"
+          >
+            <Sparkles size={13} />
+            <span>{reanalyzing ? 'Đang phân tích...' : 'Phân tích lại với AI'}</span>
+          </button>
+        )}
+        <Link
+          to="/ai-chef"
+          state={{
+            source: 'blog-knowledge',
+            title: `Tư vấn: ${postTitle}`,
+            initialPrompt: knowledge.suggestedFollowUpPrompt,
+          }}
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-xs"
+        >
+          <ChefHat size={14} />
+          <span>Chuyển sang Chatbot AI Bếp Trưởng để tư vấn &amp; hỗ trợ tiếp</span>
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 function parseMarketItemsFromStrings(rawIngredients: string[], recipeTitle: string): SmartMarketItem[] {
@@ -209,7 +319,7 @@ export function BlogPage() {
   // Per-card inline AI analysis state on the feed
   const [analyzingPostId, setAnalyzingPostId] = useState<string | null>(null);
   const [feedRecipeResults, setFeedRecipeResults] = useState<Record<string, GeneratedRecipeAiResponse>>({});
-  const [feedKnowledgeResults, setFeedKnowledgeResults] = useState<Record<string, KnowledgeAiAnalysisResult>>({});
+  const [feedKnowledgeResults, setFeedKnowledgeResults] = useState<Record<string, BlogInsightAiResponse>>({});
   const [feedErrors, setFeedErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -240,8 +350,9 @@ export function BlogPage() {
   const handleAnalyzePostOnFeed = async (post: BlogPost) => {
     const mode = resolvePostAiMode(post);
     setFeedErrors(prev => ({ ...prev, [post.postId]: '' }));
-    if (mode === 'RECIPE_STEPS' && !isAuthenticated) {
-      setFeedErrors(prev => ({ ...prev, [post.postId]: 'Vui lòng đăng nhập để AI bóc tách công thức từ bài đăng.' }));
+    const accessError = getBlogAiAccessError(isAuthenticated, user?.role, mode);
+    if (accessError) {
+      setFeedErrors(prev => ({ ...prev, [post.postId]: accessError }));
       return;
     }
     setAnalyzingPostId(post.postId);
@@ -254,7 +365,8 @@ export function BlogPage() {
         );
         setFeedRecipeResults(prev => ({ ...prev, [post.postId]: extracted }));
       } else {
-        setFeedKnowledgeResults(prev => ({ ...prev, [post.postId]: buildKnowledgeFallback(post) }));
+        const insight = await aiService.analyzeBlogPost(post.postId);
+        setFeedKnowledgeResults(prev => ({ ...prev, [post.postId]: insight }));
       }
     } catch (reason) {
       setFeedErrors(prev => ({ ...prev, [post.postId]: errorMessage(reason) }));
@@ -714,9 +826,7 @@ export function BlogPage() {
                   )}
 
                   {feedErrors[activeModalPost.postId] && (
-                    <p role="alert" className="p-3 rounded-xl bg-red-50 text-red-700 text-xs font-semibold">
-                      {feedErrors[activeModalPost.postId]}
-                    </p>
+                    <BlogAiErrorBanner message={feedErrors[activeModalPost.postId]} isAuthenticated={isAuthenticated} />
                   )}
 
                   {/* RECIPE ANALYSIS RESULT */}
@@ -724,6 +834,14 @@ export function BlogPage() {
                     const recipe = feedRecipeResults[activeModalPost.postId];
                     return (
                       <div className="space-y-4 text-xs">
+                        {(recipe.aiFallbackNotice || recipe.source === 'TEMPLATE_FALLBACK') && (
+                          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200">
+                            <AlertCircle size={15} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                            <span>
+                              {recipe.aiFallbackNotice || 'Đang hiển thị công thức mẫu dự phòng do Gemini AI chưa cấu hình hoặc tạm gián đoạn.'}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
                           <span className="font-bold text-emerald-900 dark:text-emerald-200">⏱ Thời gian nấu: {recipe.cookTimeMinutes} phút</span>
                           <span>•</span>
@@ -796,55 +914,15 @@ export function BlogPage() {
                   })()}
 
                   {/* KNOWLEDGE ANALYSIS RESULT */}
-                  {feedKnowledgeResults[activeModalPost.postId] && (() => {
-                    const knowledge = feedKnowledgeResults[activeModalPost.postId];
-                    return (
-                      <div className="space-y-4 text-xs">
-                        <div className="p-3 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200 font-bold">
-                          {knowledge.headline}
-                        </div>
-
-                        <div className="space-y-2">
-                          <h4 className="font-extrabold uppercase text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                            <Lightbulb size={14} className="text-amber-500" />
-                            <span>Điểm cốt lõi từ bài viết:</span>
-                          </h4>
-                          <div className="space-y-1.5">
-                            {knowledge.keyTakeaways.map((point, idx) => (
-                              <div key={idx} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                                <CheckCircle2 size={13} className="text-teal-600 shrink-0 mt-0.5" />
-                                <span>{point}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800 space-y-1.5">
-                          <h4 className="font-extrabold uppercase text-slate-800 dark:text-slate-200">
-                            Gợi ý áp dụng sống xanh:
-                          </h4>
-                          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                            {knowledge.scientificOrLifestyleInsight}
-                          </p>
-                        </div>
-
-                        <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-                          <Link
-                            to="/ai-chef"
-                            state={{
-                              source: 'blog-knowledge',
-                              title: `Tư vấn: ${activeModalPost.title}`,
-                              initialPrompt: knowledge.suggestedFollowUpPrompt,
-                            }}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold transition shadow-2xs"
-                          >
-                            <ChefHat size={14} />
-                            <span>Chuyển sang Chatbot AI Bếp Trưởng tư vấn tiếp</span>
-                          </Link>
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {feedKnowledgeResults[activeModalPost.postId] && (
+                    <BlogKnowledgeInsightCard
+                      knowledge={feedKnowledgeResults[activeModalPost.postId]}
+                      postTitle={activeModalPost.title}
+                      compact
+                      onReanalyze={() => void handleAnalyzePostOnFeed(activeModalPost)}
+                      reanalyzing={analyzingPostId === activeModalPost.postId}
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -859,7 +937,7 @@ export function BlogPage() {
 
 export function BlogDetailPage() {
   const { id } = useParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
@@ -868,7 +946,7 @@ export function BlogDetailPage() {
   // Context-Aware AI Copilot state (supports both Recipe Steps & Knowledge Analysis)
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiRecipe, setAiRecipe] = useState<GeneratedRecipeAiResponse | null>(null);
-  const [aiKnowledge, setAiKnowledge] = useState<KnowledgeAiAnalysisResult | null>(null);
+  const [aiKnowledge, setAiKnowledge] = useState<BlogInsightAiResponse | null>(null);
   const [aiError, setAiError] = useState('');
 
   useEffect(() => {
@@ -899,8 +977,9 @@ export function BlogDetailPage() {
     if (!post) return;
     const mode = resolvePostAiMode(post);
     setAiError('');
-    if (mode === 'RECIPE_STEPS' && !isAuthenticated) {
-      setAiError('Vui lòng đăng nhập để AI bóc tách công thức từ bài đăng.');
+    const accessError = getBlogAiAccessError(isAuthenticated, user?.role, mode);
+    if (accessError) {
+      setAiError(accessError);
       return;
     }
     setAiAnalyzing(true);
@@ -913,7 +992,8 @@ export function BlogDetailPage() {
         );
         setAiRecipe(extracted);
       } else {
-        setAiKnowledge(buildKnowledgeFallback(post));
+        const insight = await aiService.analyzeBlogPost(post.postId);
+        setAiKnowledge(insight);
       }
     } catch (reason) {
       setAiError(errorMessage(reason));
@@ -1032,7 +1112,7 @@ export function BlogDetailPage() {
                 </div>
               </div>
 
-              {aiError && <p className="text-xs text-red-600 font-semibold">{aiError}</p>}
+              {aiError && <BlogAiErrorBanner message={aiError} isAuthenticated={isAuthenticated} />}
 
               {/* Output Type A: Recipe Steps + Switch to Chatbot + Find Nearby Stores */}
               {aiRecipe && (
@@ -1057,6 +1137,15 @@ export function BlogDetailPage() {
                       </span>
                     </div>
                   </div>
+
+                  {(aiRecipe.aiFallbackNotice || aiRecipe.source === 'TEMPLATE_FALLBACK') && (
+                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs">
+                      <AlertCircle size={15} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                      <span>
+                        {aiRecipe.aiFallbackNotice || 'Đang hiển thị công thức mẫu dự phòng do Gemini AI chưa cấu hình hoặc tạm gián đoạn.'}
+                      </span>
+                    </div>
+                  )}
 
                   <div>
                     <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 mb-2 uppercase">
@@ -1133,68 +1222,10 @@ export function BlogDetailPage() {
 
               {/* Output Type B: Knowledge / Green Living / Review Analysis + Switch to Chatbot */}
               {aiKnowledge && (
-                <div className="p-5 rounded-2xl border border-teal-300 dark:border-teal-800 bg-white dark:bg-slate-900 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-                    <div>
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400">
-                        Kết quả AI phân tích Kiến thức &amp; Giá trị bài đăng
-                      </span>
-                      <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white mt-0.5">
-                        {aiKnowledge.headline}
-                      </h3>
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 text-xs font-bold">
-                      {aiKnowledge.categoryBadge}
-                    </span>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4 text-xs">
-                    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 space-y-2">
-                      <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase flex items-center gap-1.5">
-                        <Lightbulb size={14} className="text-amber-500" />
-                        <span>Ý chính trích từ bài viết:</span>
-                      </h4>
-                      <ul className="space-y-1.5 text-slate-700 dark:text-slate-300">
-                        {aiKnowledge.keyTakeaways.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <CheckCircle2 size={13} className="text-teal-600 shrink-0 mt-0.5" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 space-y-2">
-                      <h4 className="font-extrabold text-slate-800 dark:text-slate-200 uppercase flex items-center gap-1.5">
-                        <Sparkles size={14} className="text-emerald-600" />
-                        <span>Lưu ý &amp; Gợi ý thực hành trên VEGEAI:</span>
-                      </h4>
-                      <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                        {aiKnowledge.scientificOrLifestyleInsight}
-                      </p>
-                      <ul className="space-y-1 text-emerald-800 dark:text-emerald-300 font-semibold pt-1">
-                        {aiKnowledge.actionableSteps.map((step, idx) => (
-                          <li key={idx}>• {step}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
-                    <Link
-                      to="/ai-chef"
-                      state={{
-                        source: 'blog-knowledge',
-                        title: `Tư vấn: ${post.title}`,
-                        initialPrompt: aiKnowledge.suggestedFollowUpPrompt,
-                      }}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-xs"
-                    >
-                      <ChefHat size={14} />
-                      <span>Chuyển sang Chatbot AI Bếp Trưởng để tư vấn &amp; hỗ trợ tiếp</span>
-                    </Link>
-                  </div>
-                </div>
+                <BlogKnowledgeInsightCard
+                  knowledge={aiKnowledge}
+                  postTitle={post.title}
+                />
               )}
             </div>
 

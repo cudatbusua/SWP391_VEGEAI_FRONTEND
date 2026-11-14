@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowUp,
   ChefHat,
@@ -40,9 +40,68 @@ import type {
   ChatActivityRingsCardData
 } from '../components/ChatInteractiveWidgets';
 import { DEFAULT_WEEKLY_SCHEDULE } from '../data/weeklyScheduleData';
+import type { ScheduledDayPlan, ScheduledMealItem } from '../data/weeklyScheduleData';
 import { wearableService } from '../utils/wearableService';
 import { userService } from '../services/userService';
 import { fridgeService } from '../services/fridgeService';
+import { mealPlanService } from '../services/mealPlanService';
+import type { MealPlan, PlannedMeal } from '../types/mealPlan';
+
+const VIETNAMESE_WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+function formatScheduleDayName(dateStr: string, dayNumber: number): string {
+  const parsed = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return `Ngày ${dayNumber}`;
+  const weekday = VIETNAMESE_WEEKDAYS[parsed.getDay()];
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  return `${weekday} (${day}/${month})`;
+}
+
+function toScheduledMeal(meal: PlannedMeal | undefined, fallbackCategory: string): ScheduledMealItem {
+  if (!meal) {
+    return {
+      name: 'Chưa xếp món',
+      calories: 0,
+      protein: 0,
+      category: fallbackCategory,
+    };
+  }
+  return {
+    name: meal.title,
+    calories: Math.round(meal.nutrition?.calories || 0),
+    protein: Math.round(meal.nutrition?.protein || 0),
+    category: fallbackCategory,
+    description: meal.portions > 1 ? `${meal.portions} khẩu phần` : undefined,
+  };
+}
+
+function mapMealPlanToScheduleCard(plan: MealPlan, fallbackCalories: number): ChatMealScheduleCardData | null {
+  const planDays = plan?.plan?.days;
+  if (!Array.isArray(planDays) || planDays.length === 0) return null;
+  const targetCalories = Math.round(plan.plan.targets?.dailyCaloriesTarget || fallbackCalories);
+  const days: ScheduledDayPlan[] = planDays.slice(0, 7).map((day, index) => {
+    const sortedMeals = [...(day.meals || [])].sort((a, b) => a.slot - b.slot);
+    const breakfast = sortedMeals.find(m => m.slot === 0) || sortedMeals[0];
+    const lunch = sortedMeals.find(m => m.slot === 1) || sortedMeals[1] || sortedMeals[0];
+    const dinner = sortedMeals.find(m => m.slot === 2) || sortedMeals[sortedMeals.length - 1] || sortedMeals[0];
+    return {
+      dayName: formatScheduleDayName(day.date, index + 1),
+      dayIndex: index + 1,
+      targetCal: Math.round(day.totals?.calories || targetCalories),
+      breakfast: toScheduledMeal(breakfast, 'Bữa sáng'),
+      lunch: toScheduledMeal(lunch, 'Bữa trưa'),
+      dinner: toScheduledMeal(dinner, 'Bữa tối'),
+    };
+  });
+  return {
+    weekTitle: plan.status === 'SAVED'
+      ? 'Thực đơn đã lưu từ Kế hoạch bữa ăn của bạn'
+      : 'Thực đơn nháp gần nhất của bạn',
+    targetCalories,
+    days,
+  };
+}
 import { BlogBody } from '../components/BlogUi';
 import { calculateBmr, calculateTdee, calculateExactAge } from '../utils/nutritionProfile';
 
@@ -81,6 +140,7 @@ function formatTime(timestamp: number | string): string {
 export function AiChatPage() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Keep account history isolated from guest history: each account reads only its own key,
   // guests read only the guest key, so a shared machine can never show the other side.
@@ -508,27 +568,6 @@ export function AiChatPage() {
     });
   };
 
-    const handleClearGuestSessions = () => {
-    if (window.confirm('Bạn có chắc muốn xóa sạch toàn bộ lịch sử trò chuyện khách trên trình duyệt này?')) {
-      clearChatSessions(localStorage, storageKey);
-      const initialSession: ChatSession = {
-        id: 'default-welcome',
-        title: 'Chào mừng bạn đến với Bếp trưởng',
-        category: 'ai-chef',
-        messages: [
-          {
-            sender: 'ai',
-            text: 'Xin chào! Tôi là Bếp trưởng VEGEAI. Toàn bộ lịch sử trò chuyện khách đã được xóa sạch sẽ. Hôm nay bạn muốn lên thực đơn hoặc phân tích nguyên liệu gì?',
-            time: formatTime(Date.now())
-          }
-        ],
-        updatedAt: Date.now()
-      };
-      setSessions([initialSession]);
-      setActiveSessionId('default-welcome');
-    }
-  };
-
   const handleFridgeQuickAction = async () => {
     if (!user?.id) {
       setFridgeLoginFrom('/ai-chef');
@@ -684,8 +723,21 @@ export function AiChatPage() {
       const effectiveFiberTarget = effectiveCalorieTarget > 0 ? 35 : 0;
 
       if (isSchedule) {
-        attachedScheduleCard = {
-          weekTitle: 'Lịch Thực Đơn Tuần 7 Ngày Thuần Thực Vật Cân Bằng Dinh Dưỡng',
+        let loadedPlanCard: ChatMealScheduleCardData | null = null;
+        if (user?.id) {
+          try {
+            const page = await mealPlanService.list(0);
+            const latestSummary = page.items?.[0];
+            if (latestSummary?.id) {
+              const fullPlan = await mealPlanService.get(latestSummary.id);
+              loadedPlanCard = mapMealPlanToScheduleCard(fullPlan, effectiveCalorieTarget);
+            }
+          } catch (planErr) {
+            console.debug('[AI-CHAT] Could not load saved meal plan, using sample schedule:', planErr);
+          }
+        }
+        attachedScheduleCard = loadedPlanCard ?? {
+          weekTitle: 'Thực đơn mẫu 7 ngày thuần thực vật (tham khảo)',
           targetCalories: effectiveCalorieTarget,
           days: DEFAULT_WEEKLY_SCHEDULE
         };
@@ -770,7 +822,7 @@ export function AiChatPage() {
         setShowQuotaModal(true);
         const quotaMsg = {
           sender: 'ai' as const,
-          text: '🌿 Bạn đã dùng hết 3 lượt tư vấn miễn phí cho khách vãng lai hôm nay. Hãy đăng ký hoặc đăng nhập tài khoản VEGEAI hoàn toàn miễn phí để tiếp tục trò chuyện không giới hạn với mình nhé!',
+          text: '🌿 Bạn đã dùng hết lượt trò chuyện nhanh miễn phí hôm nay. Hãy đăng nhập hoặc tạo tài khoản VEGEAI miễn phí để tiếp tục trò chuyện không giới hạn với mình nhé!',
           time: formatTime(Date.now())
         };
         setSessions(prev => prev.map(s => {
@@ -847,41 +899,6 @@ export function AiChatPage() {
             </button>
           </div>
         </div>
-
-        {/* Guest Mode Privacy Notice Banner */}
-        {!user && (
-          <div className="mb-6 p-4 rounded-2xl bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200">
-            <div className="flex items-start sm:items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <ChefHat className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="font-bold text-sm">
-                  Chế độ Khách (Chưa đăng nhập) — Quyền riêng tư & Bộ nhớ trình duyệt
-                </p>
-                <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5 leading-relaxed">
-                  Bạn có <strong>3 lượt hỏi thử miễn phí</strong>; hết 3 lượt hệ thống sẽ mời đăng nhập để tiếp tục. Lịch sử trò chuyện này chỉ được lưu tạm thời trên trình duyệt máy bạn qua <strong>LocalStorage</strong> và KHÔNG đồng bộ lên tài khoản hay các thiết bị khác, cũng không hiển thị cho tài khoản đăng nhập trên cùng máy.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-              <button
-                type="button"
-                onClick={handleClearGuestSessions}
-                className="px-3 py-1.5 rounded-xl bg-amber-200/80 hover:bg-amber-300 dark:bg-amber-900 dark:hover:bg-amber-800 text-amber-950 dark:text-amber-100 font-bold text-xs transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Xóa lịch sử chat khách</span>
-              </button>
-              <Link
-                to="/register"
-                className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition shadow-2xs"
-              >
-                Đăng ký tài khoản
-              </Link>
-            </div>
-          </div>
-        )}
 
         {/* Guest trial reminder + resumed-conversation confirmation */}
         {resumedAfterLogin && (
@@ -1291,7 +1308,13 @@ export function AiChatPage() {
               <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => handleSubmitWithText('Hãy hiển thị vòng Ring hoạt động, tiến độ calo và thể trạng dinh dưỡng của tôi ngay trong đoạn chat này.')}
+                  onClick={() => {
+                    if (!user?.id) {
+                      navigate('/login', { state: { from: '/ai-chef' } });
+                      return;
+                    }
+                    handleSubmitWithText('Hãy hiển thị vòng Ring hoạt động, tiến độ calo và thể trạng dinh dưỡng của tôi ngay trong đoạn chat này.');
+                  }}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold border border-emerald-200 dark:border-emerald-800 transition cursor-pointer shadow-2xs"
                 >
                   <span>⭕</span> Hiện Vòng Ring Thể Trạng
@@ -1299,7 +1322,13 @@ export function AiChatPage() {
 
                 <button
                   type="button"
-                  onClick={() => handleSubmitWithText('Hãy gửi cho tôi một lịch biểu thực đơn 7 ngày hoàn chỉnh có thể tương tác bấm chọn từng ngày và xem chi tiết các bữa ngay trong chat.')}
+                  onClick={() => {
+                    if (!user?.id) {
+                      navigate('/login', { state: { from: '/ai-chef' } });
+                      return;
+                    }
+                    handleSubmitWithText('Hãy gửi cho tôi một lịch biểu thực đơn 7 ngày hoàn chỉnh có thể tương tác bấm chọn từng ngày và xem chi tiết các bữa ngay trong chat.');
+                  }}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-teal-50 dark:bg-teal-950/40 hover:bg-teal-100 dark:hover:bg-teal-900/40 text-teal-800 dark:text-teal-300 text-[11px] font-bold border border-teal-200 dark:border-teal-800 transition cursor-pointer shadow-2xs"
                 >
                   <span>📅</span> Lịch Biểu Thực Đơn Tuần
@@ -1307,7 +1336,13 @@ export function AiChatPage() {
 
                 <button
                   type="button"
-                  onClick={() => handleSubmitWithText('Tôi muốn kiểm tra và đồng bộ dữ liệu vòng đeo tay Google Fit (bước chân, calo vận động) trên VEGEAI. Bếp trưởng hãy giải thích ý nghĩa các chỉ số trên vòng Zen Rings và cách hệ thống tự động cân đối dinh dưỡng thích ứng theo mức vận động nhé!')}
+                  onClick={() => {
+                    if (!user?.id) {
+                      navigate('/login', { state: { from: '/ai-chef' } });
+                      return;
+                    }
+                    handleSubmitWithText('Tôi muốn kiểm tra và đồng bộ dữ liệu vòng đeo tay Google Fit (bước chân, calo vận động) trên VEGEAI. Bếp trưởng hãy giải thích ý nghĩa các chỉ số trên vòng Zen Rings và cách hệ thống tự động cân đối dinh dưỡng thích ứng theo mức vận động nhé!');
+                  }}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-800 dark:text-sky-300 text-[11px] font-bold border border-sky-200 dark:border-sky-800 transition cursor-pointer shadow-2xs"
                 >
                   <span>⌚</span> Đồng Bộ Google Fit
@@ -1409,7 +1444,7 @@ export function AiChatPage() {
                 Trải nghiệm trọn vẹn cùng VEGEAI
               </h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                Bạn đã sử dụng hết <strong>3 lượt tư vấn thử nghiệm</strong> cho khách vãng lai hôm nay. Hãy đăng ký hoặc đăng nhập tài khoản miễn phí để tiếp tục trò chuyện không giới hạn với AI Bếp Trưởng, lưu kế hoạch thực đơn và đồng bộ tủ lạnh!
+                Hãy đăng nhập hoặc đăng ký tài khoản miễn phí để tiếp tục trò chuyện không giới hạn với AI Bếp Trưởng, lưu kế hoạch thực đơn và đồng bộ tủ lạnh!
               </p>
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Link

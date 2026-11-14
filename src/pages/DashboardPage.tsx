@@ -351,15 +351,10 @@ export const DashboardPage: React.FC = () => {
                     Tránh dị ứng: {allergyText}
                   </span>
                 )}
-                {!isAuthenticated && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-900/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300/80 dark:border-emerald-700 shadow-2xs">
-                    ✨ Trải nghiệm khách vãng lai
-                  </span>
-                )}
               </div>
 
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-stone-900 dark:text-white">
-                {timeGreeting.title}, {user?.name || (isAuthenticated ? 'Bạn' : 'Khách quý')}! {timeGreeting.emoji} <br className="hidden sm:inline" />
+                {timeGreeting.title}, {user?.name || 'Bạn'}! {timeGreeting.emoji} <br className="hidden sm:inline" />
                 <span className="text-emerald-700 dark:text-emerald-400 font-bold block sm:inline mt-1 sm:mt-0">
                   {timeGreeting.question}
                 </span>
@@ -483,8 +478,12 @@ export const DashboardPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-center gap-6 p-5 rounded-2xl bg-stone-50/70 dark:bg-[#16222f]/80 border border-stone-200/60 dark:border-slate-700/60">
                   <div className="w-full sm:w-36 h-36 rounded-2xl overflow-hidden bg-stone-100 dark:bg-slate-800 shrink-0 shadow-xs">
                     <img
-                      src={nextMeal.imageUrl || 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=500&q=80'}
+                      src={nextMeal.imageUrl || '/images/vietnamese-vegan-table.png'}
                       alt={nextMeal.title}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = '/images/vietnamese-vegan-table.png';
+                      }}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -528,7 +527,7 @@ export const DashboardPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-center gap-6 p-5 rounded-2xl bg-stone-50/70 dark:bg-[#16222f]/80 border border-stone-200/60 dark:border-slate-700/60">
                   <div className="w-full sm:w-36 h-36 rounded-2xl overflow-hidden bg-stone-100 dark:bg-slate-800 shrink-0 shadow-xs">
                     <img
-                      src="https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=500&q=80"
+                      src="/images/vietnamese-vegan-table.png"
                       alt="Cơm gạo lứt đậu hũ nấm sốt tiêu đen"
                       className="w-full h-full object-cover"
                     />

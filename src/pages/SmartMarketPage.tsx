@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingBag,
   CheckCircle2,
@@ -45,6 +45,7 @@ import {
 } from '../data/smartMarketData';
 import {
   fetchRealPlacesNearby,
+  suggestRealPlacesForFood,
   reverseGeocodeAddress,
   buildAnchoredStoresForCoordinates
 } from '../services/smartMarketRealPlacesService';
@@ -292,6 +293,7 @@ export function SmartMarketPage() {
   const [storeDistanceRadius, setStoreDistanceRadius] = useState<'ALL' | '3KM' | '5KM'>('ALL');
   const [selectedStore, setSelectedStore] = useState<SmartMarketStore | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
+  const [foodSuggestionQuery, setFoodSuggestionQuery] = useState('');
   const [locationStatus, setLocationStatus] = useState<'default' | 'requesting' | 'granted' | 'denied'>('default');
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
@@ -426,7 +428,14 @@ export function SmartMarketPage() {
   }
 
   const location = useLocation();
+  const navigate = useNavigate();
   const [importNotice, setImportNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const foodParam = (params.get('food') || '').trim();
+    setFoodSuggestionQuery(foodParam);
+  }, [location.search]);
 
   // Show nearby stores immediately, then upgrade to real OpenStreetMap data when it arrives.
   const loadStoresForCoords = useCallback(async (lat: number, lon: number) => {
@@ -448,6 +457,26 @@ export function SmartMarketPage() {
       setLoadingStores(false);
     }
   }, []);
+
+  // Suggest OSM places specifically ranked for ?food= query when coordinates are available
+  useEffect(() => {
+    const cleanFood = foodSuggestionQuery.trim();
+    if (!cleanFood || !userLoc?.lat || !userLoc?.lon) return;
+    let active = true;
+    suggestRealPlacesForFood(cleanFood, userLoc.lat, userLoc.lon).then(foodStores => {
+      if (!active || foodStores.length === 0) return;
+      setStores(prev => {
+        const merged = [...foodStores];
+        const seen = new Set(foodStores.map(s => s.id));
+        for (const existing of prev) {
+          if (!seen.has(existing.id)) merged.push(existing);
+        }
+        return merged;
+      });
+      setSelectedStore(prev => prev ?? foodStores[0]);
+    });
+    return () => { active = false; };
+  }, [foodSuggestionQuery, userLoc?.lat, userLoc?.lon]);
 
   // Initialize location from session, guest GPS, or the signed-in user's profile.
   useEffect(() => {
@@ -621,18 +650,24 @@ export function SmartMarketPage() {
     setLocationMessage('Đang định vị địa chỉ của bạn...');
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(input)}&countrycodes=vn&limit=1`,
-        { headers: { 'Accept': 'application/json' } }
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(input)}&limit=1`,
+        { headers: { 'Accept': 'application/json' }, signal: controller.signal }
       );
+      clearTimeout(timeout);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          await handleSelectPredefinedArea(input, lat, lon);
-          setManualAddressInput('');
-          return;
+        const coords = data?.features?.[0]?.geometry?.coordinates;
+        if (Array.isArray(coords) && coords.length >= 2) {
+          const lon = Number(coords[0]);
+          const lat = Number(coords[1]);
+          if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            await handleSelectPredefinedArea(input, lat, lon);
+            setManualAddressInput('');
+            return;
+          }
         }
       }
     } catch (err) {
@@ -795,22 +830,67 @@ export function SmartMarketPage() {
     });
   }, [items, statusFilter, categoryFilter]);
 
-  // Filter stores by category, distance radius, and search query
+  // Filter stores by category, distance radius, food suggestion query, and search query
   const filteredStores = useMemo(() => {
-    return stores.filter(store => {
+    const normalizeText = (raw: string) =>
+      raw
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'd')
+        .toLowerCase()
+        .trim();
+
+    const storeText = (store: SmartMarketStore) =>
+      normalizeText(
+        [
+          store.name,
+          store.address,
+          store.tagline,
+          store.categoryLabel,
+          ...(store.featuredItems || []),
+          ...(store.catalog || []).map(item => item.name),
+        ].join(' ')
+      );
+
+    const scoreForFood = (store: SmartMarketStore, query: string): number => {
+      const norm = normalizeText(query);
+      if (!norm) return 0;
+      const haystack = storeText(store);
+      let score = store.category === 'VEGAN_STORE' || store.category === 'SUPERMARKET' ? 1 : 0;
+      if (haystack.includes(norm)) score += 20;
+      const tokens = norm
+        .split(/[\s,;:/()-]+/)
+        .filter(t => t.length >= 2 && !['mon', 'chay', 'thuan', 'tu', 'nau', 'voi'].includes(t));
+      for (const token of tokens) {
+        if (haystack.includes(token)) score += 6;
+      }
+      return score;
+    };
+
+    const list = stores.filter(store => {
       // 1. Category filter
       if (storeCategoryFilter !== 'ALL' && store.category !== storeCategoryFilter) return false;
       // 2. Distance radius filter (GPS-based)
       if (storeDistanceRadius === '3KM' && (store.distanceKm ?? 0) > 3) return false;
       if (storeDistanceRadius === '5KM' && (store.distanceKm ?? 0) > 5) return false;
-      // 3. Search query
+      // 3. Search query (matches store name, address, tagline, featured items, or dish catalog)
       if (storeSearch.trim()) {
-        const q = storeSearch.toLowerCase();
-        return store.name.toLowerCase().includes(q) || store.address.toLowerCase().includes(q);
+        const q = normalizeText(storeSearch);
+        return storeText(store).includes(q);
       }
       return true;
     });
-  }, [stores, storeCategoryFilter, storeDistanceRadius, storeSearch]);
+
+    if (foodSuggestionQuery.trim()) {
+      return [...list].sort((a, b) => {
+        const diff = scoreForFood(b, foodSuggestionQuery) - scoreForFood(a, foodSuggestionQuery);
+        if (diff !== 0) return diff;
+        return (a.distanceKm ?? 0) - (b.distanceKm ?? 0);
+      });
+    }
+    return list;
+  }, [stores, storeCategoryFilter, storeDistanceRadius, storeSearch, foodSuggestionQuery]);
 
   // Multi-Store Cart Actions
   const handleUpdateMultiCart = (item: StoreCatalogItem, store: SmartMarketStore, delta: number) => {
@@ -1147,6 +1227,33 @@ export function SmartMarketPage() {
 
             {/* SECTION 2: BỘ LỌC TÌM KIẾM & BÁN KÍNH GPS (NGAY DƯỚI BẢN ĐỒ) */}
             <div id="store-list" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-3.5">
+              {!loadingStores && stores.length > 0 && stores.every(s => s.id.startsWith('anchored-')) && (
+                <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200">
+                  <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>
+                    Dữ liệu bản đồ OpenStreetMap trực tiếp đang tạm gián đoạn — đang hiển thị các điểm mua sắm tham khảo quanh tọa độ của bạn.
+                  </span>
+                </div>
+              )}
+              {foodSuggestionQuery && (
+                <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs">
+                  <span className="text-emerald-900 dark:text-emerald-200 font-semibold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    Đang ưu tiên gợi ý quán chay &amp; cửa hàng bán nguyên liệu phù hợp cho món:{' '}
+                    <strong className="text-emerald-800 dark:text-emerald-300">&ldquo;{foodSuggestionQuery}&rdquo;</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFoodSuggestionQuery('');
+                      navigate('/smart-market#store-list', { replace: true });
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-rose-600 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" /> Xóa gợi ý món
+                  </button>
+                </div>
+              )}
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 {/* Search Box */}
                 <div className="relative flex-1">

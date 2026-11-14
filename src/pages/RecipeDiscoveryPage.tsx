@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Search,
   Camera,
@@ -50,7 +50,8 @@ interface UnifiedCard {
 }
 
 export function RecipeDiscoveryPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   const [contentType, setContentType] = useState<ExploreCategoryType>('ALL');
   const [keyword, setKeyword] = useState('');
   const [tags, setTags] = useState<Record<string, RecipeTag[]>>({});
@@ -142,8 +143,8 @@ export function RecipeDiscoveryPage() {
           setVideosData(null);
         }
 
-        // 4. Q&A Questions
-        if (contentType === 'ALL' || contentType === 'QA') {
+        // 4. Q&A Questions (account-only endpoint)
+        if (isAuthenticated && (contentType === 'ALL' || contentType === 'QA')) {
           promises.push(
             communityService.questions(
               { keyword: keyword.trim(), page },
@@ -166,7 +167,7 @@ export function RecipeDiscoveryPage() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [contentType, keyword, included, excluded, mode, time, calories, protein, difficulty, sort, page, reload]);
+  }, [isAuthenticated, contentType, keyword, included, excluded, mode, time, calories, protein, difficulty, sort, page, reload]);
 
   const toggle = (code: string, exclusion: boolean) => {
     const setter = exclusion ? setExcluded : setIncluded;
@@ -349,6 +350,10 @@ export function RecipeDiscoveryPage() {
                   key={tab.id}
                   type="button"
                   onClick={() => {
+                    if (tab.id === 'QA' && !isAuthenticated) {
+                      navigate('/login', { state: { from: '/questions' } });
+                      return;
+                    }
                     setContentType(tab.id as ExploreCategoryType);
                     setPage(0);
                   }}
@@ -417,6 +422,21 @@ export function RecipeDiscoveryPage() {
               </select>
             </div>
           </div>
+
+          {/* Food-to-Vegan-Shop Bridge */}
+          {keyword.trim().length >= 2 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs">
+              <span className="text-emerald-900 dark:text-emerald-200 font-medium">
+                Muốn thưởng thức ngoài hàng hoặc mua nguyên liệu cho <strong>&ldquo;{keyword.trim()}&rdquo;</strong>?
+              </span>
+              <Link
+                to={`/smart-market?food=${encodeURIComponent(keyword.trim())}#store-list`}
+                className="inline-flex items-center gap-1 font-extrabold text-emerald-700 dark:text-emerald-300 hover:underline shrink-0"
+              >
+                Gợi ý quán chay &amp; điểm bán <ArrowUpRight size={13} />
+              </Link>
+            </div>
+          )}
 
           {/* Dietary Quick Filter Pills */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
@@ -590,11 +610,19 @@ export function RecipeDiscoveryPage() {
               <p className="text-xs text-slate-500 dark:text-slate-400">Học nấu trực quan qua video và nhờ AI tự động trích xuất công thức.</p>
             </Link>
 
-            <Link to="/questions" className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 hover:shadow-md transition space-y-2">
-              <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs"><MessageCircle size={15} /></span>
-              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Góc Hỏi Đáp Chuyên Gia</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Đặt câu hỏi dinh dưỡng, ẩm thực chay và nhận tư vấn chuyên môn.</p>
-            </Link>
+            {isAuthenticated && user?.role !== 'admin' ? (
+              <Link to="/questions" className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 hover:shadow-md transition space-y-2">
+                <span className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs"><MessageCircle size={15} /></span>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Góc Hỏi Đáp Chuyên Gia</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Đặt câu hỏi dinh dưỡng, ẩm thực chay và nhận tư vấn chuyên môn.</p>
+              </Link>
+            ) : (
+              <Link to="/smart-market" className="p-4 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 hover:shadow-md transition space-y-2">
+                <span className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center font-bold text-xs"><Sparkles size={15} /></span>
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">Quán Chay &amp; Điểm Bán (GPS)</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Tìm nhà hàng thuần chay và cửa hàng nguyên liệu quanh khu vực của bạn.</p>
+              </Link>
+            )}
           </div>
         </section>
       </div>

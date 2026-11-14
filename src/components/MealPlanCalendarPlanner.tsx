@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  Activity,
   AlertCircle,
   CalendarDays,
   CheckCircle2,
@@ -28,6 +29,7 @@ import { useAuth } from '../hooks/useAuth';
 import { mealPlanService } from '../services/mealPlanService';
 import { errorMessage } from '../services/apiClient';
 import { sfx } from '../utils/soundEffects';
+import { wearableService, type WearableMetrics } from '../utils/wearableService';
 import { missingMarketItems } from '../utils/mealPlanMarket';
 import { escapeHtml, formatNumber, printHtml } from '../utils/printDocument';
 import type { NutritionTargets } from '../types/api';
@@ -160,6 +162,22 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
   const [deleting, setDeleting] = useState<MealPlanSummary | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [wearable, setWearable] = useState<WearableMetrics>(() => wearableService.getMetrics());
+  const [applyWearableBonus, setApplyWearableBonus] = useState<boolean>(() => wearableService.getMetrics().activeCalories > 0);
+
+  useEffect(() => {
+    const refreshWearable = () => {
+      const next = wearableService.getMetrics();
+      setWearable(next);
+      if (next.activeCalories > 0) setApplyWearableBonus(true);
+    };
+    window.addEventListener('wearable_sync_updated', refreshWearable);
+    window.addEventListener('storage', refreshWearable);
+    return () => {
+      window.removeEventListener('wearable_sync_updated', refreshWearable);
+      window.removeEventListener('storage', refreshWearable);
+    };
+  }, []);
 
   const range = useMemo(() => {
     const { from, to } = calendarGridRange(calendarMonth);
@@ -226,21 +244,27 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
     setSwapping(null);
   };
 
-  const generate = async () => {
+  const generate = async (overrideWearableCalories?: number) => {
     if (busy || !canGenerate) return;
     setBusy(true);
     setError('');
     setMessage('');
+    const bonusCalories = overrideWearableCalories !== undefined
+      ? overrideWearableCalories
+      : applyWearableBonus && wearable.activeCalories > 0
+      ? Math.round(wearable.activeCalories)
+      : undefined;
     try {
       const result = await mealPlanService.generate({
         period,
         days: customDays,
         startDate: selectedKey,
         mealsPerDay,
+        ...(bonusCalories && bonusCalories > 0 ? { wearableActiveCalories: bonusCalories } : {}),
       });
       setDraft(result);
       setMessage(
-        `AI đã lập bản nháp thực đơn ${result.plan.days.length} ngày (gồm Bữa chính & Món phụ/Món dặm). Hãy kiểm tra các ngày có chấm cam, đổi món nếu muốn rồi bấm "Xác nhận lưu vào lịch".`
+        `AI đã lập bản nháp thực đơn ${result.plan.days.length} ngày${bonusCalories ? ` (đã cộng bù +${bonusCalories} kcal từ thiết bị đeo)` : ''}. Hãy kiểm tra các ngày có chấm cam, đổi món nếu muốn rồi bấm "Xác nhận lưu vào lịch".`
       );
     } catch (reason) {
       setError(errorMessage(reason));
@@ -694,7 +718,7 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
               <div className="sm:col-span-3">
                 <button
                   type="button"
-                  onClick={generate}
+                  onClick={() => void generate()}
                   disabled={busy || !canGenerate}
                   className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-black transition shadow-2xs cursor-pointer"
                 >
@@ -703,9 +727,23 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                 </button>
               </div>
             </div>
+            {wearable.activeCalories > 0 && (
+              <label className="flex items-center gap-2 text-xs font-semibold text-emerald-900 dark:text-emerald-200 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={applyWearableBonus}
+                  onChange={(e) => setApplyWearableBonus(e.target.checked)}
+                  className="rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>
+                  Tự động cộng bù <strong>+{Math.round(wearable.activeCalories)} kcal</strong> vận động từ{' '}
+                  {wearable.deviceModel || 'thiết bị đeo'} vào ngân sách năng lượng (tận dụng sẵn nguyên liệu tủ lạnh)
+                </span>
+              </label>
+            )}
             <p className="text-[11px] text-slate-600 dark:text-slate-400">
               {canGenerate
-                ? '💡 AI tự động phân bổ 3 Bữa chính (Sáng · Trưa · Tối) kèm Món phụ ăn kèm & Món dặm xế/tối khớp mục tiêu Calo, Đạm và dị ứng của bạn. Sau khi tạo nháp, bạn sẽ xác nhận trước khi lưu chính thức vào lịch.'
+                ? '💡 AI tự động ưu tiên nguyên liệu sẵn có trong tủ lạnh và phân bổ Bữa chính kèm Món phụ/dặm khớp mục tiêu Calo, Đạm và dị ứng của bạn.'
                 : 'Chọn hôm nay hoặc một ngày trong tương lai để lập thực đơn.'}
             </p>
           </div>
@@ -837,6 +875,64 @@ export function MealPlanCalendarPlanner({ dailyCalorieTarget, onAddToShoppingLis
                 </div>
               ))}
             </dl>
+
+            {(wearable.steps > 0 || wearable.activeCalories > 0) && (() => {
+              const baseCalorieTarget = dailyCalorieTarget ?? shown.targets.dailyCaloriesTarget;
+              const adjustedCalorieBudget = Math.round(baseCalorieTarget + wearable.activeCalories);
+              const plannedCalories = Math.round(shown.totals.calories);
+              const calorieDelta = plannedCalories - adjustedCalorieBudget;
+              const isDeficit = calorieDelta < -120;
+              const isSurplus = calorieDelta > 150;
+              return (
+                <div className="p-4 rounded-2xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800/70 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-sky-600" />
+                      Đối chiếu Menu AI &amp; Thiết bị đeo (Thời gian thực)
+                    </span>
+                    <span className="text-[11px] font-bold text-sky-700 dark:text-sky-300">
+                      {wearable.steps.toLocaleString('vi-VN')} bước · +{Math.round(wearable.activeCalories)} kcal tiêu hao
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-sky-100 dark:border-sky-900/50">
+                      <span className="text-[10px] text-slate-500 block">Ngân sách + vận động</span>
+                      <strong className="text-slate-900 dark:text-white">{adjustedCalorieBudget.toLocaleString('vi-VN')} kcal</strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-sky-100 dark:border-sky-900/50">
+                      <span className="text-[10px] text-slate-500 block">Menu AI hiện tại</span>
+                      <strong className="text-slate-900 dark:text-white">{plannedCalories.toLocaleString('vi-VN')} kcal</strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white/80 dark:bg-slate-900/60 border border-sky-100 dark:border-sky-900/50">
+                      <span className="text-[10px] text-slate-500 block">Chênh lệch</span>
+                      <strong className={isDeficit ? 'text-amber-700 dark:text-amber-300' : isSurplus ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-400'}>
+                        {calorieDelta > 0 ? `+${calorieDelta}` : calorieDelta} kcal
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                      {isDeficit
+                        ? `Menu đang thấp hơn ${Math.abs(calorieDelta)} kcal so với vận động hôm nay. Đề xuất: ${wearable.recommendedSnack}.`
+                        : isSurplus
+                        ? `Menu cao hơn ${calorieDelta} kcal so với ngân sách sau vận động; bạn có thể tối ưu lại khẩu phần.`
+                        : 'Thực đơn hiện tại đã cân bằng tốt với mức vận động thực tế từ thiết bị đeo.'}
+                    </p>
+                    {(isDeficit || isSurplus) && canGenerate && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void generate(Math.round(wearable.activeCalories))}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-700 hover:bg-sky-800 disabled:opacity-50 text-white text-[11px] font-extrabold transition shrink-0 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Điều chỉnh thực đơn (+{Math.round(wearable.activeCalories)} kcal)
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* GROUP 1: BỮA ĂN CHÍNH (SÁNG, TRƯA, TỐI) */}
             <div className="space-y-3">

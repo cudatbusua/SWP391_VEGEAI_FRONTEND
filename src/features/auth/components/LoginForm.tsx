@@ -178,9 +178,16 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
             setIsGoogleSubmitting(false);
           }
         },
-        error_callback: () => {
+        error_callback: (err?: { type?: string }) => {
           setIsGoogleSubmitting(false);
-          setGeneralError('Không thể mở cửa sổ đăng nhập Google. Vui lòng thử lại.');
+          if (err?.type === 'popup_closed') {
+            return;
+          }
+          if (err?.type === 'popup_failed_to_open') {
+            setGeneralError('Trình duyệt đang chặn cửa sổ bật lên Google. Vui lòng cho phép pop-up và thử lại.');
+            return;
+          }
+          setGeneralError('Đăng nhập bằng Google chưa hoàn tất. Vui lòng thử lại.');
         }
       });
       tokenClient.requestAccessToken({ prompt: 'select_account' });

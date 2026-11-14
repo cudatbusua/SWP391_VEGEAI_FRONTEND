@@ -124,6 +124,12 @@ test('place search encodes keywords and preserves backend errors', async () => {
   const url = new URL(fixture.calls[0].url, 'http://localhost');
   assert.equal(url.pathname, '/api/places/search');
   assert.equal(url.searchParams.get('query'), 'Quận 1 & trung tâm'); assert.equal(url.searchParams.get('radius'), '2000');
+  assert.equal(url.searchParams.has('category'), false);
+  await fixture.restaurants.search('Thảo Điền', undefined, 5, 'GROCERY_STORE');
+  const filteredUrl = new URL(fixture.calls[1].url, 'http://localhost');
+  assert.equal(filteredUrl.pathname, '/api/places/search');
+  assert.equal(filteredUrl.searchParams.get('category'), 'GROCERY_STORE');
+  assert.equal(filteredUrl.searchParams.get('radius'), '5000');
   const failure = setup(() => reply(null, 503, 'Places unavailable'));
   failure.api.setSession(auth(), true);
   await assert.rejects(failure.restaurants.nearby({ lat: 10, lon: 106 }, 2), /Places unavailable/);
@@ -579,4 +585,35 @@ test('cookbook saves, queries and removes recipes using personal cookbook endpoi
   await fixture.cookbook.remove('cb-1');
   assert.equal(fixture.calls[2].url, '/api/recipes/cookbook/cb-1');
   assert.equal(fixture.calls[2].method, 'DELETE');
+});
+
+test('analyzeBlogPost requires member auth, calls /ai/blog-insight, and rejects incomplete AI JSON', async () => {
+  const validReply = {
+    postId: 'post-1',
+    headline: 'Vitamin B12 và sắt thực vật',
+    categoryBadge: '🧬 Kiến thức Dinh dưỡng & Sức khỏe',
+    keyTakeaways: ['Vitamin C giúp tăng hấp thu sắt non-heme.'],
+    scientificOrLifestyleInsight: 'Kết hợp rau lá xanh đậm với nguồn vitamin C tự nhiên.',
+    actionableSteps: ['Thêm ớt chuông hoặc chanh vào bữa ăn chay.'],
+    nutritionSafetyDisclaimer: 'Chỉ mang tính tham khảo dinh dưỡng.',
+    suggestedFollowUpPrompt: 'Tư vấn thực đơn giàu sắt?',
+    source: 'AI',
+    model: 'gemini-3.5-flash-lite',
+  };
+  let payload = validReply;
+  const fixture = setup(() => reply(payload));
+
+  await assert.rejects(fixture.ai.analyzeBlogPost('post-1'), /đăng nhập/);
+  assert.equal(fixture.calls.length, 0);
+
+  fixture.api.setSession(auth(), true);
+  const res = await fixture.ai.analyzeBlogPost('post-1');
+  assert.equal(res.source, 'AI');
+  assert.equal(res.headline, 'Vitamin B12 và sắt thực vật');
+  assert.equal(fixture.calls[0].url, '/api/ai/blog-insight');
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), { postId: 'post-1' });
+  assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
+
+  payload = { postId: 'post-1', headline: 'Thiếu luận điểm', keyTakeaways: [] };
+  await assert.rejects(fixture.ai.analyzeBlogPost('post-1'), /chưa trả về/);
 });

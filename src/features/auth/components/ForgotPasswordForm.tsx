@@ -38,8 +38,8 @@ export const ForgotPasswordForm: React.FC = () => {
         // BE intentionally uses the same response whether or not the account exists.
         // Email delivery is asynchronous; a local SMTP failure logs a fallback OTP on BE.
         setInfoMessage(
-          'Nếu email tồn tại, backend đã tiếp nhận yêu cầu gửi OTP. Hãy kiểm tra hộp thư; ' +
-          'nếu chưa nhận, xem console backend với dòng [DEV/FALLBACK] Forgot Password OTP.'
+          'Nếu email tồn tại, hệ thống đã tiếp nhận yêu cầu gửi mã OTP. ' +
+          'Vui lòng kiểm tra hộp thư đến hoặc thư mục spam để lấy mã xác nhận.'
         );
         setStep('otp');
       } else {

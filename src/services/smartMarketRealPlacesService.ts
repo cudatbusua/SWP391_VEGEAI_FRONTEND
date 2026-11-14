@@ -33,28 +33,23 @@ export async function reverseGeocodeAddress(lat: number, lon: number): Promise<s
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 4000);
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=vi`,
+      `https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`,
       { signal: controller.signal }
     );
     clearTimeout(timeout);
     if (res.ok) {
       const data = await res.json();
-      const addr = data?.address || {};
-      const parts = [
-        addr.road || addr.neighbourhood || addr.quarter,
-        addr.suburb || addr.village || addr.town,
-        addr.city_district || addr.district || addr.county || addr.city || addr.state,
-      ].filter(Boolean);
-      if (parts.length > 0) {
-        return Array.from(new Set(parts)).join(', ');
-      }
-      if (typeof data?.display_name === 'string' && data.display_name.trim()) {
-        return data.display_name
-          .split(',')
-          .slice(0, 3)
-          .map((s: string) => s.trim())
-          .filter((s: string) => s && !/^\d{5,6}$/.test(s))
-          .join(', ');
+      const props = data?.features?.[0]?.properties;
+      if (props) {
+        const streetLine = [props.housenumber, props.street].filter(Boolean).join(' ').trim();
+        const parts = [
+          streetLine || props.name,
+          props.locality || props.suburb,
+          props.district || props.city || props.state,
+        ].filter(Boolean);
+        if (parts.length > 0) {
+          return Array.from(new Set(parts)).join(', ');
+        }
       }
     }
   } catch {
@@ -174,6 +169,23 @@ export async function fetchRealPlacesNearby(userLat: number, userLon: number): P
     console.debug('[SMART-MARKET] Backend places unavailable:', error);
   }
   return buildAnchoredStoresForCoordinates(userLat, userLon);
+}
+
+export async function suggestRealPlacesForFood(
+  food: string,
+  userLat?: number,
+  userLon?: number
+): Promise<SmartMarketStore[]> {
+  const cleanFood = food.trim();
+  if (!cleanFood) return [];
+  try {
+    const coords = userLat != null && userLon != null ? { lat: userLat, lon: userLon } : undefined;
+    const places = await restaurantService.suggestForFood(cleanFood, coords, 8);
+    if (places.length > 0) return places.map(mapBackendPlace);
+  } catch (error) {
+    console.debug('[SMART-MARKET] Food-based backend place suggestion unavailable:', error);
+  }
+  return [];
 }
 
 /** @deprecated Kept only for visual fallback comparison; production uses the backend proxy above. */

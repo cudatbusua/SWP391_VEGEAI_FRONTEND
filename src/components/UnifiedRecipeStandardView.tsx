@@ -38,6 +38,8 @@ export interface UnifiedRecipeData {
   safetyNotes?: string[];
   sourceType: 'VERIFIED_RECIPE' | 'BLOG_AI' | 'VIDEO_AI';
   sourceUrl?: string;
+  isFallback?: boolean;
+  fallbackNotice?: string;
 }
 
 function inferCategory(raw: string): { category: 'produce' | 'protein' | 'grains' | 'spices'; categoryLabel: string; name: string; amount: string } {
@@ -135,6 +137,14 @@ export const UnifiedRecipeStandardView: React.FC<{ recipe: UnifiedRecipeData }> 
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
             {recipe.description}
           </p>
+        )}
+        {(recipe.fallbackNotice || recipe.isFallback) && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 dark:border-amber-800/70 bg-amber-50 dark:bg-amber-950/40 px-3.5 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+            <AlertCircle size={15} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+            <span>
+              {recipe.fallbackNotice || 'Đang hiển thị công thức mẫu dự phòng do Gemini AI chưa cấu hình hoặc tạm gián đoạn.'}
+            </span>
+          </div>
         )}
       </div>
 

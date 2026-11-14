@@ -247,11 +247,16 @@ export interface AiModelStatus {
 
 export interface AiOpsStatus {
   systemHealth: string;
-  uptimePercentage: number;
-  averageLatencyMs: number;
+  uptimePercentage?: number;
+  successRatePercentage?: number | null;
+  averageLatencyMs?: number | null;
   totalAiRequests: number;
+  failedAiRequests?: number;
   guestAiRequestsToday: number;
-  lastHealthCheckAt: string;
+  moderationReviewedCount?: number;
+  moderationAgreementRate?: number | null;
+  lastHealthCheckAt?: string;
+  generatedAt?: string;
   models: AiModelStatus[];
 }
 
@@ -278,6 +283,23 @@ export interface GeneratedRecipeAiResponse {
   ingredients: string[];
   instructions: string[];
   safetyNotes?: string[];
+  source?: 'AI' | 'TEMPLATE_FALLBACK' | string;
+  aiFallbackNotice?: string;
   createdAt?: string;
   requiresProfileSetup?: boolean;
+}
+
+export interface BlogInsightAiResponse {
+  postId: string;
+  headline: string;
+  categoryBadge: string;
+  keyTakeaways: string[];
+  scientificOrLifestyleInsight: string;
+  actionableSteps: string[];
+  personalizedNote?: string;
+  nutritionSafetyDisclaimer: string;
+  suggestedFollowUpPrompt: string;
+  source: 'AI' | string;
+  model?: string;
+  generatedAt?: string;
 }

@@ -118,6 +118,8 @@ function VideoAiRecipeCopilot({
               safetyNotes: recipe.safetyNotes,
               sourceType: 'VIDEO_AI',
               sourceUrl: videoUrl,
+              isFallback: recipe.source === 'TEMPLATE_FALLBACK',
+              fallbackNotice: recipe.aiFallbackNotice,
             }}
           />
           <div className="flex justify-end pt-2">

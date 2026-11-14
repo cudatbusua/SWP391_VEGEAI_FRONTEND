@@ -1,4 +1,4 @@
-import type { AiChatMessage, AiChatResponse, FridgeScanResponse, GeneratedRecipeAiResponse, GenerateRecipeAiRequest } from '../types/api';
+import type { AiChatMessage, AiChatResponse, BlogInsightAiResponse, FridgeScanResponse, GeneratedRecipeAiResponse, GenerateRecipeAiRequest } from '../types/api';
 import { apiRequest } from './apiClient';
 
 export const aiService = {
@@ -34,6 +34,25 @@ export const aiService = {
       timeoutMs: 90000,
     });
     if (!response.data) throw new Error('AI chưa trả về công thức từ video.');
+    return response.data;
+  },
+
+  async analyzeBlogPost(postId: string): Promise<BlogInsightAiResponse> {
+    const trimmed = postId?.trim();
+    if (!trimmed) throw new Error('Không xác định được mã bài viết cần phân tích.');
+    const response = await apiRequest<BlogInsightAiResponse>('/ai/blog-insight', {
+      method: 'POST',
+      body: { postId: trimmed },
+      timeoutMs: 90000,
+    });
+    if (
+      !response.data ||
+      !response.data.headline?.trim() ||
+      !Array.isArray(response.data.keyTakeaways) ||
+      response.data.keyTakeaways.length === 0
+    ) {
+      throw new Error('AI chưa trả về kết quả phân tích bài viết hợp lệ.');
+    }
     return response.data;
   },
 

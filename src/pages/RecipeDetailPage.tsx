@@ -5,9 +5,12 @@ import { MainLayout } from '../layouts/MainLayout';
 import { RecipeImage } from '../components/RecipeImage';
 import { VideoPlayer } from '../components/CommunityUi';
 import { recipeService } from '../services/recipeService';
+import { blogService } from '../services/blogService';
 import { ApiError, errorMessage } from '../services/apiClient';
 import { ContentInteractions } from '../components/ContentInteractions';
 import type { RecipeDetail } from '../types/recipe';
+import type { BlogPost } from '../types/blog';
+import { blogCategories } from '../types/blog';
 
 function inferIngredientCategory(name: string): { category: 'produce' | 'protein' | 'grains' | 'spices'; categoryLabel: string } {
   const lower = name.toLowerCase();
@@ -26,14 +29,34 @@ function inferIngredientCategory(name: string): { category: 'produce' | 'protein
 export function RecipeDetailPage() {
   const { id } = useParams();
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
+  const [relatedBlogs, setRelatedBlogs] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notFound, setNotFound] = useState(false);
   const [reload, setReload] = useState(0);
   useEffect(() => {
-    const controller = new AbortController(); setLoading(true); setRecipe(null); setError(''); setNotFound(false);
+    const controller = new AbortController(); setLoading(true); setRecipe(null); setRelatedBlogs([]); setError(''); setNotFound(false);
     if (!id) { setNotFound(true); setLoading(false); return; }
-    recipeService.detail(id, controller.signal).then(value => { if (!controller.signal.aborted) setRecipe(value); })
+    recipeService.detail(id, controller.signal).then(async value => {
+      if (controller.signal.aborted) return;
+      setRecipe(value);
+      const searchHint = value.title.split(/\s+/).slice(0, 2).join(' ').trim();
+      try {
+        const matched = searchHint
+          ? await blogService.published({ keyword: searchHint, page: 0 }, controller.signal)
+          : null;
+        if (controller.signal.aborted) return;
+        const items = matched?.items?.slice(0, 2) || [];
+        if (items.length > 0) {
+          setRelatedBlogs(items);
+        } else {
+          const latest = await blogService.published({ page: 0 }, controller.signal);
+          if (!controller.signal.aborted) setRelatedBlogs((latest.items || []).slice(0, 2));
+        }
+      } catch {
+        // Optional related blogs: keep page functional if blog feed request fails
+      }
+    })
       .catch(reason => {
         if (controller.signal.aborted) return;
         if (reason instanceof ApiError && ([400, 404].includes(reason.status) || [1001, 2101].includes(reason.code || 0))) setNotFound(true);
@@ -119,10 +142,10 @@ export function RecipeDetailPage() {
             <ShoppingBag size={15} /> Đi chợ mua nguyên liệu
           </Link>
           <Link
-            to="/restaurants"
+            to={`/smart-market?food=${encodeURIComponent(recipe.title)}#store-list`}
             className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 hover:border-emerald-400 text-slate-700 dark:text-slate-200 text-xs font-bold transition"
           >
-            <MapPin size={15} className="text-emerald-600" /> Quán chay gần đây
+            <MapPin size={15} className="text-emerald-600" /> Tìm quán chay &amp; nguyên liệu
           </Link>
         </div>
       </div>
@@ -157,18 +180,34 @@ export function RecipeDetailPage() {
           </Link>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Link to="/blog" className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:border-emerald-500 transition group shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-950 px-2.5 py-0.5 rounded-full">Kỹ thuật nấu chay</span>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 mt-2 truncate">Bí quyết nêm nếm món chay thanh ngọt tự nhiên không cần hạt nêm công nghiệp</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Sử dụng mía lau, củ sen, nấm hương và bắp ngọt để tạo vị ngọt hậu tự nhiên cho mọi món canh và kho.</p>
-          </Link>
-          <Link to="/blog" className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:border-emerald-500 transition group shadow-2xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 bg-teal-100/70 dark:bg-teal-950 px-2.5 py-0.5 rounded-full">Dinh dưỡng thực vật</span>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 mt-2 truncate">Bổ sung đủ đạm và khoáng chất cho người mới bắt đầu ăn chay</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Phối hợp giữa đậu hạt, đậu hũ non, hạt lanh và rau xanh thẫm để không lo thiếu chất hay mệt mỏi.</p>
-          </Link>
-        </div>
+        {relatedBlogs.length > 0 ? (
+          <div className="grid sm:grid-cols-2 gap-4">
+            {relatedBlogs.map(post => (
+              <Link
+                key={post.postId}
+                to={'/blog/' + post.postId}
+                className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 hover:border-emerald-500 transition group shadow-2xs"
+              >
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-950 px-2.5 py-0.5 rounded-full">
+                  {blogCategories[post.category] || 'Cộng đồng'}
+                </span>
+                <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-700 mt-2 truncate">
+                  {post.title}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
+                  {post.excerpt || 'Xem bài viết chi tiết từ cộng đồng VEGEAI.'}
+                </p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Chưa có bài blog cộng đồng được xuất bản cho chủ đề này.{' '}
+            <Link to="/blog" className="text-emerald-700 dark:text-emerald-400 font-bold hover:underline">
+              Khám phá thêm trên Bảng tin →
+            </Link>
+          </p>
+        )}
       </section>
       <ContentInteractions type="RECIPE" id={recipe.recipeId} />
     </>}

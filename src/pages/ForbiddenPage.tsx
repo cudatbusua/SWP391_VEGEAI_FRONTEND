@@ -49,13 +49,13 @@ export const ForbiddenPage: React.FC = () => {
             <div className="flex justify-between items-center">
               <span className="text-stone-500 dark:text-slate-400 font-medium">Tài khoản:</span>
               <span className="font-semibold text-stone-800 dark:text-slate-200">
-                {isAuthenticated ? (user?.name || user?.username || 'Đã đăng nhập') : 'Khách vãng lai'}
+                {isAuthenticated ? (user?.name || user?.username || 'Đã đăng nhập') : 'Chưa đăng nhập'}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-stone-500 dark:text-slate-400 font-medium">Vai trò hiện tại:</span>
               <span className="font-mono uppercase font-bold text-emerald-600 dark:text-emerald-400">
-                {user?.role || 'GUEST'}
+                {user?.role || 'Chưa xác thực'}
               </span>
             </div>
             <div className="flex justify-between items-center border-t border-stone-200/60 dark:border-slate-700/60 pt-2">

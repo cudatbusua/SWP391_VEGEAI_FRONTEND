@@ -10,7 +10,7 @@ export interface MealPlanSummary { id: string; period: MealPlanPeriod; startDate
 export interface MealCalendarDay { date: string; planId: string; period: MealPlanPeriod; targets: NutritionTargets; meals: PlannedMeal[]; totals: PlanNutrients; needsReview: boolean; }
 export interface RecordedMeal { id: string; date: string; slot: number; planId: string; recipeId: string; title: string; portions: number; nutrition: PlanNutrients; recordedAt: string; }
 export interface DailyIntake { date: string; meals: RecordedMeal[]; totals: PlanNutrients; }
-export interface GenerateMealPlan { period: MealPlanPeriod; startDate: string; mealsPerDay: number; days?: number; }
+export interface GenerateMealPlan { period: MealPlanPeriod; startDate: string; mealsPerDay: number; days?: number; wearableActiveCalories?: number; }
 export type Season = 'XUAN' | 'HA' | 'THU' | 'DONG';
 export type Region = 'MIEN_BAC' | 'MIEN_TRUNG' | 'MIEN_NAM';
 export interface SeasonalMealSuggestion { mealType: string; dishName: string; seasonalIngredients: string; healthBenefits: string; regionalHighlights: string; estimatedCalories: number; cookingTip: string; recipeId?: string | null; }

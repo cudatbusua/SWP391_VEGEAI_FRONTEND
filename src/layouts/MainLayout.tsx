@@ -55,9 +55,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
   const guestNavItems: { label: string; path: string; isActive: boolean }[] = [
     { label: 'Khám phá & Cộng đồng', path: '/explore', isActive: isDiscoverActive && pathname !== '/restaurants' },
-    { label: 'Tủ Lạnh Thông Minh (Vision)', path: '/fridge-scan', isActive: isFridgeActive },
     { label: 'Định Vị Quán Chay & Điểm Bán (GPS)', path: '/smart-market', isActive: isSmartMarketActive },
-    { label: 'AI Bếp trưởng (Dùng thử)', path: '/ai-chef', isActive: pathname === '/ai-chef' },
+    { label: 'AI Bếp trưởng', path: '/ai-chef', isActive: pathname === '/ai-chef' },
   ];
 
   if (isAdmin) return <AdminLayout>{children}</AdminLayout>;
@@ -201,7 +200,6 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
               <Link to="/explore" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname === '/explore' || pathname.startsWith('/recipe') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><UtensilsCrossed size={14} /> Công thức nấu ăn</Link>
               <Link to="/blog" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/blog') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><BookOpen size={14} /> Blog dinh dưỡng</Link>
               <Link to="/videos" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/videos') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><CirclePlay size={14} /> Video nấu chay</Link>
-              <Link to="/questions" className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-1.5 font-bold transition ${pathname.startsWith('/questions') ? 'bg-white text-emerald-800 shadow-xs dark:bg-[#0f1720] dark:text-emerald-300' : 'text-slate-600 hover:text-emerald-700 dark:text-slate-400'}`}><MessageCircle size={14} /> Hỏi đáp (Q&A)</Link>
             </div>
           </div>
         )}

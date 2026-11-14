@@ -56,7 +56,7 @@ export function OpenStreetMapVegetarianMap({ center, places, selectedPlace, onSe
         scrollWheelZoom
         className="z-0 h-full min-h-[420px] w-full"
         style={{ height: '100%', minHeight: '420px', width: '100%' }}
-        aria-label="Bản đồ chỉ hiển thị quán chay đã lọc"
+        aria-label="Bản đồ địa điểm ăn chay và cửa hàng nguyên liệu"
       >
         <TileLayer
           key={`${tileConfig.label}-${theme}`}

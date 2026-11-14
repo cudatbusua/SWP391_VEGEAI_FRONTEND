@@ -31,6 +31,7 @@ import type {
   TimeRange,
   EventLevel
 } from '../types/aiMonitoring';
+import type { AiOpsStatus } from '../types/api';
 
 export function AdminAiMonitoringPage() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -38,13 +39,15 @@ export function AdminAiMonitoringPage() {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'audit' | 'logs'>('overview');
   const [overview, setOverview] = useState<AiMonitoringOverview | null>(null);
+  const [aiStatus, setAiStatus] = useState<AiOpsStatus | null>(null);
   const [loadingOverview, setLoadingOverview] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Events tab state
   const [events, setEvents] = useState<AiMonitoringEvent[]>([]);
-  const [eventsPage] = useState(0);
+  const [eventsPage, setEventsPage] = useState(0);
   const [eventsTotal, setEventsTotal] = useState(0);
+  const eventsPageSize = 20;
   const [eventRange, setEventRange] = useState<TimeRange>('LAST_24_HOURS');
   const [eventLevel, setEventLevel] = useState<EventLevel | ''>('');
   const [eventSearch, setEventSearch] = useState('');
@@ -66,8 +69,12 @@ export function AdminAiMonitoringPage() {
   const fetchOverview = useCallback(async () => {
     setLoadingOverview(true);
     try {
-      const data = await adminService.getAiMonitoringOverview();
+      const [data, statusData] = await Promise.all([
+        adminService.getAiMonitoringOverview(),
+        adminService.aiStatus().catch(() => null),
+      ]);
       setOverview(data);
+      setAiStatus(statusData);
     } catch (err: any) {
       console.error('[AI-MONITORING] Fetch overview failed:', err);
     } finally {
@@ -83,7 +90,7 @@ export function AdminAiMonitoringPage() {
         level: eventLevel ? eventLevel : undefined,
         search: eventSearch.trim() || undefined,
         page: eventsPage,
-        size: 20
+        size: eventsPageSize
       });
       setEvents(res.items || []);
       setEventsTotal(res.totalElements || 0);
@@ -257,7 +264,7 @@ export function AdminAiMonitoringPage() {
         )}
 
         {/* KPI Metrics Cards (24-Hour Window) */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3.5">
           <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs">
             <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
               <Activity className="w-3.5 h-3.5 text-emerald-600" /> Lượt gọi (24h)
@@ -328,6 +335,18 @@ export function AdminAiMonitoringPage() {
             </div>
             <span className="text-[10px] text-teal-600 font-bold mt-0.5 block">
               Chatbot thử nghiệm
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-2xs">
+            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-500" /> Độ Chính Xác AI Duyệt
+            </span>
+            <div className="text-xl sm:text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">
+              {aiStatus?.moderationAgreementRate != null ? `${aiStatus.moderationAgreementRate}%` : '--'}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
+              {aiStatus?.moderationReviewedCount ?? 0} bài đã đối chiếu Admin
             </span>
           </div>
         </div>
@@ -419,12 +438,18 @@ export function AdminAiMonitoringPage() {
                   type="text"
                   placeholder="Tìm theo Request ID, model, caller hoặc mã lỗi..."
                   value={eventSearch}
-                  onChange={e => setEventSearch(e.target.value)}
+                  onChange={e => {
+                    setEventSearch(e.target.value);
+                    setEventsPage(0);
+                  }}
                   className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs w-72 text-slate-900 dark:text-white"
                 />
                 <button
                   type="button"
-                  onClick={fetchEvents}
+                  onClick={() => {
+                    if (eventsPage !== 0) setEventsPage(0);
+                    else fetchEvents();
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-bold transition cursor-pointer"
                 >
                   <Search className="w-3.5 h-3.5 inline mr-1" /> Lọc
@@ -434,7 +459,10 @@ export function AdminAiMonitoringPage() {
               <div className="flex items-center gap-2 text-xs">
                 <select
                   value={eventRange}
-                  onChange={e => setEventRange(e.target.value as any)}
+                  onChange={e => {
+                    setEventRange(e.target.value as any);
+                    setEventsPage(0);
+                  }}
                   className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-white"
                 >
                   <option value="TODAY">Hôm nay</option>
@@ -445,7 +473,10 @@ export function AdminAiMonitoringPage() {
 
                 <select
                   value={eventLevel}
-                  onChange={e => setEventLevel(e.target.value as any)}
+                  onChange={e => {
+                    setEventLevel(e.target.value as any);
+                    setEventsPage(0);
+                  }}
                   className="px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-800 dark:text-white"
                 >
                   <option value="">Tất cả trạng thái</option>
@@ -532,6 +563,29 @@ export function AdminAiMonitoringPage() {
                     ))}
                   </tbody>
                 </table>
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 text-xs">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    Hiển thị trang <strong className="text-slate-800 dark:text-slate-200">{eventsPage + 1}</strong> / {Math.max(1, Math.ceil(eventsTotal / eventsPageSize))} · Tổng {eventsTotal.toLocaleString('vi-VN')} sự kiện
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={eventsPage <= 0 || loadingEvents}
+                      onClick={() => setEventsPage(p => Math.max(0, p - 1))}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                    >
+                      Trang trước
+                    </button>
+                    <button
+                      type="button"
+                      disabled={(eventsPage + 1) * eventsPageSize >= eventsTotal || loadingEvents}
+                      onClick={() => setEventsPage(p => p + 1)}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+                    >
+                      Trang sau
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>

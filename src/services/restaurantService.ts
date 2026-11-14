@@ -5,6 +5,7 @@ export interface Coordinates { lat: number; lon: number; }
 export interface Place {
   id: string; name: string; lat: number; lon: number; distance: number; address: string;
   category: PlaceCategory; rating?: number; openNow?: boolean; photoUrl?: string; openStreetMapUrl?: string; attribution?: string; isSample: boolean;
+  isVerified?: boolean; types?: string[];
 }
 interface BackendPlace {
   placeId: string; name: string; latitude: number; longitude: number; distanceKm?: number;
@@ -32,6 +33,8 @@ function mapPlaces(values: BackendPlace[]): Place[] {
     openStreetMapUrl: value.openStreetMapUrl || value.googleMapsUrl,
     attribution: value.attribution,
     isSample: value.placeId.startsWith('mock_'),
+    isVerified: value.isVerified,
+    types: value.types,
   })).sort((a, b) => a.distance - b.distance);
 }
 
@@ -47,9 +50,10 @@ export const restaurantService = {
     if (!response.data) throw new Error('Không thể tải danh mục địa điểm.');
     return response.data;
   },
-  async search(query: string, center?: Coordinates, radius = 10): Promise<Place[]> {
+  async search(query: string, center?: Coordinates, radius = 10, category: PlaceCategory = 'ALL'): Promise<Place[]> {
     const params = new URLSearchParams({ query: query.trim(), radius: String(radius * 1000) });
     if (center) { params.set('lat', String(center.lat)); params.set('lng', String(center.lon)); }
+    if (category && category !== 'ALL') { params.set('category', category); }
     const response = await apiRequest<BackendPlace[]>('/places/search?' + params, { auth: 'none', timeoutMs: 45000 });
     if (!response.data) throw new Error('Không thể tìm địa điểm.');
     return mapPlaces(response.data);
@@ -72,5 +76,28 @@ export const restaurantService = {
     const response = await apiRequest<BackendPlace[]>('/places/verified/search?' + params, { auth: 'none', timeoutMs: 45000 });
     if (!response.data) throw new Error('Máy chủ không trả về kết quả quán chay.');
     return mapPlaces(exclusiveVegetarianRestaurants(response.data));
+  },
+  async suggestForFood(food: string, center?: Coordinates, radius = 5): Promise<Place[]> {
+    const params = new URLSearchParams({ food: food.trim(), radius: String(radius * 1000) });
+    if (center) { params.set('lat', String(center.lat)); params.set('lng', String(center.lon)); }
+    const response = await apiRequest<BackendPlace[]>('/places/suggest-for-food?' + params, { auth: 'none', timeoutMs: 30000 });
+    if (!response.data) return [];
+    return response.data
+      .filter(value => Number.isFinite(value.latitude) && Number.isFinite(value.longitude))
+      .map(value => ({
+        id: value.placeId,
+        name: value.name,
+        lat: value.latitude,
+        lon: value.longitude,
+        distance: value.distanceKm ?? 0,
+        address: value.address || '',
+        category: value.category,
+        rating: value.rating,
+        openNow: value.isOpenNow ?? value.openNow,
+        photoUrl: value.photoUrl,
+        openStreetMapUrl: value.openStreetMapUrl || value.googleMapsUrl,
+        attribution: value.attribution,
+        isSample: value.placeId.startsWith('mock_'),
+      }));
   },
 };

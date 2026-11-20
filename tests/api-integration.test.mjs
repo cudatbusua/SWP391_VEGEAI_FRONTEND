@@ -617,3 +617,32 @@ test('analyzeBlogPost requires member auth, calls /ai/blog-insight, and rejects 
   payload = { postId: 'post-1', headline: 'Thiếu luận điểm', keyTakeaways: [] };
   await assert.rejects(fixture.ai.analyzeBlogPost('post-1'), /chưa trả về/);
 });
+
+test('Google login and profile restore map avatarUrl into user.avatar', async () => {
+  const googleAvatar = 'https://lh3.googleusercontent.com/a/example-photo=s96-c';
+  const fixture = setup((url) => {
+    if (url === '/api/auth/google') return reply({ ...auth('google-token'), avatarUrl: googleAvatar });
+    if (url === '/api/auth/refresh') return reply({ ...auth('refreshed-token'), avatarUrl: googleAvatar });
+    if (url === '/api/users/me') return reply({ ...profile, avatarUrl: '/api/public/content-interactions/assets/custom.png' });
+    return reply(null, 404);
+  });
+
+  const loggedIn = await fixture.auth.loginWithGoogle('fake-google-token', true);
+  assert.equal(loggedIn.success, true);
+  assert.equal(loggedIn.data.avatar, googleAvatar);
+
+  const restored = await fixture.auth.getCurrentUser();
+  assert.equal(restored.avatar, '/api/public/content-interactions/assets/custom.png');
+});
+
+test('changeUsername normalizes input and sends PUT /api/users/me/username with bearer auth', async () => {
+  const fixture = setup(() => reply({ ...profile, username: 'vege_star' }));
+  fixture.api.setSession(auth(), true);
+
+  const updated = await fixture.users.changeUsername('  Vege_Star  ');
+  assert.equal(updated.username, 'vege_star');
+  assert.equal(fixture.calls[0].url, '/api/users/me/username');
+  assert.equal(fixture.calls[0].method, 'PUT');
+  assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
+  assert.deepEqual(JSON.parse(fixture.calls[0].body), { username: 'vege_star' });
+});

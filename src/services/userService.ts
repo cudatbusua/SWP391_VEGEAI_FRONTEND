@@ -26,6 +26,14 @@ export const userService = {
     if (!response.data) throw new Error('Không thể cập nhật địa chỉ email.');
     return response.data;
   },
+  async changeUsername(username: string): Promise<UserProfile> {
+    const response = await apiRequest<UserProfile>('/users/me/username', {
+      method: 'PUT',
+      body: { username: username.trim().toLowerCase() },
+    });
+    if (!response.data) throw new Error('Không thể cập nhật tên người dùng.');
+    return response.data;
+  },
   async changePassword(currentPassword: string, newPassword: string, confirmNewPassword: string): Promise<void> {
     await apiRequest('/users/me/password-hashed', { method: 'PUT', body: {
       currentPassword: await hashPassword(currentPassword),

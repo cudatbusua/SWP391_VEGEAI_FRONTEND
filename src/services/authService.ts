@@ -4,8 +4,14 @@ import { apiRequest, clearSession, errorMessage, hasSession, refreshSession, set
 import { hashPassword } from '../utils/password';
 
 export function toUser(profile: AuthResponse | UserProfile): User {
-  return { id: profile.userId, name: profile.fullName || profile.username, username: profile.username,
-    emailOrPhone: profile.email, role: profile.role === 'ADMIN' ? 'admin' : 'user' };
+  return {
+    id: profile.userId,
+    name: profile.fullName || profile.username,
+    username: profile.username,
+    emailOrPhone: profile.email,
+    role: profile.role === 'ADMIN' ? 'admin' : 'user',
+    ...(profile.avatarUrl ? { avatar: profile.avatarUrl } : {}),
+  };
 }
 async function action<T>(callback: () => Promise<T>): Promise<ActionResult<T>> {
   try { return { success: true, data: await callback() }; }

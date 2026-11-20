@@ -13,6 +13,7 @@ export interface AuthResponse {
   username: string;
   email: string;
   fullName: string;
+  avatarUrl?: string;
   role: string;
   status: string;
 }

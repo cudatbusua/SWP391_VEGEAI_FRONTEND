@@ -344,7 +344,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
               error={errors.password}
             />
 
-            {/* Row: Ghi nhớ đăng nhập (1 ngày) | Quên mật khẩu? */}
+            {/* Row: Ghi nhớ đăng nhập | Quên mật khẩu? */}
             <div className="flex items-center justify-between pt-1 text-xs">
               <label className="flex items-center gap-2 text-gray-600 dark:text-slate-300 cursor-pointer select-none">
                 <input
@@ -353,7 +353,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
                   onChange={(e) => setFormData({ ...formData, rememberMe: e.target.checked })}
                   className="w-4 h-4 rounded text-emerald-600 border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-emerald-500"
                 />
-                <span>Ghi nhớ đăng nhập (1 ngày)</span>
+                <span>Ghi nhớ đăng nhập</span>
               </label>
 
               <Link
@@ -485,7 +485,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
                 <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-slate-500 pointer-events-none" />
               </div>
               <p className="text-[11px] text-gray-400 dark:text-slate-500 text-center mt-2">
-                {formData.rememberMe ? '✓ Ghi nhớ phiên trong 24 giờ sau khi xác thực thành công' : 'Phiên đăng nhập tạm thời cho phiên duyệt hiện tại'}
+                {formData.rememberMe ? '✓ Duy trì phiên đăng nhập trên thiết bị này sau khi xác thực thành công' : 'Phiên đăng nhập tạm thời cho phiên duyệt hiện tại'}
               </p>
             </div>
 

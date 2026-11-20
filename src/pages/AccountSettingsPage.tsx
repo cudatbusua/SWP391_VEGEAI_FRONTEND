@@ -24,7 +24,7 @@ import {
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../store/ThemeContext';
-import { authService } from '../services/authService';
+import { authService, toUser } from '../services/authService';
 import { userService } from '../services/userService';
 import { nutritionService } from '../services/nutritionService';
 import { MealPlanCalendarPlanner } from '../components/MealPlanCalendarPlanner';
@@ -50,8 +50,29 @@ const ALLERGIES_LIST = [
   'Nấm hương'
 ];
 
+const RESERVED_USERNAMES = new Set([
+  'admin', 'administrator', 'root', 'system', 'support',
+  'vegeai', 'moderator', 'staff', 'null', 'undefined',
+  'me', 'api', 'login', 'register', 'settings'
+]);
+
+function validateUsernameInput(raw: string): string | null {
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) return 'Vui lòng nhập tên người dùng.';
+  if (normalized.length < 4 || normalized.length > 50) {
+    return 'Tên người dùng phải có từ 4 đến 50 ký tự.';
+  }
+  if (!/^(?=.*[a-zA-Z])[a-zA-Z0-9_]{4,50}$/.test(normalized)) {
+    return 'Tên người dùng chỉ gồm chữ cái không dấu, số, dấu gạch dưới (_) và phải có ít nhất 1 chữ cái.';
+  }
+  if (RESERVED_USERNAMES.has(normalized)) {
+    return 'Tên người dùng này thuộc danh sách hệ thống bảo lưu. Vui lòng chọn tên khác.';
+  }
+  return null;
+}
+
 export const AccountSettingsPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { theme, setTheme } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'profile';
@@ -71,6 +92,10 @@ export const AccountSettingsPage: React.FC = () => {
 
   // Profile Form state
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameMessage, setUsernameMessage] = useState('');
+  const [usernameError, setUsernameError] = useState('');
+  const [isChangingUsername, setIsChangingUsername] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [gender, setGender] = useState('');
@@ -123,6 +148,7 @@ export const AccountSettingsPage: React.FC = () => {
         } catch {}
         setAvatar(data.avatarUrl || '');
         setFullName(data.fullName || '');
+        setUsername(data.username || '');
         setPhoneNumber(data.phoneNumber || '');
         setDateOfBirth(data.dateOfBirth || '');
         setGender(data.gender || '');
@@ -174,6 +200,16 @@ export const AccountSettingsPage: React.FC = () => {
       setProfileError('Vui lòng nhập họ và tên.');
       return;
     }
+    const normalizedUsername = username.trim().toLowerCase();
+    const currentUsername = (profile?.username || user?.username || '').trim().toLowerCase();
+    const usernameChanged = normalizedUsername !== '' && normalizedUsername !== currentUsername;
+    if (usernameChanged) {
+      const usernameValidationError = validateUsernameInput(normalizedUsername);
+      if (usernameValidationError) {
+        setProfileError(usernameValidationError);
+        return;
+      }
+    }
     if (heightCm !== '' && (Number(heightCm) < 100 || Number(heightCm) > 280)) {
       setProfileError('Chiều cao phải nằm trong khoảng 100–280 cm.');
       return;
@@ -185,6 +221,13 @@ export const AccountSettingsPage: React.FC = () => {
 
     setIsSavingProfile(true);
     try {
+      if (usernameChanged) {
+        const usernameUpdated = await userService.changeUsername(normalizedUsername);
+        setProfile(usernameUpdated);
+        setUsername(usernameUpdated.username || normalizedUsername);
+        updateUser(toUser(usernameUpdated));
+      }
+
       const payload: UpdateUserProfile = {
         fullName: fullName.trim(),
         phoneNumber: phoneNumber.trim() || undefined,
@@ -203,6 +246,7 @@ export const AccountSettingsPage: React.FC = () => {
 
       const updated = await userService.updateProfile(payload);
       setProfile(updated);
+      updateUser(toUser(updated));
 
       const effectiveGender = (gender === 'MALE' || gender === 'FEMALE')
         ? gender
@@ -296,6 +340,7 @@ export const AccountSettingsPage: React.FC = () => {
     try {
       const updated = await userService.changeEmail(newEmail.trim(), emailPassword);
       setProfile(updated);
+      updateUser(toUser(updated));
       setNewEmail('');
       setEmailPassword('');
       setEmailMessage('Đã cập nhật địa chỉ email đăng nhập.');
@@ -304,6 +349,40 @@ export const AccountSettingsPage: React.FC = () => {
       setEmailError(errorMessage(err));
     } finally {
       setIsChangingEmail(false);
+    }
+  };
+
+  const handleChangeUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUsernameMessage('');
+    setUsernameError('');
+    const normalized = username.trim().toLowerCase();
+    const validationErr = validateUsernameInput(normalized);
+    if (validationErr) {
+      setUsernameError(validationErr);
+      return;
+    }
+    if (normalized === (profile?.username || user?.username || '').toLowerCase()) {
+      setUsernameMessage('Tên người dùng hiện tại đã trùng khớp.');
+      return;
+    }
+    setIsChangingUsername(true);
+    try {
+      const updated = await userService.changeUsername(normalized);
+      setProfile(updated);
+      setUsername(updated.username || normalized);
+      updateUser(toUser(updated));
+      try {
+        localStorage.setItem('vegeai_user_profile', JSON.stringify(updated));
+        window.dispatchEvent(new Event('user_profile_updated'));
+      } catch {}
+      setUsernameMessage(`Đã cập nhật tên người dùng thành @${updated.username}.`);
+      sfx.playSuccess();
+      setTimeout(() => setUsernameMessage(''), 5000);
+    } catch (err) {
+      setUsernameError(errorMessage(err));
+    } finally {
+      setIsChangingUsername(false);
     }
   };
 
@@ -558,7 +637,7 @@ export const AccountSettingsPage: React.FC = () => {
               <div className="flex flex-col items-center gap-2 shrink-0">
                 <div className="relative">
                   <div className="w-24 h-24 overflow-hidden rounded-full bg-linear-to-br from-emerald-600 via-teal-600 to-emerald-800 text-white flex items-center justify-center font-extrabold text-3xl shadow-lg ring-4 ring-emerald-100 dark:ring-emerald-950/60">
-                    {avatar ? <img src={avatar} alt="Ảnh đại diện" className="h-full w-full object-cover" onError={() => setAvatar('')} /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
+                    {avatar ? <img src={avatar} alt="Ảnh đại diện" referrerPolicy="no-referrer" className="h-full w-full object-cover" onError={() => setAvatar('')} /> : (fullName ? fullName.charAt(0).toUpperCase() : user?.name?.charAt(0) || 'V')}
                   </div>
                   <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" title="Đang trực tuyến" />
                 </div>
@@ -574,6 +653,8 @@ export const AccountSettingsPage: React.FC = () => {
                       const updated = await userService.updateAvatar(file);
                       setProfile(updated);
                       setAvatar(updated.avatarUrl || '');
+                      updateUser(toUser(updated));
+                      try { localStorage.setItem('vegeai_user_profile', JSON.stringify(updated)); } catch {}
                       setProfileSuccess('Đã cập nhật ảnh đại diện thành công.');
                     } catch (reason) {
                       setProfileError(errorMessage(reason));
@@ -681,59 +762,87 @@ export const AccountSettingsPage: React.FC = () => {
           <form onSubmit={handleSaveProfile} className="space-y-6">
             
             {/* Grid 1: Basic Demographics */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Họ và tên *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
-                />
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Họ và tên *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Tên người dùng (@username) *
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">
+                      @
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      minLength={4}
+                      maxLength={50}
+                      value={username}
+                      onChange={e => setUsername(e.target.value.replace(/\s+/g, ''))}
+                      placeholder="vege_lover"
+                      className="w-full pl-8 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    4–50 ký tự (chữ không dấu, số, dấu _). Tự động tạo từ Gmail và có thể cập nhật thủ công.
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Số điện thoại
-                </label>
-                <input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={e => setPhoneNumber(e.target.value)}
-                  placeholder="0912345678"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
-                />
-              </div>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={e => setPhoneNumber(e.target.value)}
+                    placeholder="0912345678"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Ngày sinh
-                </label>
-                <input
-                  type="date"
-                  value={dateOfBirth}
-                  onChange={e => setDateOfBirth(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Ngày sinh
+                  </label>
+                  <input
+                    type="date"
+                    value={dateOfBirth}
+                    onChange={e => setDateOfBirth(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Giới tính
-                </label>
-                <select
-                  value={gender}
-                  onChange={e => setGender(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
-                >
-                  <option value="">Chưa chọn</option>
-                  <option value="FEMALE">Nữ</option>
-                  <option value="MALE">Nam</option>
-                  <option value="OTHER">Khác</option>
-                </select>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Giới tính
+                  </label>
+                  <select
+                    value={gender}
+                    onChange={e => setGender(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-900 dark:text-white focus:outline-emerald-600"
+                  >
+                    <option value="">Chưa chọn</option>
+                    <option value="FEMALE">Nữ</option>
+                    <option value="MALE">Nam</option>
+                    <option value="OTHER">Khác</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -1466,6 +1575,39 @@ export const AccountSettingsPage: React.FC = () => {
                     {isOtpResetMode ? 'Đổi bằng mật khẩu cũ' : 'Quên mật khẩu? (Dùng OTP)'}
                   </button>
                 </div>
+
+                <form onSubmit={handleChangeUsername} className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 bg-slate-50/70 dark:bg-slate-800/40">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Đổi tên người dùng (@username)</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Hiện tại: <strong>@{profile?.username || user?.username}</strong> · Không cần mật khẩu (hỗ trợ cả tài khoản Gmail).
+                    </p>
+                  </div>
+                  {usernameMessage && <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">{usernameMessage}</p>}
+                  {usernameError && <p className="text-xs font-semibold text-rose-700 dark:text-rose-400">{usernameError}</p>}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-bold text-slate-400">@</span>
+                      <input
+                        type="text"
+                        required
+                        minLength={4}
+                        maxLength={50}
+                        value={username}
+                        onChange={e => { setUsername(e.target.value.replace(/\s+/g, '')); setUsernameError(''); }}
+                        placeholder="Tên người dùng mới (vd: minh_vegan)"
+                        className="w-full pl-8 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-semibold text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isChangingUsername}
+                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs disabled:opacity-50 cursor-pointer shrink-0"
+                    >
+                      {isChangingUsername ? 'Đang cập nhật...' : 'Cập nhật @username'}
+                    </button>
+                  </div>
+                </form>
 
                 <form onSubmit={handleChangeEmail} className="space-y-3 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 bg-slate-50/70 dark:bg-slate-800/40">
                   <div>

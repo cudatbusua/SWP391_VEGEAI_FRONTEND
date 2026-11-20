@@ -11,9 +11,13 @@ interface UserMenuProps {
 
 export function UserMenu({ user, loggingOut, onLogout }: UserMenuProps) {
   const [open, setOpen] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const location = useLocation();
+  const initial = user?.name?.charAt(0).toUpperCase() || 'M';
+  const avatarSrc = !avatarFailed && user?.avatar ? user.avatar : '';
 
+  useEffect(() => setAvatarFailed(false), [user?.avatar]);
   useEffect(() => setOpen(false), [location.pathname, location.search]);
 
   useEffect(() => {
@@ -42,8 +46,18 @@ export function UserMenu({ user, loggingOut, onLogout }: UserMenuProps) {
         aria-controls="user-menu"
         className="flex items-center gap-2 p-1 pr-2.5 rounded-full border border-slate-200/90 dark:border-slate-700/80 bg-white dark:bg-[#121922] hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-2xs"
       >
-        <div className="w-8 h-8 rounded-full bg-linear-to-br from-emerald-700 to-teal-800 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
-          {user?.name?.charAt(0).toUpperCase() || 'M'}
+        <div className="w-8 h-8 rounded-full overflow-hidden bg-linear-to-br from-emerald-700 to-teal-800 text-white flex items-center justify-center font-bold text-xs shadow-2xs shrink-0 ring-1 ring-emerald-500/20">
+          {avatarSrc ? (
+            <img
+              src={avatarSrc}
+              alt={user?.name || 'Ảnh đại diện'}
+              referrerPolicy="no-referrer"
+              onError={() => setAvatarFailed(true)}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            initial
+          )}
         </div>
         <span
           className="text-xs font-bold text-slate-800 dark:text-slate-100 hidden sm:block max-w-[150px] truncate"
@@ -62,15 +76,32 @@ export function UserMenu({ user, loggingOut, onLogout }: UserMenuProps) {
         >
           {/* User profile card header */}
           <div className="px-4 py-2.5 mb-1.5 border-b border-slate-100 dark:border-[#212c3b]">
-            <div className="flex items-center justify-between gap-2 mb-0.5">
-              <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{user?.name}</p>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60">
-                {user?.role === 'admin' ? 'Quản trị' : 'Thành viên'}
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full overflow-hidden bg-linear-to-br from-emerald-700 to-teal-800 text-white flex items-center justify-center font-bold text-sm shrink-0 ring-2 ring-emerald-500/20">
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={user?.name || 'Ảnh đại diện'}
+                    referrerPolicy="no-referrer"
+                    onError={() => setAvatarFailed(true)}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initial
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{user?.name}</p>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/60 shrink-0">
+                    {user?.role === 'admin' ? 'Quản trị' : 'Thành viên'}
+                  </span>
+                </div>
+                {user?.emailOrPhone && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.emailOrPhone}</p>
+                )}
+              </div>
             </div>
-            {user?.emailOrPhone && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{user.emailOrPhone}</p>
-            )}
           </div>
 
           <Link to="/settings?tab=profile" role="menuitem" className="flex items-center gap-3 px-4 py-2.5 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50/80 dark:hover:bg-slate-800 hover:text-emerald-800 dark:hover:text-emerald-400 transition">

@@ -6,11 +6,15 @@ export interface Place {
   id: string; name: string; lat: number; lon: number; distance: number; address: string;
   category: PlaceCategory; rating?: number; openNow?: boolean; photoUrl?: string; openStreetMapUrl?: string; attribution?: string; isSample: boolean;
   isVerified?: boolean; types?: string[];
+  phoneNumber?: string;
+  dietaryEvidence?: 'OSM_EXCLUSIVE' | 'OSM_OPTION' | 'NAME_ONLY';
 }
 interface BackendPlace {
   placeId: string; name: string; latitude: number; longitude: number; distanceKm?: number;
   address?: string; category: PlaceCategory; rating?: number; isOpenNow?: boolean; openNow?: boolean;
   photoUrl?: string; openStreetMapUrl?: string; googleMapsUrl?: string; attribution?: string; types?: string[]; isVerified?: boolean;
+  phoneNumber?: string;
+  dietaryEvidence?: 'OSM_EXCLUSIVE' | 'OSM_OPTION' | 'NAME_ONLY';
 }
 function exclusiveVegetarianRestaurants(values: BackendPlace[]): BackendPlace[] {
   return values.filter(value => value.category === 'RESTAURANT' && value.isVerified === true
@@ -19,7 +23,8 @@ function exclusiveVegetarianRestaurants(values: BackendPlace[]): BackendPlace[] 
       || /^cuisine=(?:vegetarian|vegan)(?:[;,](?:vegetarian|vegan))*$/i.test(type)));
 }
 function mapPlaces(values: BackendPlace[]): Place[] {
-  return values.filter(value => Number.isFinite(value.latitude) && Number.isFinite(value.longitude)).map(value => ({
+  return values.filter(value => value.placeId && !value.placeId.startsWith('mock_')
+    && Number.isFinite(value.latitude) && Number.isFinite(value.longitude)).map(value => ({
     id: value.placeId,
     name: value.name,
     lat: value.latitude,
@@ -32,13 +37,21 @@ function mapPlaces(values: BackendPlace[]): Place[] {
     photoUrl: value.photoUrl,
     openStreetMapUrl: value.openStreetMapUrl || value.googleMapsUrl,
     attribution: value.attribution,
+    phoneNumber: value.phoneNumber,
     isSample: value.placeId.startsWith('mock_'),
     isVerified: value.isVerified,
+    dietaryEvidence: value.dietaryEvidence,
     types: value.types,
   })).sort((a, b) => a.distance - b.distance);
 }
 
 export const restaurantService = {
+  async resolveArea(query: string): Promise<Coordinates | null> {
+    const params = new URLSearchParams({ query: query.trim() });
+    const response = await apiRequest<Coordinates | null>('/places/resolve-area?' + params, { auth: 'none', timeoutMs: 15000 });
+    const point = response.data;
+    return point && Number.isFinite(point.lat) && Number.isFinite(point.lon) ? point : null;
+  },
   async reverseGeocode(center: Coordinates): Promise<string> {
     const params = new URLSearchParams({ lat: String(center.lat), lng: String(center.lon) });
     const response = await apiRequest<{ address: string }>('/places/reverse-geocode?' + params, { auth: 'none', timeoutMs: 15000 });
@@ -97,6 +110,7 @@ export const restaurantService = {
         photoUrl: value.photoUrl,
         openStreetMapUrl: value.openStreetMapUrl || value.googleMapsUrl,
         attribution: value.attribution,
+        phoneNumber: value.phoneNumber,
         isSample: value.placeId.startsWith('mock_'),
       }));
   },

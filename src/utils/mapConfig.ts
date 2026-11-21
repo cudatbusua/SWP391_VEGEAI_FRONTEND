@@ -14,10 +14,10 @@ export function maskApiKey(key: string): string {
 export function getTileLayerConfig(isDarkTheme: boolean, styleOverride: MapStyleMode = 'auto') {
   if (styleOverride === 'satellite') {
     return {
-      url: 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-      attribution: '&copy; Google Maps Vệ tinh',
-      label: 'Google Vệ tinh & Đường phố',
-      subdomains: '0123',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution: 'Tiles &copy; Esri',
+      label: 'Ảnh vệ tinh Esri',
+      subdomains: '',
     };
   }
 
@@ -30,11 +30,11 @@ export function getTileLayerConfig(isDarkTheme: boolean, styleOverride: MapStyle
     };
   }
 
-  // Primary Default: Google Maps Standard Roadmap (Fastest, zero watermark, 100% unblocked in Vietnam)
+  // OpenStreetMap remains available when the Google Maps JavaScript API key is absent.
   return {
-    url: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-    attribution: '&copy; Google Maps',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
     label: isDarkTheme ? 'Bản đồ Đường phố (Tối)' : 'Bản đồ Đường phố (Sáng)',
-    subdomains: '0123',
+    subdomains: '',
   };
 }

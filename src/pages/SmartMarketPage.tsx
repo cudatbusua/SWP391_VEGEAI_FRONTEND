@@ -25,7 +25,6 @@ import {
   Tag,
   Star,
   PackageCheck,
-  Flame,
   FileDown,
 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
@@ -46,9 +45,9 @@ import {
 import {
   fetchRealPlacesNearby,
   suggestRealPlacesForFood,
-  reverseGeocodeAddress,
-  buildAnchoredStoresForCoordinates
+  reverseGeocodeAddress
 } from '../services/smartMarketRealPlacesService';
+import { restaurantService } from '../services/restaurantService';
 
 const LOCAL_STORAGE_KEY = 'vegeai:smart-market:items-v1';
 const SESSION_GPS_KEY = 'vegeai:session:gps_coords';
@@ -275,20 +274,9 @@ export function SmartMarketPage() {
     return sessionStorage.getItem(SESSION_ADDR_KEY) || '';
   });
 
-  // Stores State (Only initialized if address was already confirmed in this session)
-  const [stores, setStores] = useState<SmartMarketStore[]>(() => {
-    const cachedLoc = sessionStorage.getItem(SESSION_GPS_KEY);
-    if (cachedLoc) {
-      try {
-        const parsed = JSON.parse(cachedLoc);
-        if (parsed?.lat && parsed?.lon) {
-          return buildAnchoredStoresForCoordinates(parsed.lat, parsed.lon);
-        }
-      } catch {}
-    }
-    return [];
-  });
+  const [stores, setStores] = useState<SmartMarketStore[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
+  const [storeLoadError, setStoreLoadError] = useState<string | null>(null);
   const [storeCategoryFilter, setStoreCategoryFilter] = useState<string>('ALL');
   const [storeDistanceRadius, setStoreDistanceRadius] = useState<'ALL' | '3KM' | '5KM'>('ALL');
   const [selectedStore, setSelectedStore] = useState<SmartMarketStore | null>(null);
@@ -437,22 +425,18 @@ export function SmartMarketPage() {
     setFoodSuggestionQuery(foodParam);
   }, [location.search]);
 
-  // Show nearby stores immediately, then upgrade to real OpenStreetMap data when it arrives.
   const loadStoresForCoords = useCallback(async (lat: number, lon: number) => {
     setLoadingStores(true);
-    const fallbackStores = buildAnchoredStoresForCoordinates(lat, lon);
-    setStores(fallbackStores);
-    if (fallbackStores.length > 0) {
-      setSelectedStore(current => current ?? fallbackStores[0]);
-    }
+    setStoreLoadError(null);
+    setStores([]);
+    setSelectedStore(null);
     try {
       const realStores = await fetchRealPlacesNearby(lat, lon);
-      if (realStores.length > 0) {
-        setStores(realStores);
-        setSelectedStore(current => (current && realStores.some(store => store.id === current.id) ? current : realStores[0]));
-      }
+      setStores(realStores);
+      setSelectedStore(realStores[0] ?? null);
     } catch (err) {
       console.error('[SMART-MARKET] Failed to load stores:', err);
+      setStoreLoadError('Chưa thể tải địa điểm OpenStreetMap lúc này. Vui lòng thử lại sau.');
     } finally {
       setLoadingStores(false);
     }
@@ -524,28 +508,19 @@ export function SmartMarketPage() {
 
     // Try checking saved address from user profile
     userService.getProfile()
-      .then(res => {
+      .then(async res => {
         const profileAddr = res?.address;
         if (profileAddr && profileAddr.trim().length > 3) {
           const addr = profileAddr.trim();
           setUserAddress(addr);
-          setIsAddressConfirmed(true);
-          setLocationStatus('granted');
-          sessionStorage.setItem(SESSION_ADDR_KEY, addr);
-
-          const lower = addr.toLowerCase();
-          let lat = 10.7769;
-          let lon = 106.7009;
-          if (lower.includes('thảo điền') || lower.includes('thủ đức')) {
-            lat = 10.8030; lon = 106.7360;
-          } else if (lower.includes('phú nhuận')) {
-            lat = 10.7952; lon = 106.6855;
-          } else if (lower.includes('bình thạnh')) {
-            lat = 10.8035; lon = 106.6940;
+          try {
+            const coords = await restaurantService.resolveArea(addr);
+            if (!coords) throw new Error('Address not found');
+            await handleSelectPredefinedArea(addr, coords.lat, coords.lon);
+          } catch {
+            setLocationStatus('denied');
+            setLocationMessage('Không xác định được địa chỉ hồ sơ. Vui lòng dùng GPS hoặc nhập vị trí khác.');
           }
-          setUserLoc({ lat, lon });
-          sessionStorage.setItem(SESSION_GPS_KEY, JSON.stringify({ lat, lon }));
-          loadStoresForCoords(lat, lon);
         }
       })
       .catch(() => {
@@ -650,45 +625,14 @@ export function SmartMarketPage() {
     setLocationMessage('Đang định vị địa chỉ của bạn...');
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 4000);
-      const res = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(input)}&limit=1`,
-        { headers: { 'Accept': 'application/json' }, signal: controller.signal }
-      );
-      clearTimeout(timeout);
-      if (res.ok) {
-        const data = await res.json();
-        const coords = data?.features?.[0]?.geometry?.coordinates;
-        if (Array.isArray(coords) && coords.length >= 2) {
-          const lon = Number(coords[0]);
-          const lat = Number(coords[1]);
-          if (Number.isFinite(lat) && Number.isFinite(lon)) {
-            await handleSelectPredefinedArea(input, lat, lon);
-            setManualAddressInput('');
-            return;
-          }
-        }
-      }
-    } catch (err) {
-      console.debug('Geocode error fallback:', err);
+      const coords = await restaurantService.resolveArea(input);
+      if (!coords) throw new Error('Address not found');
+      await handleSelectPredefinedArea(input, coords.lat, coords.lon);
+      setManualAddressInput('');
+    } catch {
+      setLocationStatus('denied');
+      setLocationMessage('Không tìm thấy vị trí này. Vui lòng nhập địa chỉ cụ thể hơn hoặc dùng GPS.');
     }
-
-    // Fallback: match known zones or default District 1
-    const lower = input.toLowerCase();
-    let lat = 10.7769;
-    let lon = 106.7009;
-    if (lower.includes('thảo điền') || lower.includes('thủ đức')) {
-      lat = 10.8030; lon = 106.7360;
-    } else if (lower.includes('phú nhuận')) {
-      lat = 10.7952; lon = 106.6855;
-    } else if (lower.includes('bình thạnh')) {
-      lat = 10.8035; lon = 106.6940;
-    } else if (lower.includes('quận 3') || lower.includes('q3')) {
-      lat = 10.7828; lon = 106.6890;
-    }
-    await handleSelectPredefinedArea(input, lat, lon);
-    setManualAddressInput('');
   };
 
   const handleToggle = (id: string) => {
@@ -1227,12 +1171,11 @@ export function SmartMarketPage() {
 
             {/* SECTION 2: BỘ LỌC TÌM KIẾM & BÁN KÍNH GPS (NGAY DƯỚI BẢN ĐỒ) */}
             <div id="store-list" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-3.5">
-              {!loadingStores && stores.length > 0 && stores.every(s => s.id.startsWith('anchored-')) && (
+              {storeLoadError && (
                 <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200">
                   <Info className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>
-                    Dữ liệu bản đồ OpenStreetMap trực tiếp đang tạm gián đoạn — đang hiển thị các điểm mua sắm tham khảo quanh tọa độ của bạn.
-                  </span>
+                  <span>{storeLoadError}</span>
+                  {userLoc && <button type="button" onClick={() => loadStoresForCoords(userLoc.lat, userLoc.lon)} className="ml-auto font-bold underline">Thử lại</button>}
                 </div>
               )}
               {foodSuggestionQuery && (
@@ -1318,10 +1261,14 @@ export function SmartMarketPage() {
             </div>
 
             {/* SECTION 3: DANH SÁCH ĐỊA ĐIỂM DẠNG LƯỚI 3 CỘT (STORES & RESTAURANTS GRID) */}
+            {!loadingStores && !storeLoadError && isAddressConfirmed && filteredStores.length === 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                Chưa tìm thấy địa điểm phù hợp trong khu vực này trên OpenStreetMap. Hãy thử tăng bán kính hoặc chọn khu vực khác.
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredStores.map(store => {
                 const isSelected = selectedStore?.id === store.id;
-                const isPromoted = store.category === 'VEGAN_STORE' || store.rating >= 4.8;
                 return (
                   <div
                     key={store.id}
@@ -1332,12 +1279,6 @@ export function SmartMarketPage() {
                         : 'bg-white dark:bg-[#182230] border-slate-200 dark:border-slate-800 hover:border-emerald-400 dark:hover:border-emerald-600 hover:bg-slate-50/80 dark:hover:bg-[#1e2a3b] shadow-xs'
                     }`}
                   >
-                    {isPromoted && (
-                      <div className="absolute top-0 right-0 bg-gradient-to-l from-emerald-600 to-teal-600 text-white text-[9.5px] font-extrabold px-2.5 py-0.5 rounded-bl-lg shadow-2xs flex items-center gap-1">
-                        <Flame className="w-2.5 h-2.5" /> Quán Yêu Thích
-                      </div>
-                    )}
-
                     <div>
                       <div className="flex items-start justify-between gap-2 pr-12">
                         <div>
@@ -1365,32 +1306,32 @@ export function SmartMarketPage() {
                     <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400">
                         <Navigation className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Cách {store.distanceKm} km · 🛵 {store.duration}</span>
+                        <span>{store.distance}</span>
                       </div>
                       <div className="flex items-center gap-2.5">
                         <span className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
                           <Clock className="w-3 h-3 text-slate-400" /> {store.hours}
                         </span>
-                        <div className="flex items-center gap-1 text-amber-500 font-bold">
+                        {store.rating > 0 && store.reviewsCount > 0 && <div className="flex items-center gap-1 text-amber-500 font-bold">
                           <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                           <span>{store.rating} ({store.reviewsCount})</span>
-                        </div>
+                        </div>}
                       </div>
                     </div>
 
                     <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between gap-2">
                       <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(store.address + ', ' + store.name)}`}
+                        href={`https://www.openstreetmap.org/directions?to=${store.lat}%2C${store.lon}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 hover:underline cursor-pointer"
-                        title="Mở Google Maps chỉ đường trực tiếp tới đây"
+                        title="Mở OpenStreetMap để xem đường đi"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Chỉ đường Google Maps ↗</span>
+                        <span>Chỉ đường OpenStreetMap ↗</span>
                       </a>
-                      <span className="text-[10px] text-slate-400 font-medium">Bấm để xem kệ hàng</span>
+                      <span className="text-[10px] text-slate-400 font-medium">Bấm để xem địa điểm</span>
                     </div>
                   </div>
                 );
@@ -1409,10 +1350,10 @@ export function SmartMarketPage() {
                         {selectedStore.categoryLabel}
                       </span>
                       <span className="text-xs text-slate-400">· Cách {selectedStore.distanceKm} km</span>
-                      <span className="text-xs font-bold text-amber-500 flex items-center gap-0.5">
+                      {selectedStore.rating > 0 && selectedStore.reviewsCount > 0 && <span className="text-xs font-bold text-amber-500 flex items-center gap-0.5">
                         <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                         {selectedStore.rating} ({selectedStore.reviewsCount} đánh giá khách hàng)
-                      </span>
+                      </span>}
                     </div>
 
                     <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
@@ -1488,7 +1429,7 @@ export function SmartMarketPage() {
 
                   {(!selectedStore.catalog || selectedStore.catalog.length === 0) ? (
                     <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs text-slate-500">
-                      Cửa hàng đang đồng bộ kệ hàng trực tuyến. Vui lòng liên hệ hotline: {selectedStore.phone || '1900 1908'}.
+                      OpenStreetMap chưa cung cấp mặt hàng, giá và tồn kho của địa điểm này. Hãy liên hệ cửa hàng để xác nhận trước khi mua.
                     </div>
                   ) : (
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

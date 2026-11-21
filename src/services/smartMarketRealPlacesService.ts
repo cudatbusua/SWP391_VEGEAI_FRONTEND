@@ -125,8 +125,7 @@ export function formatDeliveryTime(distanceKm: number): string {
 }
 
 /**
- * Fetches real places around user's GPS coordinates using OpenStreetMap Overpass.
- * Falls back to authentically calculated local hotspots around the user's exact coordinates.
+ * Maps places returned by the backend's OpenStreetMap provider.
  */
 function mapBackendPlace(place: Place): SmartMarketStore {
   const category: SmartMarketStore['category'] = place.category === 'RESTAURANT'
@@ -137,10 +136,10 @@ function mapBackendPlace(place: Place): SmartMarketStore {
     id: place.id,
     name: place.name,
     tagline: category === 'VEGAN_STORE' ? 'Địa điểm chay từ OpenStreetMap' : 'Cửa hàng nguyên liệu gần bạn',
-    address: place.address || `${place.name}, gần vị trí của bạn`,
+    address: place.address || 'Chưa có địa chỉ trên OpenStreetMap',
     distance: `Cách ${distanceKm < 1 ? Math.round(distanceKm * 1000) + 'm' : distanceKm.toFixed(1) + ' km'}`,
     distanceKm,
-    duration: formatDeliveryTime(distanceKm),
+    duration: 'Chưa rõ',
     rating: place.rating ?? 0,
     reviewsCount: 0,
     hours: place.openNow === true ? 'Đang mở cửa' : place.openNow === false ? 'Đang đóng cửa' : 'Chưa có giờ mở cửa',
@@ -148,7 +147,9 @@ function mapBackendPlace(place: Place): SmartMarketStore {
     totalNeeded: 0,
     matchPercent: 0,
     priceEstimate: '',
-    statusBadge: category === 'VEGAN_STORE' ? '🌱 Có thẻ chay trên OSM' : '🛒 Cửa hàng gần bạn',
+    statusBadge: category === 'VEGAN_STORE'
+      ? (place.dietaryEvidence === 'OSM_EXCLUSIVE' ? 'OSM gắn thẻ chuyên chay' : place.dietaryEvidence === 'OSM_OPTION' ? 'OSM ghi có món chay' : 'Tên gợi ý quán chay; chưa xác minh')
+      : 'Địa điểm mua sắm trên OSM',
     badgeType: 'high',
     category,
     categoryLabel: category === 'VEGAN_STORE' ? 'Quán chay & Tiệm đồ chay' : 'Cửa hàng nguyên liệu',
@@ -156,19 +157,14 @@ function mapBackendPlace(place: Place): SmartMarketStore {
     featuredItems: [],
     lat: place.lat,
     lon: place.lon,
-    phone: '',
-    catalog: generateSmartStoreCatalog(place.name, category),
+    phone: place.phoneNumber || '',
+    catalog: [],
   };
 }
 
 export async function fetchRealPlacesNearby(userLat: number, userLon: number): Promise<SmartMarketStore[]> {
-  try {
-    const places = await restaurantService.nearby({ lat: userLat, lon: userLon }, 3.5, 'ALL');
-    if (places.length > 0) return places.map(mapBackendPlace);
-  } catch (error) {
-    console.debug('[SMART-MARKET] Backend places unavailable:', error);
-  }
-  return buildAnchoredStoresForCoordinates(userLat, userLon);
+  const places = await restaurantService.nearby({ lat: userLat, lon: userLon }, 3.5, 'ALL');
+  return places.map(mapBackendPlace);
 }
 
 export async function suggestRealPlacesForFood(

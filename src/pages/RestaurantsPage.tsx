@@ -15,9 +15,21 @@ const CATEGORY_FILTERS: { id: Place['category']; label: string }[] = [
 ];
 
 function placeSourceBadge(place: Place): { label: string; className: string } {
+  if (place.dietaryEvidence === 'NAME_ONLY') {
+    return {
+      label: 'Tên gợi ý quán chay · chưa xác nhận thực đơn',
+      className: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300',
+    };
+  }
+  if (place.dietaryEvidence === 'OSM_OPTION') {
+    return {
+      label: 'OSM ghi có món chay',
+      className: 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
+    };
+  }
   if (place.isVerified) {
     return {
-      label: 'Chuyên chay xác thực OSM',
+      label: 'OSM gắn thẻ chuyên chay',
       className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300',
     };
   }
@@ -59,6 +71,7 @@ export function RestaurantsPage() {
     nextCategory: Place['category'] = category,
     nextExclusive = exclusiveOnly,
   ) => {
+    setError('');
     setActiveQuery(null);
     setCenter(point);
     setSelected(null);
@@ -79,7 +92,12 @@ export function RestaurantsPage() {
   };
 
   useEffect(() => {
-    void load(DEFAULT_CENTER);
+    // Ask for location once; never present the default map center as the user's position.
+    navigator.geolocation?.getCurrentPosition(
+      position => { void load({ lat: position.coords.latitude, lon: position.coords.longitude }); },
+      () => { /* A typed area or the location button can be used instead. */ },
+      { timeout: 12000, maximumAge: 60000 },
+    );
   }, []);
 
   const runSearch = async (
@@ -95,14 +113,15 @@ export function RestaurantsPage() {
     setSelected(null);
     setSearched(false);
     try {
-      // Send the location text without the default map center so BE can geocode the requested area.
+      const point = await restaurantService.resolveArea(trimmed);
+      if (!point) throw new Error('Không tìm thấy khu vực này. Hãy nhập tên quận, thành phố hoặc địa chỉ khác.');
+      setCenter(point);
       setActiveQuery(trimmed);
       const results = nextExclusive
-        ? await restaurantService.searchVerifiedRestaurants(trimmed, undefined, Number(radius))
-        : await restaurantService.search(trimmed, undefined, Number(radius), nextCategory);
+        ? await restaurantService.verifiedRestaurantsNearby(point, Number(radius))
+        : await restaurantService.nearby(point, Number(radius), nextCategory);
       setPlaces(results);
       setSearched(true);
-      if (results[0]) setCenter({ lat: results[0].lat, lon: results[0].lon });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Không thể tìm địa điểm.');
     } finally {
@@ -147,7 +166,7 @@ export function RestaurantsPage() {
         <div>
           <p className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400"><MapPin size={16} /> Khám phá quanh bạn</p>
           <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">Quán chay &amp; Cửa hàng đồ chay gần đây</h1>
-          <p className="mt-2 max-w-2xl text-slate-500 dark:text-slate-400">Tìm quán ăn chay, quán có món chay, siêu thị và cửa hàng tiện lợi bán nguyên liệu, thực phẩm chay trên OpenStreetMap.</p>
+          <p className="mt-2 max-w-2xl text-slate-500 dark:text-slate-400">Tìm địa điểm OSM có thẻ chay hoặc tên gợi ý quán chay. Dùng vị trí hiện tại hoặc nhập khu vực khác để xem kết quả thật quanh đó.</p>
         </div>
         <div className="flex items-center gap-2 self-start rounded-full border border-emerald-100 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300 sm:self-auto">
           <span className="h-2 w-2 rounded-full bg-emerald-600" />
@@ -212,7 +231,7 @@ export function RestaurantsPage() {
           </>
         ) : (
           <>
-            Hiển thị quán chay, nhà hàng có món chay cùng siêu thị, cửa hàng tiện lợi và cửa hàng thực phẩm có bán nguyên liệu/món chay nói chung (dữ liệu OpenStreetMap).
+            Kết quả là địa điểm có trên OpenStreetMap. Quán có thẻ ăn chay và quán chỉ có tên gợi ý ăn chay được ghi nhãn riêng; hãy kiểm tra thực đơn trước khi đến.
           </>
         )}
       </p>
@@ -256,7 +275,7 @@ export function RestaurantsPage() {
                     </span>
                   );
                 })()}
-                <a href={place.openStreetMapUrl || `https://www.openstreetmap.org/directions?to=${place.lat}%2C${place.lon}`} target="_blank" rel="noreferrer"
+                <a href={`https://www.openstreetmap.org/directions?to=${place.lat}%2C${place.lon}`} target="_blank" rel="noreferrer"
                   className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300"><Navigation size={14} /> Chỉ đường <ArrowUpRight size={13} /></a>
               </div>
             </article>)}

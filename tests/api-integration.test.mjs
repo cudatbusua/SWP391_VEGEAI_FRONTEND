@@ -107,6 +107,7 @@ test('nearby places map backend coordinates and send radius in metres', async ()
   const fixture = setup(() => reply([
     { placeId: 'far', name: 'Far', latitude: 10.02, longitude: 106, distanceKm: 2, category: 'RESTAURANT', isOpenNow: true },
     { placeId: 'near', name: 'Near', latitude: 10.001, longitude: 106, distanceKm: 0.1, category: 'RESTAURANT' },
+    { placeId: 'mock_place', name: 'Demo', latitude: 10.002, longitude: 106, distanceKm: 0.2, category: 'RESTAURANT' },
     { placeId: 'invalid', name: 'Invalid' },
   ]));
   fixture.api.setSession(auth(), true);
@@ -133,6 +134,15 @@ test('place search encodes keywords and preserves backend errors', async () => {
   const failure = setup(() => reply(null, 503, 'Places unavailable'));
   failure.api.setSession(auth(), true);
   await assert.rejects(failure.restaurants.nearby({ lat: 10, lon: 106 }, 2), /Places unavailable/);
+});
+
+test('area lookup returns its actual center even without restaurant results', async () => {
+  const fixture = setup(() => reply({ lat: 16.0544, lon: 108.2022 }));
+  const center = await fixture.restaurants.resolveArea('Đà Nẵng & Hải Châu');
+  assert.deepEqual(center, { lat: 16.0544, lon: 108.2022 });
+  const url = new URL(fixture.calls[0].url, 'http://localhost');
+  assert.equal(url.pathname, '/api/places/resolve-area');
+  assert.equal(url.searchParams.get('query'), 'Đà Nẵng & Hải Châu');
 });
 
 test('verified restaurant feeds only include explicitly vegetarian-only or vegan-only OSM tags', async () => {

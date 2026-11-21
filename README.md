@@ -182,6 +182,12 @@ npm run dev
 
 Mặc định trình duyệt gọi `/api`, Vite proxy tới `http://localhost:8081`. Đổi `API_PROXY_TARGET` trong `.env` nếu backend chạy ở địa chỉ khác; khởi động lại Vite sau khi đổi cấu hình.
 
+### Google Maps
+
+Trang Quán chay gần đây và bản đồ Điểm bán dùng Google Maps JavaScript API khi có `VITE_GOOGLE_MAPS_API_KEY`. Điền browser key vào `.env.local` (file này đã được Git bỏ qua), sau đó chạy lại `npm run dev`. Nếu chưa có key hoặc Google Maps tải lỗi, trang tự dùng OpenStreetMap. Kết quả tìm địa điểm vẫn lấy từ API backend riêng, nên key này chỉ đổi nền bản đồ và ghim.
+
+Trong Google Cloud, bật **Maps JavaScript API** và thiết lập billing cho project. Giới hạn key theo **Websites (HTTP referrers)** với `http://localhost:5173/*` khi phát triển và domain frontend thực tế khi deploy; giới hạn API chỉ cho Maps JavaScript API. Trên Vercel, thêm cùng biến vào Environment Variables rồi redeploy. Key frontend xuất hiện trong trình duyệt nên không dùng Gemini key hoặc server key tại đây.
+
 | Màn hình / chức năng | API backend |
 | --- | --- |
 | Đăng ký | `POST /api/auth/register` |

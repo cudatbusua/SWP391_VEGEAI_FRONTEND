@@ -4,7 +4,8 @@ import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Coordinates, Place } from '../services/restaurantService';
 import { useTheme } from '../store/ThemeContext';
-import { getTileLayerConfig } from '../utils/mapConfig';
+import { getActiveMapApiKey, getTileLayerConfig } from '../utils/mapConfig';
+import { GoogleMapCanvas } from './GoogleMapCanvas';
 
 interface OpenStreetMapVegetarianMapProps {
   center: Coordinates;
@@ -46,11 +47,23 @@ function numberedIcon(number: number) {
 export function OpenStreetMapVegetarianMap({ center, places, selectedPlace, onSelect }: OpenStreetMapVegetarianMapProps) {
   const { theme } = useTheme();
   const [tileError, setTileError] = useState(false);
+  const [googleError, setGoogleError] = useState(false);
+  const apiKey = getActiveMapApiKey();
   const tileConfig = getTileLayerConfig(theme === 'dark', 'auto');
 
   return (
     <div className="relative h-full min-h-[420px] bg-slate-100 dark:bg-slate-900">
-      <MapContainer
+      {apiKey && !googleError ? (
+        <GoogleMapCanvas
+          apiKey={apiKey}
+          center={center}
+          points={places.map((place, index) => ({ id: place.id, lat: place.lat, lon: place.lon, title: place.name, label: String(index + 1) }))}
+          selectedId={selectedPlace?.id}
+          onSelect={id => { const place = places.find(item => item.id === id); if (place) onSelect(place); }}
+          onError={() => setGoogleError(true)}
+          className="h-full min-h-[420px] w-full"
+        />
+      ) : <MapContainer
         center={[center.lat, center.lon]}
         zoom={14}
         scrollWheelZoom
@@ -86,7 +99,12 @@ export function OpenStreetMapVegetarianMap({ center, places, selectedPlace, onSe
             )}
           </Marker>
         ))}
-      </MapContainer>
+      </MapContainer>}
+      {googleError && (
+        <p role="alert" className="absolute bottom-10 left-3 z-[1000] max-w-xs rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow">
+          Google Maps không tải được. Đang dùng OpenStreetMap; kiểm tra key và quyền API.
+        </p>
+      )}
       {tileError && (
         <p role="alert" className="absolute bottom-10 left-3 z-[1000] max-w-xs rounded-lg bg-white/95 dark:bg-slate-900/95 px-3 py-2 text-xs text-slate-700 dark:text-slate-200 shadow">
           Không tải được ảnh nền bản đồ. Hãy kiểm tra kết nối mạng; các ghim địa điểm vẫn có thể hoạt động.

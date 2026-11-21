@@ -1,59 +1,40 @@
 import { expect, test } from '@playwright/test';
 
-test('guest browses market, logs in in-place, then adds a server-backed cart item', async ({ page }) => {
-  let savedItems: unknown[] = [];
-  let loggedIn = false;
-
-  await page.route('**/api/**', async route => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const ok = (data: unknown) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, code: 200, message: 'OK', data }),
-    });
-
-    if (url.pathname === '/api/auth/login') {
-      loggedIn = true;
-      return ok({
-        accessToken: 'e2e-access-token', userId: '11111111-1111-1111-1111-111111111111',
-        tokenType: 'Bearer', expiresInSeconds: 900, username: 'member', fullName: 'Thành viên E2E',
-        email: 'member@vegeai.com', role: 'USER', status: 'ACTIVE',
-      });
-    }
-    if (url.pathname === '/api/users/me') return ok({
-      userId: '11111111-1111-1111-1111-111111111111', username: 'member',
-      fullName: 'Thành viên E2E', email: 'member@vegeai.com', role: 'USER', status: 'ACTIVE',
-    });
-    if (url.pathname === '/api/market/cart' && request.method() === 'GET') return ok({ items: savedItems });
-    if (url.pathname === '/api/market/cart' && request.method() === 'PUT') {
-      savedItems = (request.postDataJSON() as { items: unknown[] }).items;
-      return ok({ items: savedItems });
-    }
-    if (url.pathname.startsWith('/api/places/')) return ok([]);
-    if (loggedIn) return ok({});
-    return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ success: false, code: 401 }) });
+test('guest finds nearby places and filters the map results', async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem('vegeai:session:gps_coords', JSON.stringify({ lat: 10.803, lon: 106.736 }));
+    sessionStorage.setItem('vegeai:session:gps_address', 'Thảo Điền, TP. Thủ Đức');
   });
 
+  await page.route('**/api/places/nearby?**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      success: true,
+      code: 200,
+      message: 'OK',
+      data: [
+        {
+          placeId: 'osm_vegan_1', name: 'Quán Chay Thảo Điền', latitude: 10.8032,
+          longitude: 106.7362, distanceKm: 0.05, address: 'Thảo Điền, TP. Thủ Đức',
+          category: 'RESTAURANT', attribution: '© OpenStreetMap contributors',
+        },
+        {
+          placeId: 'osm_market_1', name: 'Cửa hàng Rau Xanh', latitude: 10.804,
+          longitude: 106.737, distanceKm: 0.2, address: 'Thảo Điền, TP. Thủ Đức',
+          category: 'SUPERMARKET', attribution: '© OpenStreetMap contributors',
+        },
+      ],
+    }),
+  }));
+
   await page.goto('/smart-market');
-  await page.getByRole('button', { name: 'Thảo Điền' }).click();
-  await page.getByTitle(/Thêm combo Canh Chua Chay Nam Bộ vào giỏ/i).click();
+  await expect(page.getByText('2 địa điểm phù hợp')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Quán Chay Thảo Điền' }).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cửa hàng Rau Xanh' }).first()).toBeVisible();
 
-  const dialog = page.getByRole('dialog', { name: 'Đăng nhập để sử dụng giỏ nguyên liệu' });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel('Tên đăng nhập hoặc email').fill('member');
-  await dialog.getByLabel('Mật khẩu').fill('Asdfghjkl1234567890@');
-  const cartLoaded = page.waitForResponse(response => response.url().includes('/api/market/cart') && response.request().method() === 'GET');
-  await dialog.getByRole('button', { name: /^Đăng nhập$/ }).click();
-
-  await expect(dialog).toBeHidden();
-  await expect(page).toHaveURL(/\/smart-market$/);
-  await expect(page.getByText('Thành viên E2E').first()).toBeVisible();
-  await cartLoaded;
-  // Nearby places are deliberately mocked as empty. Static VietGAP products
-  // must still enter the authenticated user's cart via the reference store.
-  await page.locator('button[title*="Rau dền đỏ"]').click();
-  await expect(page.getByRole('button', { name: /Mở giỏ nguyên liệu/i })).toBeVisible();
-  await expect(page.getByText(/món đã chọn/).last()).toBeVisible();
-  await expect.poll(() => savedItems.length).toBeGreaterThan(0);
+  await page.getByPlaceholder(/Tìm quán chay, tiệm nguyên liệu/).fill('Rau Xanh');
+  await expect(page.getByText('1 địa điểm phù hợp')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cửa hàng Rau Xanh' }).first()).toBeVisible();
+  await expect(page.getByText('Bấm để xem địa điểm')).toHaveCount(1);
 });

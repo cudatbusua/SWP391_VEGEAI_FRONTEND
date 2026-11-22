@@ -63,12 +63,13 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
 }) => {
   const [metrics, setMetrics] = useState<WearableMetrics>(() => wearableService.getMetrics());
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isLivePolling, setIsLivePolling] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [showArchitectureGuide, setShowArchitectureGuide] = useState(false);
   const [showHubInfo, setShowHubInfo] = useState(false);
   const [activeGuideTab, setActiveGuideTab] = useState<'phone' | 'apple' | 'samsung' | 'xiaomi' | 'garmin'>('phone');
   const [showManualHrModal, setShowManualHrModal] = useState(false);
-  const [manualHrInput, setManualHrInput] = useState(() => (metrics.avgHeartRate > 0 ? String(metrics.avgHeartRate) : '75'));
+  const [manualHrInput, setManualHrInput] = useState(() => (metrics.latestHeartRate > 0 ? String(metrics.latestHeartRate) : '75'));
   const [isHrScopeMissing, setIsHrScopeMissing] = useState(() => localStorage.getItem('wearable_hr_scope_missing') === 'true');
 
   // Auto-sync live metrics in background on load if Google Fit token exists
@@ -101,13 +102,34 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
+  // Optional Live Sync polling (every 15s) so newly measured Mi Band SpO2 / HR synced to Google Fit appears immediately
+  useEffect(() => {
+    if (!isLivePolling || !metrics.isConnected) return;
+    const poll = () => {
+      const token = wearableService.getStoredToken();
+      if (!token) {
+        setIsLivePolling(false);
+        return;
+      }
+      wearableService.fetchGoogleFitLive(token).catch(err => {
+        console.warn('Live Sync poll error:', err);
+        if (err?.message?.includes('hết hạn')) {
+          setIsLivePolling(false);
+          setStatusMessage(err.message);
+        }
+      });
+    };
+    const timer = window.setInterval(poll, 15000);
+    return () => window.clearInterval(timer);
+  }, [isLivePolling, metrics.isConnected]);
+
   useEffect(() => {
     const handleUpdate = () => {
       const updated = wearableService.getMetrics();
       setMetrics(updated);
       setIsHrScopeMissing(localStorage.getItem('wearable_hr_scope_missing') === 'true');
-      if (updated.avgHeartRate > 0) {
-        setManualHrInput(String(updated.avgHeartRate));
+      if (updated.latestHeartRate > 0 || updated.avgHeartRate > 0) {
+        setManualHrInput(String(updated.latestHeartRate || updated.avgHeartRate));
       }
       onSyncMetrics?.({
         steps: updated.steps,
@@ -175,6 +197,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
 
   const handleDisconnect = () => {
     sfx.playTap();
+    setIsLivePolling(false);
     wearableService.disconnect();
     setStatusMessage('Đã ngắt liên kết và đặt lại dữ liệu thiết bị.');
   };
@@ -387,7 +410,25 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold transition shadow-xs cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ lại'}</span>
+                <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ ngay'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playTap();
+                  const next = !isLivePolling;
+                  setIsLivePolling(next);
+                  if (next) void handleSyncLive();
+                }}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                  isLivePolling
+                    ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-400 text-emerald-700 dark:text-emerald-300'
+                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+                title="Tự động kéo dữ liệu mới nhất từ Google Fit Cloud mỗi 15 giây"
+              >
+                <span className={`w-2 h-2 rounded-full ${isLivePolling ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
+                <span>{isLivePolling ? 'Live Sync: BẬT (15s)' : 'Live Sync (15s)'}</span>
               </button>
               <button
                 type="button"
@@ -463,18 +504,18 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         </MetricCard>
 
         <MetricCard
-          title={metrics.isTodayData || !metrics.dataDateLabel ? 'Calo vận động' : `Calo vận động (${metrics.dataDateLabel})`}
+          title={metrics.isTodayData || !metrics.dataDateLabel ? 'Tổng tiêu hao (Google Fit)' : `Tổng tiêu hao (${metrics.dataDateLabel})`}
           icon={<Flame className="w-4 h-4 text-amber-500" />}
-          value={metrics.activeCalories > 0 ? `+${metrics.activeCalories.toLocaleString('vi-VN')}` : null}
+          value={metrics.totalCaloriesExpended > 0 ? metrics.totalCaloriesExpended.toLocaleString('vi-VN') : null}
           unit="kcal"
           valueClass="text-amber-500"
-          note={!metrics.isTodayData && metrics.activeCalories > 0
+          note={!metrics.isTodayData && metrics.totalCaloriesExpended > 0
             ? `Ghi nhận ${metrics.dataDateLabel || 'ngày trước'} · Không cộng vào ngân sách hôm nay`
+            : metrics.totalCaloriesExpended > 0 && metrics.activeCalories > 0
+            ? `Khớp tổng tiêu hao app Google Fit (gồm BMR). Ước tách vận động: +${metrics.activeCalories.toLocaleString('vi-VN')} kcal.`
             : metrics.totalCaloriesExpended > 0
-            ? `Google Fit ghi nhận tổng ${metrics.totalCaloriesExpended.toLocaleString('vi-VN')} kcal (gồm trao đổi chất cơ bản). Calo vận động = tổng − BMR.`
-            : (totalCaloriesBurned > 0
-              ? `Tổng tiêu hao BMR + vận động: ${totalCaloriesBurned.toLocaleString('vi-VN')} kcal`
-              : 'Chưa có dữ liệu tiêu hao')}
+            ? `Khớp tổng tiêu hao app Google Fit (gồm trao đổi chất cơ bản). ${userBmr === 0 ? 'Cập nhật BMR hồ sơ để tách calo vận động.' : ''}`
+            : 'Chưa có dữ liệu tiêu hao từ Google Fit'}
         />
 
         <MetricCard
@@ -484,8 +525,8 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
           unit="km"
           valueClass="text-slate-900 dark:text-white"
           note={metrics.activeMinutes > 0
-            ? `Vận động tích cực: ${metrics.activeMinutes} phút`
-            : 'Chưa có dữ liệu vận động'}
+            ? `Vận động tích cực (Google Fit): ${metrics.activeMinutes} phút`
+            : 'Chưa có dữ liệu quãng đường / phút vận động từ Google Fit'}
         />
 
         <MetricCard
@@ -506,8 +547,8 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
           unit="%"
           valueClass="text-sky-500"
           note={metrics.spo2 > 0
-            ? (metrics.spo2 >= 95 ? 'Trong ngưỡng bình thường' : 'Thấp hơn ngưỡng thông thường – chỉ tham khảo, không thay thế tư vấn y tế')
-            : 'Chưa nhận được từ Google Fit'}
+            ? `${metrics.spo2Note ? `${metrics.spo2Note} · ` : ''}${metrics.spo2 >= 95 ? 'Trong ngưỡng bình thường (tham khảo)' : 'Thấp hơn ngưỡng thông thường – chỉ tham khảo'}`
+            : 'Chưa nhận được từ Google Fit. Nếu vừa đo trên Mi Band: đồng bộ app Mi Fitness → vuốt làm mới app Google Fit → bấm "Đồng bộ ngay".'}
         />
 
         <MetricCard
@@ -522,14 +563,19 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         />
       </div>
 
-      {/* Heart rate (bpm): average on latest active day, or manual entry */}
+      {/* Heart rate (bpm): latest reading + daily average, or manual entry */}
       <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#182230] border border-slate-200/80 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Heart className={`w-5 h-5 text-rose-500 ${metrics.avgHeartRate > 0 ? 'fill-rose-500/20' : ''}`} />
+          <Heart className={`w-5 h-5 text-rose-500 ${metrics.latestHeartRate > 0 ? 'fill-rose-500/20' : ''}`} />
           <div>
-            <div className="text-xs font-bold text-slate-500">Nhịp tim (bpm)</div>
-            <div className="text-lg font-black text-rose-500">
-              {metrics.avgHeartRate > 0 ? `${metrics.avgHeartRate} bpm` : '—'}
+            <div className="text-xs font-bold text-slate-500">Nhịp tim mới nhất (bpm)</div>
+            <div className="text-lg font-black text-rose-500 flex items-baseline gap-2">
+              <span>{metrics.latestHeartRate > 0 ? `${metrics.latestHeartRate} bpm` : '—'}</span>
+              {metrics.avgHeartRate > 0 && metrics.avgHeartRate !== metrics.latestHeartRate && (
+                <span className="text-xs font-bold text-slate-400">
+                  (TB: {metrics.avgHeartRate} bpm)
+                </span>
+              )}
             </div>
           </div>
           <div className="text-[11px] text-slate-500 max-w-md">

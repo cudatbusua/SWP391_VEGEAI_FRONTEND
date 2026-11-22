@@ -162,9 +162,21 @@ function mapBackendPlace(place: Place): SmartMarketStore {
   };
 }
 
-export async function fetchRealPlacesNearby(userLat: number, userLon: number): Promise<SmartMarketStore[]> {
-  const places = await restaurantService.nearby({ lat: userLat, lon: userLon }, 3.5, 'ALL');
-  return places.map(mapBackendPlace);
+const nearbyRequests = new Map<string, Promise<SmartMarketStore[]>>();
+
+export function fetchRealPlacesNearby(userLat: number, userLon: number): Promise<SmartMarketStore[]> {
+  const key = `${userLat}:${userLon}`;
+  const pending = nearbyRequests.get(key);
+  if (pending) return pending;
+
+  const request = restaurantService.nearby({ lat: userLat, lon: userLon }, 3.5, 'ALL')
+    .then(places => places.map(mapBackendPlace));
+  nearbyRequests.set(key, request);
+  void request.then(
+    () => { nearbyRequests.delete(key); },
+    () => { nearbyRequests.delete(key); },
+  );
+  return request;
 }
 
 export async function suggestRealPlacesForFood(

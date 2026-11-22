@@ -47,11 +47,12 @@ import {
   suggestRealPlacesForFood,
   reverseGeocodeAddress
 } from '../services/smartMarketRealPlacesService';
-import { restaurantService } from '../services/restaurantService';
+import { restaurantService, type AreaSuggestion } from '../services/restaurantService';
 
 const LOCAL_STORAGE_KEY = 'vegeai:smart-market:items-v1';
 const SESSION_GPS_KEY = 'vegeai:session:gps_coords';
 const SESSION_ADDR_KEY = 'vegeai:session:gps_address';
+const RECENT_AREAS_KEY = 'vegeai:map:recent-areas-v1';
 
 export type MultiStoreCartItem = MarketCartItem;
 
@@ -257,6 +258,17 @@ export function SmartMarketPage() {
     return Boolean(sessionStorage.getItem(SESSION_ADDR_KEY) && sessionStorage.getItem(SESSION_GPS_KEY));
   });
   const [manualAddressInput, setManualAddressInput] = useState('');
+  const [areaSuggestions, setAreaSuggestions] = useState<AreaSuggestion[]>([]);
+  const [showAreaSuggestions, setShowAreaSuggestions] = useState(false);
+  const [areaSuggestionsLoading, setAreaSuggestionsLoading] = useState(false);
+  const [activeAreaIndex, setActiveAreaIndex] = useState(-1);
+  const [recentAreas, setRecentAreas] = useState<AreaSuggestion[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(RECENT_AREAS_KEY) || '[]');
+      return Array.isArray(saved) ? saved.filter(item => item && typeof item.name === 'string'
+        && Number.isFinite(item.lat) && Number.isFinite(item.lon)).slice(0, 5) : [];
+    } catch { return []; }
+  });
 
   // Location permission & session persistence
   const [userLoc, setUserLoc] = useState(() => {
@@ -274,10 +286,40 @@ export function SmartMarketPage() {
     return sessionStorage.getItem(SESSION_ADDR_KEY) || '';
   });
 
+  useEffect(() => {
+    const query = manualAddressInput.trim();
+    if (!showAreaSuggestions || query.length < 2) {
+      setAreaSuggestions([]);
+      setAreaSuggestionsLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setAreaSuggestionsLoading(true);
+      restaurantService.suggestAreas(query, userLoc, controller.signal)
+        .then(items => { if (!controller.signal.aborted) setAreaSuggestions(items); })
+        .catch(() => { if (!controller.signal.aborted) setAreaSuggestions([]); })
+        .finally(() => { if (!controller.signal.aborted) setAreaSuggestionsLoading(false); });
+    }, 400);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [manualAddressInput, showAreaSuggestions, userLoc.lat, userLoc.lon]);
+
+  const visibleAreaSuggestions = useMemo(() => {
+    const query = manualAddressInput.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const recent = recentAreas.filter(item => !query || `${item.name} ${item.address}`
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes(query));
+    const seen = new Set(recent.map(item => `${item.lat}:${item.lon}`));
+    return [
+      ...recent.map(item => ({ ...item, recent: true })),
+      ...areaSuggestions.filter(item => !seen.has(`${item.lat}:${item.lon}`))
+        .map(item => ({ ...item, recent: false })),
+    ].slice(0, 8);
+  }, [manualAddressInput, recentAreas, areaSuggestions]);
+
   const [stores, setStores] = useState<SmartMarketStore[]>([]);
   const [loadingStores, setLoadingStores] = useState(false);
   const [storeLoadError, setStoreLoadError] = useState<string | null>(null);
-  const [storeCategoryFilter, setStoreCategoryFilter] = useState<string>('ALL');
+  const [storeCategoryFilter, setStoreCategoryFilter] = useState<string>('VEGAN_STORE');
   const [storeDistanceRadius, setStoreDistanceRadius] = useState<'ALL' | '3KM' | '5KM'>('ALL');
   const [selectedStore, setSelectedStore] = useState<SmartMarketStore | null>(null);
   const [storeSearch, setStoreSearch] = useState('');
@@ -423,6 +465,7 @@ export function SmartMarketPage() {
     const params = new URLSearchParams(location.search);
     const foodParam = (params.get('food') || '').trim();
     setFoodSuggestionQuery(foodParam);
+    if (foodParam) setStoreCategoryFilter('ALL');
   }, [location.search]);
 
   const loadStoresForCoords = useCallback(async (lat: number, lon: number) => {
@@ -433,7 +476,7 @@ export function SmartMarketPage() {
     try {
       const realStores = await fetchRealPlacesNearby(lat, lon);
       setStores(realStores);
-      setSelectedStore(realStores[0] ?? null);
+      setSelectedStore(realStores.find(store => store.category === 'VEGAN_STORE') ?? null);
     } catch (err) {
       console.error('[SMART-MARKET] Failed to load stores:', err);
       setStoreLoadError('Chưa thể tải địa điểm OpenStreetMap lúc này. Vui lòng thử lại sau.');
@@ -614,6 +657,19 @@ export function SmartMarketPage() {
     setTimeout(() => setLocationMessage(null), 3000);
   };
 
+  const selectAreaSuggestion = (item: AreaSuggestion) => {
+    const label = [item.name, item.address].filter(Boolean).join(', ');
+    setManualAddressInput('');
+    setShowAreaSuggestions(false);
+    setActiveAreaIndex(-1);
+    setRecentAreas(previous => {
+      const next = [item, ...previous.filter(saved => saved.lat !== item.lat || saved.lon !== item.lon)].slice(0, 5);
+      try { localStorage.setItem(RECENT_AREAS_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      return next;
+    });
+    void handleSelectPredefinedArea(label, item.lat, item.lon);
+  };
+
     // Manual address submission handler
   const handleManualAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -627,8 +683,7 @@ export function SmartMarketPage() {
     try {
       const coords = await restaurantService.resolveArea(input);
       if (!coords) throw new Error('Address not found');
-      await handleSelectPredefinedArea(input, coords.lat, coords.lon);
-      setManualAddressInput('');
+      selectAreaSuggestion({ name: input, address: '', lat: coords.lat, lon: coords.lon, category: 'AREA' });
     } catch {
       setLocationStatus('denied');
       setLocationMessage('Không tìm thấy vị trí này. Vui lòng nhập địa chỉ cụ thể hơn hoặc dùng GPS.');
@@ -1037,7 +1092,7 @@ export function SmartMarketPage() {
         </div>
 
         {/* Real GPS Location Bar (Session-Persistent) */}
-        <div id="location-bar" className="bg-white dark:bg-[#121922] rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 mb-6 shadow-xs">
+        <div id="location-bar" className="relative z-30 bg-white dark:bg-[#121922] rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 mb-6 shadow-xs">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-xs ${
@@ -1095,14 +1150,52 @@ export function SmartMarketPage() {
           )}
 
           {!isAddressConfirmed && (
-            <form onSubmit={handleManualAddressSubmit} className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Hoặc nhập địa chỉ/quận để định vị (ví dụ: Quận 1, TP.HCM)..."
-                value={manualAddressInput}
-                onChange={e => setManualAddressInput(e.target.value)}
-                className="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-white"
-              />
+            <form onSubmit={handleManualAddressSubmit} onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setShowAreaSuggestions(false);
+            }} className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800 flex items-start gap-2">
+              <div className="relative flex-1 min-w-0">
+                <input
+                  type="text"
+                  role="combobox"
+                  aria-label="Tìm khu vực hoặc địa chỉ"
+                  aria-autocomplete="list"
+                  aria-expanded={showAreaSuggestions && (visibleAreaSuggestions.length > 0 || areaSuggestionsLoading)}
+                  aria-controls="area-suggestions"
+                  aria-activedescendant={activeAreaIndex >= 0 ? `area-suggestion-${activeAreaIndex}` : undefined}
+                  autoComplete="off"
+                  placeholder="Nhập địa chỉ/quận, ví dụ: Quận 1, TP.HCM..."
+                  value={manualAddressInput}
+                  onFocus={() => setShowAreaSuggestions(true)}
+                  onChange={event => { setManualAddressInput(event.target.value); setAreaSuggestions([]); setShowAreaSuggestions(true); setActiveAreaIndex(-1); }}
+                  onKeyDown={event => {
+                    if (event.key === 'Escape') { setShowAreaSuggestions(false); setActiveAreaIndex(-1); }
+                    if (event.key === 'ArrowDown' && visibleAreaSuggestions.length) {
+                      event.preventDefault(); setActiveAreaIndex(index => (index + 1) % visibleAreaSuggestions.length);
+                    }
+                    if (event.key === 'ArrowUp' && visibleAreaSuggestions.length) {
+                      event.preventDefault(); setActiveAreaIndex(index => (index - 1 + visibleAreaSuggestions.length) % visibleAreaSuggestions.length);
+                    }
+                    if (event.key === 'Enter' && showAreaSuggestions && activeAreaIndex >= 0) {
+                      event.preventDefault(); selectAreaSuggestion(visibleAreaSuggestions[activeAreaIndex]);
+                    }
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                {showAreaSuggestions && (visibleAreaSuggestions.length > 0 || areaSuggestionsLoading) && (
+                  <div id="area-suggestions" role="listbox" aria-label="Gợi ý địa điểm" className="absolute left-0 right-0 top-full mt-1 max-h-80 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl">
+                    {visibleAreaSuggestions.map((item, index) => (
+                      <button key={`${item.lat}:${item.lon}`} id={`area-suggestion-${index}`} type="button" role="option" aria-selected={index === activeAreaIndex}
+                        onMouseDown={event => event.preventDefault()}
+                        onClick={() => selectAreaSuggestion(item)}
+                        className={`w-full flex items-start gap-3 px-4 py-3 text-left border-b last:border-0 border-slate-100 dark:border-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-800 ${index === activeAreaIndex ? 'bg-emerald-50 dark:bg-slate-800' : ''}`}>
+                        {item.recent ? <Clock className="w-4 h-4 mt-0.5 shrink-0 text-slate-500" /> : <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />}
+                        <span className="min-w-0"><span className="block text-sm font-semibold text-slate-900 dark:text-white truncate">{item.name}</span>{item.address && <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">{item.address}</span>}</span>
+                      </button>
+                    ))}
+                    {areaSuggestionsLoading && <div className="px-4 py-2 text-xs text-slate-500">Đang tìm địa điểm...</div>}
+                  </div>
+                )}
+              </div>
               <button
                 type="submit"
                 disabled={!manualAddressInput.trim()}
@@ -1205,7 +1298,7 @@ export function SmartMarketPage() {
                     type="text"
                     placeholder="Tìm quán chay, tiệm nguyên liệu, Bách Hóa Xanh, đậu hũ non, tempeh..."
                     value={storeSearch}
-                    onChange={e => setStoreSearch(e.target.value)}
+                    onChange={e => { setStoreSearch(e.target.value); setSelectedStore(null); }}
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -1221,7 +1314,7 @@ export function SmartMarketPage() {
                     <button
                       key={r.radius}
                       type="button"
-                      onClick={() => { sfx.playTap(); setStoreDistanceRadius(r.radius as any); }}
+                      onClick={() => { sfx.playTap(); setStoreDistanceRadius(r.radius as any); setSelectedStore(null); }}
                       className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                         storeDistanceRadius === r.radius
                           ? 'bg-emerald-600 text-white shadow-2xs'
@@ -1244,7 +1337,7 @@ export function SmartMarketPage() {
                 ].map(tab => (
                   <button
                     key={tab.id}
-                    onClick={() => { sfx.playTap(); setStoreCategoryFilter(tab.id); }}
+                    onClick={() => { sfx.playTap(); setStoreCategoryFilter(tab.id); setSelectedStore(null); }}
                     className={`py-1.5 px-3.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                       storeCategoryFilter === tab.id
                         ? 'bg-emerald-700 text-white shadow-xs'

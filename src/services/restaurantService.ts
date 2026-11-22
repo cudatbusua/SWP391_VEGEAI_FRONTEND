@@ -2,6 +2,11 @@ import { apiRequest } from './apiClient';
 
 export type PlaceCategory = 'ALL' | 'RESTAURANT' | 'SUPERMARKET' | 'GROCERY_STORE';
 export interface Coordinates { lat: number; lon: number; }
+export interface AreaSuggestion extends Coordinates {
+  name: string;
+  address: string;
+  category: 'AREA' | 'STREET' | 'PLACE';
+}
 export interface Place {
   id: string; name: string; lat: number; lon: number; distance: number; address: string;
   category: PlaceCategory; rating?: number; openNow?: boolean; photoUrl?: string; openStreetMapUrl?: string; attribution?: string; isSample: boolean;
@@ -46,6 +51,17 @@ function mapPlaces(values: BackendPlace[]): Place[] {
 }
 
 export const restaurantService = {
+  async suggestAreas(query: string, center?: Coordinates, signal?: AbortSignal): Promise<AreaSuggestion[]> {
+    const params = new URLSearchParams({ query: query.trim() });
+    if (center) {
+      params.set('lat', String(center.lat));
+      params.set('lng', String(center.lon));
+    }
+    const response = await apiRequest<AreaSuggestion[]>('/places/suggest-areas?' + params, {
+      auth: 'none', signal, timeoutMs: 12000,
+    });
+    return Array.isArray(response.data) ? response.data : [];
+  },
   async resolveArea(query: string): Promise<Coordinates | null> {
     const params = new URLSearchParams({ query: query.trim() });
     const response = await apiRequest<Coordinates | null>('/places/resolve-area?' + params, { auth: 'none', timeoutMs: 15000 });

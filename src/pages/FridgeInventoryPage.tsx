@@ -8,6 +8,7 @@ import { FridgeRecipeMatches } from '../components/FridgeRecipeMatches';
 import { useAuth } from '../hooks/useAuth';
 import { errorMessage } from '../services/apiClient';
 import { fridgeService } from '../services/fridgeService';
+import { buildFridgeScanHandoffState, getQuantityInputRule } from '../features/ai/fridgeChatBridge';
 import type { FreshnessStatus, FridgeItem, FridgeItemStatus, FridgeSummary } from '../types/api';
 
 const freshnessLabels: Record<FreshnessStatus, string> = { FRESH: 'Tươi tốt', USABLE: 'Nên dùng sớm', SPOILED: 'Đã hỏng' };
@@ -119,6 +120,39 @@ export function FridgeInventoryPage() {
     catch (reason) { setError(errorMessage(reason)); }
   };
 
+  const aiChefHandoffState = useMemo(() => {
+    if (status !== 'ACTIVE' || !items.length) return undefined;
+    const cookable = items.filter(
+      (item) => !item.isExpired && item.freshnessStatus !== 'SPOILED' && item.isVegetarian !== false
+    );
+    if (!cookable.length) return undefined;
+    return buildFridgeScanHandoffState({
+      items: cookable.map((item) => ({
+        name: item.name,
+        category: item.category || 'VEGAN',
+        isVegetarian: item.isVegetarian,
+        isEdible: true,
+        freshness: item.isExpiringSoon ? 'USABLE' : item.freshnessStatus,
+        quantity: item.quantity,
+        unit: item.unit,
+        storageTip: item.storageTip,
+        imageUrl: safeFridgeImageUrl(item.imageUrl),
+        matchedExistingFridgeItemId: item.itemId,
+        isPreviouslyTracked: item.daysInFridge > 0 || item.isExpiringSoon,
+        previousDaysInFridge: item.daysInFridge,
+      })),
+      result: {
+        summary: `Nguyên liệu sẵn có trong Kho Tủ Lạnh (${cookable.length} món)`,
+        totalItemsDetected: cookable.length,
+        hasNonVegetarianItem: false,
+        ingredients: [],
+        warnings: summary.urgentWarnings ?? [],
+        scannedAt: new Date().toISOString(),
+      },
+      alreadySavedToFridge: true,
+    });
+  }, [items, status, summary.urgentWarnings]);
+
   if (isLoading) return <MainLayout><p className="p-8 text-center">Đang tải phiên đăng nhập...</p></MainLayout>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -160,6 +194,7 @@ export function FridgeInventoryPage() {
         </Link>
         <Link
           to="/ai-chef"
+          state={aiChefHandoffState}
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-800 text-teal-800 dark:text-teal-300 text-xs font-bold hover:bg-teal-100 transition shadow-2xs"
         >
           <ChefHat size={14} />
@@ -187,7 +222,7 @@ export function FridgeInventoryPage() {
         <div className="mb-5 flex items-start gap-3"><span className="rounded-xl bg-emerald-50 dark:bg-emerald-950/60 p-2.5 text-emerald-700 dark:text-emerald-400"><PackagePlus size={20} /></span><div><h2 className="font-bold text-slate-900 dark:text-white">{editingId ? 'Cập nhật nguyên liệu' : 'Thêm vào kho'}</h2><p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Ghi nhanh những gì bạn đang có trong tủ.</p></div></div>
         <div className="space-y-4">
           <Input label="Tên nguyên liệu" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ví dụ: đậu hũ non" />
-          <div className="grid grid-cols-2 gap-3"><Input label="Số lượng" type="number" min="0" step="0.1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} placeholder="1" /><Input label="Đơn vị" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder="hộp, bó, kg..." /></div>
+          <div className="grid grid-cols-2 gap-3">{(() => { const rule = getQuantityInputRule(form.unit); return <Input label="Số lượng" type="number" min={rule.step >= 50 ? 1 : rule.min} step={rule.step >= 50 ? 1 : rule.step} value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} placeholder="1" />; })()}<Input label="Đơn vị" value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} placeholder="hộp, bó, kg..." /></div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Độ tươi<select className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 text-sm font-normal text-slate-800 dark:text-slate-100 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" value={form.freshnessStatus} onChange={e => setForm({ ...form, freshnessStatus: e.target.value as FreshnessStatus })}>{Object.entries(freshnessLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <Input label="Hạn sử dụng" type="date" value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} />
           <Input label="Mẹo bảo quản" value={form.storageTip} onChange={e => setForm({ ...form, storageTip: e.target.value })} placeholder="Ví dụ: bọc kín, để ngăn mát" />

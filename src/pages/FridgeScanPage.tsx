@@ -29,6 +29,16 @@ import { Button } from '../components/Button';
 import { aiService } from '../services/aiService';
 import { fridgeService } from '../services/fridgeService';
 import { userService } from '../services/userService';
+import {
+  FRIDGE_UNIT_OPTIONS,
+  adjustQuantityForUnitChange,
+  buildFridgeScanHandoffState,
+  getQuantityInputRule,
+  inferIngredientUnit,
+  isIngredientAllowedForDiet,
+  normalizeQuantityForUnit,
+} from '../features/ai/fridgeChatBridge';
+import { compressImageForUpload } from '../utils/fridgeImageCompress';
 import { errorMessage } from '../services/apiClient';
 import { useAuth } from '../hooks/useAuth';
 import type { FridgeScanResponse } from '../types/api';
@@ -104,18 +114,17 @@ export type ImageReliability = {
   foodCount: number;
 };
 
-export function evaluateImageReliability(image: SelectedImage, scanRes?: FridgeScanResponse): ImageReliability {
-  const fileName = image?.file?.name || '';
-  if (isNonFoodKeyword(fileName)) {
-    return {
-      isReliable: false,
-      reason: 'Tên ảnh cho thấy là cành cây, đống lá hoặc vật phẩm không ăn được',
-      foodCount: 0,
-    };
-  }
-
+export function evaluateImageReliability(_image: SelectedImage, scanRes?: FridgeScanResponse): ImageReliability {
   if (!scanRes) {
     return { isReliable: true, foodCount: 0 };
+  }
+
+  if (scanRes.isFoodScene === false) {
+    return {
+      isReliable: false,
+      reason: 'Ảnh tải lên không phải khung cảnh thực phẩm hoặc tủ lạnh',
+      foodCount: 0,
+    };
   }
 
   const nonFoodItems = (scanRes.ingredients || []).filter(
@@ -195,16 +204,27 @@ function isIngredientDefaultSelected(
   item: FridgeScanResponse['ingredients'][number],
   dietaryPreferences?: string | null
 ): boolean {
-  if (!isIngredientSelectable(item)) return false;
-  if (item.category === 'LACTO_OVO' && isStrictVeganDiet(dietaryPreferences)) return false;
-  return true;
+  return isIngredientAllowedForDiet(item, dietaryPreferences);
 }
 
 function categoryBadgeText(item: FridgeScanResponse['ingredients'][number]): string {
   if (!isItemEdible(item) || item.category === 'NON_FOOD') return '🚫 Không phải thực phẩm';
   if (item.category === 'NON_VEG' || !item.isVegetarian) return '⚠️ Không thuần chay';
-  if (item.category === 'LACTO_OVO') return '🥛🥚 Chay trứng sữa (Lacto-Ovo)';
+  if (item.category === 'LACTO') return '🥛 Chay có sữa (Lacto)';
+  if (item.category === 'OVO') return '🥚 Chay có trứng (Ovo)';
+  if (item.category === 'LACTO_OVO' || item.category === 'OVO_LACTO') return '🥛🥚 Chay trứng sữa (Lacto-Ovo)';
   return '🌱 Thuần chay';
+}
+
+function withNormalizedIngredientDefaults(
+  item: FridgeScanResponse['ingredients'][number]
+): FridgeScanResponse['ingredients'][number] {
+  const unit = item.unit || inferIngredientUnit(item.name);
+  return {
+    ...item,
+    unit,
+    quantity: normalizeQuantityForUnit(item.quantity ?? 1, unit),
+  };
 }
 
 function mergeScanResults(results: FridgeScanResponse[]): FridgeScanResponse {
@@ -360,8 +380,12 @@ function ScanReview(props: ScanReviewProps) {
   };
 
   const selectedIngredientsToSave = ingredients.filter((item, idx) => isRowSelected(item, idx));
-  const hasLactoOvoExcludedForVegan =
-    isStrictVeganDiet(dietaryPreferences) && ingredients.some((item) => item.category === 'LACTO_OVO');
+  const hasDietExcludedVegetarian = ingredients.some(
+    (item) =>
+      isIngredientSelectable(item) &&
+      !isIngredientDefaultSelected(item, dietaryPreferences) &&
+      ['LACTO', 'OVO', 'LACTO_OVO', 'OVO_LACTO'].includes((item.category || '').toUpperCase())
+  );
 
   const reliabilities = images.map((img, idx) => evaluateImageReliability(img, imageResults[idx]));
   const currentReliability = reliabilities[activeImageIndex] || { isReliable: true, foodCount: 0 };
@@ -618,6 +642,16 @@ function ScanReview(props: ScanReviewProps) {
                             🔄 Đã có trong tủ {item.previousDaysInFridge ?? 0} ngày
                           </span>
                         )}
+                        {item.needsLabelVerification && (
+                          <span className="inline-flex items-center gap-0.5 font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded text-[9px]">
+                            🏷️ Cần đọc nhãn
+                          </span>
+                        )}
+                        {item.containsFivePungent && (
+                          <span className="inline-flex items-center gap-0.5 font-semibold text-purple-800 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 px-1.5 py-0.5 rounded text-[9px]">
+                            🧄 Ngũ vị tân
+                          </span>
+                        )}
                         {reasonText && (
                           <span className="inline-flex items-center gap-0.5 font-semibold text-rose-800 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-1.5 py-0.5 rounded text-[9px]">
                             🚫 {reasonText}
@@ -655,32 +689,48 @@ function ScanReview(props: ScanReviewProps) {
                       <option value="USABLE">Dùng sớm</option>
                       <option value="SPOILED">Hỏng (Loại bỏ)</option>
                     </select>
-                    <input
-                      aria-label={`Số lượng ${item.name}`}
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      value={item.quantity ?? 1}
-                      onChange={(event) =>
-                        updateIngredient(index, { quantity: Math.max(0.1, Number(event.target.value)) })
-                      }
-                      className="w-14 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-2 text-center text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-emerald-500"
-                    />
-                    <select
-                      aria-label={`Đơn vị ${item.name}`}
-                      value={item.unit ?? 'phần'}
-                      onChange={(event) => updateIngredient(index, { unit: event.target.value })}
-                      className="max-w-20 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-2 text-[10px] text-slate-800 dark:text-white outline-none focus:border-emerald-500"
-                    >
-                      <option>phần</option>
-                      <option>cái</option>
-                      <option>bó</option>
-                      <option>kg</option>
-                      <option>g</option>
-                      <option>ml</option>
-                      <option>quả</option>
-                      <option>hộp</option>
-                    </select>
+                    {(() => {
+                      const currentUnit = item.unit || inferIngredientUnit(item.name);
+                      const qtyRule = getQuantityInputRule(currentUnit);
+                      const unitChoices = FRIDGE_UNIT_OPTIONS.includes(currentUnit as (typeof FRIDGE_UNIT_OPTIONS)[number])
+                        ? FRIDGE_UNIT_OPTIONS
+                        : ([currentUnit, ...FRIDGE_UNIT_OPTIONS] as const);
+                      return (
+                        <>
+                          <input
+                            aria-label={`Số lượng ${item.name}`}
+                            type="number"
+                            min={qtyRule.min}
+                            step={qtyRule.step}
+                            value={item.quantity ?? (qtyRule.step >= 50 ? 100 : 1)}
+                            onChange={(event) =>
+                              updateIngredient(index, {
+                                quantity: normalizeQuantityForUnit(Number(event.target.value), currentUnit),
+                              })
+                            }
+                            className="w-16 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-2 text-center text-xs font-bold text-slate-800 dark:text-white outline-none focus:border-emerald-500"
+                          />
+                          <select
+                            aria-label={`Đơn vị ${item.name}`}
+                            value={currentUnit}
+                            onChange={(event) => {
+                              const nextUnit = event.target.value;
+                              updateIngredient(index, {
+                                unit: nextUnit,
+                                quantity: adjustQuantityForUnitChange(item.quantity, currentUnit, nextUnit),
+                              });
+                            }}
+                            className="max-w-20 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-1.5 py-2 text-[10px] text-slate-800 dark:text-white outline-none focus:border-emerald-500"
+                          >
+                            {unitChoices.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      );
+                    })()}
                     <button
                       type="button"
                       aria-label={`Xóa ${item.name}`}
@@ -727,9 +777,9 @@ function ScanReview(props: ScanReviewProps) {
           </p>
         )}
 
-        {hasLactoOvoExcludedForVegan && (
+        {hasDietExcludedVegetarian && (
           <p className="mt-3 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/80 px-4 py-3 text-xs text-sky-900 dark:text-sky-200">
-            Phát hiện nguyên liệu thuộc nhóm Chay trứng sữa (Lacto-Ovo). Theo hồ sơ Thuần chay (VEGAN) của bạn, hệ thống đã tạm bỏ tick mặc định — bạn vẫn có thể tự tick lại nếu muốn lưu.
+            Phát hiện nguyên liệu chứa trứng hoặc sữa (Lacto / Ovo / Lacto-Ovo). Theo chế độ ăn chay hiện tại của bạn{isStrictVeganDiet(dietaryPreferences) ? ' (Thuần chay)' : ''}, hệ thống đã tạm bỏ tick mặc định — bạn vẫn có thể tự tick lại nếu muốn lưu.
           </p>
         )}
 
@@ -821,17 +871,15 @@ function ScanReview(props: ScanReviewProps) {
               </Link>
             )}
 
-            {usableItems.length > 0 && (
+            {selectedIngredientsToSave.length > 0 && (
               <Link
                 to="/ai-chef"
-                state={{
-                  source: 'fridge-scan',
-                  title: `Quét tủ lạnh (${usableItems.length} món)`,
-                  ingredients: usableItems.map((item) => item.name),
-                  initialPrompt: `Tôi vừa quét tủ lạnh và có các nguyên liệu sau: ${usableItems
-                    .map((i) => `${i.name} (${i.quantity ?? 1} ${i.unit ?? 'phần'})`)
-                    .join(', ')}. Bếp trưởng hãy gợi ý món chay ngon và hướng dẫn cách nấu chi tiết nhé!`,
-                }}
+                state={buildFridgeScanHandoffState({
+                  items: selectedIngredientsToSave,
+                  imageResults,
+                  result,
+                  alreadySavedToFridge: Boolean(message),
+                })}
                 className="inline-flex items-center gap-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white px-4 py-3 text-sm font-bold shadow-xs transition"
               >
                 <ChefHat size={16} /> Chuyển sang AI Bếp Trưởng
@@ -1007,6 +1055,7 @@ export function FridgeScanPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef(new Set<string>());
+  const scannedByIdRef = useRef<Map<string, FridgeScanResponse>>(new Map());
   const [images, setImages] = useState<SelectedImage[]>([]);
   const [result, setResult] = useState<FridgeScanResponse | null>(null);
   const [imageResults, setImageResults] = useState<FridgeScanResponse[]>([]);
@@ -1043,7 +1092,11 @@ export function FridgeScanPage() {
     setInfoMessage('');
     const incoming = Array.from(files);
     if (!incoming.length) return;
+    const fileSig = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
+    const existingSigs = new Set(images.map((img) => fileSig(img.file)));
     const accepted: SelectedImage[] = [];
+    const duplicateNames: string[] = [];
+
     for (const file of incoming) {
       if (!ACCEPTED_TYPES.includes(file.type)) {
         setError('Chỉ hỗ trợ ảnh JPG, PNG hoặc WEBP.');
@@ -1053,15 +1106,31 @@ export function FridgeScanPage() {
         setError('Mỗi ảnh cần có dung lượng từ 1 byte đến 5 MB.');
         continue;
       }
+      const sig = fileSig(file);
+      if (existingSigs.has(sig)) {
+        duplicateNames.push(file.name);
+        continue;
+      }
       if (images.length + accepted.length >= MAX_IMAGES) {
         setError(`Bạn có thể tải tối đa ${MAX_IMAGES} ảnh trong một lượt quét.`);
         break;
       }
+      existingSigs.add(sig);
       const preview = URL.createObjectURL(file);
       objectUrls.current.add(preview);
       accepted.push({ id: `${Date.now()}-${accepted.length}-${file.name}`, file, preview });
     }
+    if (duplicateNames.length > 0) {
+      setInfoMessage(
+        `Đã bỏ qua ảnh trùng (${duplicateNames.join(', ')}) để tránh quét lại cùng một ảnh.`
+      );
+    }
     if (accepted.length) {
+      if (scannedByIdRef.current.size > 0 && duplicateNames.length === 0) {
+        setInfoMessage(
+          `Đã thêm ${accepted.length} ảnh mới. Khi bấm Quét AI, hệ thống sẽ giữ kết quả các ảnh đã quét trước đó và chỉ phân tích ảnh mới.`
+        );
+      }
       setImages((current) => [...current, ...accepted].slice(0, MAX_IMAGES));
       setResult(null);
       setIngredients([]);
@@ -1070,6 +1139,7 @@ export function FridgeScanPage() {
   };
 
   const removeImage = (id: string) => {
+    scannedByIdRef.current.delete(id);
     setImages((current) => {
       const removed = current.find((image) => image.id === id);
       if (removed) {
@@ -1083,6 +1153,7 @@ export function FridgeScanPage() {
   const removeImageAtIndex = (index: number) => {
     const imageToRemove = images[index];
     if (imageToRemove) {
+      scannedByIdRef.current.delete(imageToRemove.id);
       URL.revokeObjectURL(imageToRemove.preview);
       objectUrls.current.delete(imageToRemove.preview);
     }
@@ -1102,9 +1173,7 @@ export function FridgeScanPage() {
     if (nextImageResults.length > 0) {
       const scanResult = mergeScanResults(nextImageResults);
       setResult(scanResult);
-      setIngredients(
-        scanResult.ingredients.map((item) => ({ ...item, quantity: item.quantity ?? 1, unit: item.unit ?? 'phần' }))
-      );
+      setIngredients(scanResult.ingredients.map(withNormalizedIngredientDefaults));
     } else {
       setResult(null);
       setIngredients([]);
@@ -1133,6 +1202,7 @@ export function FridgeScanPage() {
     const removedCount = images.length - reliablePairs.length;
     images.forEach((img, idx) => {
       if (!reliablePairs.some((r) => r.idx === idx)) {
+        scannedByIdRef.current.delete(img.id);
         URL.revokeObjectURL(img.preview);
         objectUrls.current.delete(img.preview);
       }
@@ -1147,9 +1217,7 @@ export function FridgeScanPage() {
 
     const scanResult = mergeScanResults(nextResults);
     setResult(scanResult);
-    setIngredients(
-      scanResult.ingredients.map((item) => ({ ...item, quantity: item.quantity ?? 1, unit: item.unit ?? 'phần' }))
-    );
+    setIngredients(scanResult.ingredients.map(withNormalizedIngredientDefaults));
     setMessage('');
     setInfoMessage(
       `Đã tự động loại bỏ ${removedCount} ảnh lỗi/không đáng tin cậy. Kết quả nguyên liệu đã được tính lại chỉ từ các ảnh đạt chuẩn!`
@@ -1159,6 +1227,7 @@ export function FridgeScanPage() {
   const reset = () => {
     objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
     objectUrls.current.clear();
+    scannedByIdRef.current.clear();
     setImages([]);
     setResult(null);
     setImageResults([]);
@@ -1183,25 +1252,59 @@ export function FridgeScanPage() {
     setResult(null);
     setCompletedImages(0);
     try {
+      const scanOutcomes = new Array<{ image: SelectedImage; response?: FridgeScanResponse; errMsg?: string }>(
+        images.length
+      );
+      let nextCursor = 0;
+      // Free-tier Vision endpoints rate-limit bursts heavily; scan sequentially to avoid concurrent 429/503 spikes.
+      const concurrency = 1;
+
+      const worker = async () => {
+        while (true) {
+          const idx = nextCursor;
+          nextCursor += 1;
+          if (idx >= images.length) break;
+          const current = images[idx];
+          try {
+            const cached = scannedByIdRef.current.get(current.id);
+            let response = cached;
+            if (!response) {
+              if (idx > 0) {
+                // Brief spacing between uncached images reduces Free-Tier burst 429s
+                await new Promise((resolve) => setTimeout(resolve, 500));
+              }
+              const optimizedFile = await compressImageForUpload(current.file);
+              response = await aiService.scanFridge(optimizedFile);
+              scannedByIdRef.current.set(current.id, response);
+            }
+            scanOutcomes[idx] = { image: current, response };
+          } catch (reason) {
+            scanOutcomes[idx] = { image: current, errMsg: errorMessage(reason) };
+          } finally {
+            setCompletedImages((prev) => prev + 1);
+          }
+        }
+      };
+
+      await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
       const succeededImages: SelectedImage[] = [];
       const failedImages: SelectedImage[] = [];
       const responses: FridgeScanResponse[] = [];
       const failedNames: string[] = [];
       let lastErrorMsg = '';
 
-      for (let index = 0; index < images.length; index += 1) {
-        const current = images[index];
-        try {
-          const response = await aiService.scanFridge(current.file);
-          succeededImages.push(current);
-          responses.push(response);
-        } catch (reason) {
-          failedImages.push(current);
-          failedNames.push(current.file.name);
-          lastErrorMsg = errorMessage(reason);
+      scanOutcomes.forEach((entry) => {
+        if (!entry) return;
+        if (entry.response) {
+          succeededImages.push(entry.image);
+          responses.push(entry.response);
+        } else {
+          failedImages.push(entry.image);
+          failedNames.push(entry.image.file.name);
+          lastErrorMsg = entry.errMsg || lastErrorMsg;
         }
-        setCompletedImages(index + 1);
-      }
+      });
 
       if (!responses.length) {
         setError(lastErrorMsg || 'Không thể quét ảnh tủ lạnh lúc này. Vui lòng thử lại.');
@@ -1210,6 +1313,7 @@ export function FridgeScanPage() {
 
       if (failedNames.length > 0) {
         failedImages.forEach((img) => {
+          scannedByIdRef.current.delete(img.id);
           URL.revokeObjectURL(img.preview);
           objectUrls.current.delete(img.preview);
         });
@@ -1219,14 +1323,20 @@ export function FridgeScanPage() {
 
       const scanResult = mergeScanResults(responses);
       if (!scanResult.ingredients.length) {
-        setError('AI chưa nhận diện được nguyên liệu trong ảnh. Hãy thử ảnh rõ hơn hoặc nhập nguyên liệu bằng tay.');
+        const nonFoodSceneNotice = responses.every((r) => r.isFoodScene === false)
+          ? responses[0]?.warnings?.[0] ||
+            responses[0]?.summary ||
+            'Ảnh tải lên không phải khung cảnh thực phẩm hoặc tủ lạnh. Vui lòng chụp rõ nguyên liệu nấu ăn.'
+          : '';
+        setError(
+          nonFoodSceneNotice ||
+            'AI chưa nhận diện được nguyên liệu ăn được trong ảnh. Hãy thử ảnh rõ hơn hoặc nhập nguyên liệu bằng tay.'
+        );
       } else {
         setResult(scanResult);
         setImageResults(responses);
         setActiveImageIndex(0);
-        setIngredients(
-          scanResult.ingredients.map((item) => ({ ...item, quantity: item.quantity ?? 1, unit: item.unit ?? 'phần' }))
-        );
+        setIngredients(scanResult.ingredients.map(withNormalizedIngredientDefaults));
       }
     } catch (reason) {
       setError(errorMessage(reason));
@@ -1254,14 +1364,18 @@ export function FridgeScanPage() {
     }
   };
 
-  const updateIngredient = (index: number, changes: Partial<FridgeScanResponse['ingredients'][number]>) =>
+  const updateIngredient = (index: number, changes: Partial<FridgeScanResponse['ingredients'][number]>) => {
+    setMessage('');
     setIngredients((items) => items.map((item, itemIndex) => (itemIndex === index ? { ...item, ...changes } : item)));
+  };
   const addIngredient = () => {
     const name = newIngredientName.trim();
     if (!name) return;
+    setMessage('');
+    const unit = inferIngredientUnit(name);
     setIngredients((items) => [
       ...items,
-      { name, category: 'VEGAN', isVegetarian: true, freshness: 'FRESH', quantity: 1, unit: 'phần' },
+      { name, category: 'VEGAN', isVegetarian: true, freshness: 'FRESH', quantity: 1, unit },
     ]);
     setNewIngredientName('');
     setError('');
@@ -1442,9 +1556,10 @@ export function FridgeScanPage() {
                   onRemoveAllUnreliable={removeAllUnreliableImages}
                   ingredients={ingredients}
                   updateIngredient={updateIngredient}
-                  removeIngredient={(index) =>
-                    setIngredients((current) => current.filter((_, itemIndex) => itemIndex !== index))
-                  }
+                  removeIngredient={(index) => {
+                    setMessage('');
+                    setIngredients((current) => current.filter((_, itemIndex) => itemIndex !== index));
+                  }}
                   newIngredientName={newIngredientName}
                   setNewIngredientName={setNewIngredientName}
                   addIngredient={addIngredient}
@@ -1516,51 +1631,40 @@ export function FridgeScanPage() {
                               </span>
                             </div>
                             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                              {images.map((image, index) => {
-                                const isSuspicious = isNonFoodKeyword(image.file.name);
-                                return (
-                                  <article
-                                    key={image.id}
-                                    className="relative overflow-hidden rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                              {images.map((image, index) => (
+                                <article
+                                  key={image.id}
+                                  className="relative overflow-hidden rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                                >
+                                  <img
+                                    src={image.preview}
+                                    alt={`Ảnh nguyên liệu ${index + 1}`}
+                                    className="h-28 w-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label={`Xóa ảnh ${image.file.name}`}
+                                    onClick={() => removeImage(image.id)}
+                                    className="absolute right-1.5 top-1.5 rounded-full bg-white/95 dark:bg-slate-700 p-1 text-slate-500 dark:text-slate-300 shadow hover:text-red-600 cursor-pointer"
+                                    title="Xóa ảnh này"
                                   >
-                                    <img
-                                      src={image.preview}
-                                      alt={`Ảnh nguyên liệu ${index + 1}`}
-                                      className="h-28 w-full object-cover"
-                                    />
-                                    {isSuspicious && (
-                                      <div
-                                        className="absolute top-1.5 left-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white font-black text-xs shadow-md ring-2 ring-white animate-pulse"
-                                        title="Phát hiện tên tệp nghi ngờ là cành cây/đống lá/vật phẩm không ăn được"
-                                      >
-                                        !
-                                      </div>
-                                    )}
-                                    <button
-                                      type="button"
-                                      aria-label={`Xóa ảnh ${image.file.name}`}
-                                      onClick={() => removeImage(image.id)}
-                                      className="absolute right-1.5 top-1.5 rounded-full bg-white/95 dark:bg-slate-700 p-1 text-slate-500 dark:text-slate-300 shadow hover:text-red-600 cursor-pointer"
-                                      title="Xóa ảnh này"
-                                    >
-                                      <X size={14} />
-                                    </button>
-                                    <div className="flex items-center justify-between gap-1 px-2 py-2">
-                                      <div className="min-w-0">
-                                        <p className="truncate text-[10px] font-semibold text-slate-700 dark:text-slate-200">
-                                          {image.file.name}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400">
-                                          {image.file.size >= 1024 * 1024
-                                            ? `${(image.file.size / 1024 / 1024).toFixed(1)} MB`
-                                            : `${Math.max(1, Math.round(image.file.size / 1024))} KB`}
-                                        </p>
-                                      </div>
-                                      <CheckCircle2 size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                    <X size={14} />
+                                  </button>
+                                  <div className="flex items-center justify-between gap-1 px-2 py-2">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-[10px] font-semibold text-slate-700 dark:text-slate-200">
+                                        {image.file.name}
+                                      </p>
+                                      <p className="text-[10px] text-slate-400">
+                                        {image.file.size >= 1024 * 1024
+                                          ? `${(image.file.size / 1024 / 1024).toFixed(1)} MB`
+                                          : `${Math.max(1, Math.round(image.file.size / 1024))} KB`}
+                                      </p>
                                     </div>
-                                  </article>
-                                );
-                              })}
+                                    <CheckCircle2 size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                  </div>
+                                </article>
+                              ))}
                               {images.length < MAX_IMAGES && (
                                 <button
                                   type="button"
@@ -1573,6 +1677,15 @@ export function FridgeScanPage() {
                               )}
                             </div>
                           </section>
+                        )}
+
+                        {infoMessage && (
+                          <p
+                            role="status"
+                            className="mt-3 rounded-xl border border-sky-200 dark:border-sky-800/80 bg-sky-50 dark:bg-sky-950/40 px-4 py-3 text-xs font-semibold text-sky-900 dark:text-sky-200"
+                          >
+                            {infoMessage}
+                          </p>
                         )}
 
                         {error && (

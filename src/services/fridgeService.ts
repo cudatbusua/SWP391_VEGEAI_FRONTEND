@@ -8,9 +8,17 @@ import type {
   FridgeScanResponse,
 } from '../types/api';
 
-function shelfLifeDays(value?: string): number | undefined {
-  const match = value?.match(/\d+/);
-  return match ? Number(match[0]) : undefined;
+export function parseShelfLifeDays(value?: string): number | undefined {
+  if (!value) return undefined;
+  const normalized = value.toLowerCase();
+  const match = normalized.match(/(\d+(?:[.,]\d+)?)/);
+  if (!match) return undefined;
+  const num = Number(match[1].replace(',', '.'));
+  if (!Number.isFinite(num) || num <= 0) return undefined;
+  if (/(tháng|month)/.test(normalized)) return Math.max(1, Math.round(num * 30));
+  if (/(tuần|tuan|week)/.test(normalized)) return Math.max(1, Math.round(num * 7));
+  if (/(giờ|gio|hour|\bh\b)/.test(normalized)) return Math.max(1, Math.round(num / 24));
+  return Math.max(1, Math.round(num));
 }
 
 export const fridgeService = {
@@ -58,10 +66,14 @@ export const fridgeService = {
           unit: item.unit || 'phần',
           freshnessStatus: (item.freshness || 'FRESH') as FreshnessStatus,
           freshnessScore: item.freshnessScore,
-          estimatedShelfLifeDays: shelfLifeDays(item.shelfLifeEstimate),
+          estimatedShelfLifeDays: parseShelfLifeDays(item.shelfLifeEstimate),
           storageTip: item.storageTip,
           notes: item.visualSigns,
           confidence: item.confidence,
+          imageUrl: item.imageUrl || scan.scanImageUrl,
+          ...(item.matchedExistingFridgeItemId
+            ? { matchedExistingFridgeItemId: item.matchedExistingFridgeItemId }
+            : {}),
         })),
       },
     });

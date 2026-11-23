@@ -28,6 +28,7 @@ import { MainLayout } from '../layouts/MainLayout';
 import { Button } from '../components/Button';
 import { aiService } from '../services/aiService';
 import { fridgeService } from '../services/fridgeService';
+import { userService } from '../services/userService';
 import { errorMessage } from '../services/apiClient';
 import { useAuth } from '../hooks/useAuth';
 import type { FridgeScanResponse } from '../types/api';
@@ -40,12 +41,13 @@ type SelectedImage = { id: string; file: File; preview: string };
 
 function ingredientIllustration(name: string) {
   const normalized = name.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/(?:^|\s)(chanh|lemon)(?:\s|$)/.test(normalized)) return '🍋';
+  if (/\b(?:hanh tay|hanh la|hanh tim|hanh kho|onion)\b/.test(normalized) || /^hanh$/.test(normalized)) return '🧅';
   const illustrations: [string[], string][] = [
     [['ca chua', 'tomato'], '🍅'],
     [['dua leo', 'cucumber'], '🥒'],
     [['ca rot', 'carrot'], '🥕'],
     [['bap cai', 'rau', 'cai', 'xalach', 'lettuce', 'spinach'], '🥬'],
-    [['hanh', 'onion'], '🧅'],
     [['toi', 'garlic'], '🧄'],
     [['ot', 'chili'], '🌶️'],
     [['nam', 'mushroom'], '🍄'],
@@ -54,7 +56,6 @@ function ingredientIllustration(name: string) {
     [['khoai', 'potato'], '🥔'],
     [['tao', 'apple'], '🍎'],
     [['chuoi', 'banana'], '🍌'],
-    [['chanh', 'lemon'], '🍋'],
     [['trung', 'egg'], '🥚'],
   ];
   return illustrations.find(([keywords]) => keywords.some((keyword) => normalized.includes(keyword)))?.[1] ?? '🥗';
@@ -171,6 +172,41 @@ function isItemEdible(item: { name: string; category?: string; isEdible?: boolea
   return !isNonFoodKeyword(item.name);
 }
 
+function cleanRejectionReason(reason?: string | null): string | undefined {
+  if (!reason) return undefined;
+  const trimmed = reason.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'undefined') {
+    return undefined;
+  }
+  return trimmed;
+}
+
+function isStrictVeganDiet(dietaryPreferences?: string | null): boolean {
+  if (!dietaryPreferences) return true;
+  const normalized = dietaryPreferences.trim().toUpperCase();
+  return normalized === 'VEGAN' || normalized === 'RAW_VEGAN';
+}
+
+function isIngredientSelectable(item: FridgeScanResponse['ingredients'][number]): boolean {
+  return isItemEdible(item) && item.category !== 'NON_VEG' && item.isVegetarian && item.freshness !== 'SPOILED';
+}
+
+function isIngredientDefaultSelected(
+  item: FridgeScanResponse['ingredients'][number],
+  dietaryPreferences?: string | null
+): boolean {
+  if (!isIngredientSelectable(item)) return false;
+  if (item.category === 'LACTO_OVO' && isStrictVeganDiet(dietaryPreferences)) return false;
+  return true;
+}
+
+function categoryBadgeText(item: FridgeScanResponse['ingredients'][number]): string {
+  if (!isItemEdible(item) || item.category === 'NON_FOOD') return '🚫 Không phải thực phẩm';
+  if (item.category === 'NON_VEG' || !item.isVegetarian) return '⚠️ Không thuần chay';
+  if (item.category === 'LACTO_OVO') return '🥛🥚 Chay trứng sữa (Lacto-Ovo)';
+  return '🌱 Thuần chay';
+}
+
 function mergeScanResults(results: FridgeScanResponse[]): FridgeScanResponse {
   const ingredients = new Map<string, FridgeScanResponse['ingredients'][number]>();
   const rejectedNonFood: string[] = [];
@@ -188,7 +224,14 @@ function mergeScanResults(results: FridgeScanResponse[]): FridgeScanResponse {
         specificName = 'Rau cải ngọt tươi';
       }
       const key = specificName.toLocaleLowerCase('vi');
-      if (key && !ingredients.has(key)) ingredients.set(key, { ...item, name: specificName });
+      if (key && !ingredients.has(key)) {
+        ingredients.set(key, {
+          ...item,
+          name: specificName,
+          rejectionReason: cleanRejectionReason(item.rejectionReason),
+          imageUrl: item.imageUrl || result.scanImageUrl,
+        });
+      }
     })
   );
 
@@ -207,6 +250,7 @@ function mergeScanResults(results: FridgeScanResponse[]): FridgeScanResponse {
     suggestedRecipes: [...new Set(results.flatMap((result) => result.suggestedRecipes ?? []))],
     warnings: baseWarnings,
     scannedAt: new Date().toISOString(),
+    scanImageUrl: results.map((result) => result.scanImageUrl).find(Boolean),
   };
 }
 
@@ -255,6 +299,7 @@ type ScanReviewProps = {
   setNewIngredientName: (name: string) => void;
   addIngredient: () => void;
   isAuthenticated: boolean;
+  dietaryPreferences?: string | null;
   usableItems: FridgeScanResponse['ingredients'];
   saving: boolean;
   onSave: (itemsToSave: FridgeScanResponse['ingredients']) => Promise<void> | void;
@@ -262,6 +307,7 @@ type ScanReviewProps = {
   onBack: () => void;
   error: string;
   message: string;
+  infoMessage: string;
 };
 
 function ScanReview(props: ScanReviewProps) {
@@ -280,6 +326,7 @@ function ScanReview(props: ScanReviewProps) {
     setNewIngredientName,
     addIngredient,
     isAuthenticated,
+    dietaryPreferences,
     usableItems,
     saving,
     onSave,
@@ -287,13 +334,18 @@ function ScanReview(props: ScanReviewProps) {
     onBack,
     error,
     message,
+    infoMessage,
   } = props;
 
-  const [excludedIndices, setExcludedIndices] = useState<Set<number>>(new Set());
+  const [toggledIndices, setToggledIndices] = useState<Set<number>>(new Set());
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  useEffect(() => {
+    setToggledIndices(new Set());
+  }, [result.scannedAt, ingredients.length]);
+
   const toggleSelectIngredient = (index: number) => {
-    setExcludedIndices((prev) => {
+    setToggledIndices((prev) => {
       const next = new Set(prev);
       if (next.has(index)) next.delete(index);
       else next.add(index);
@@ -301,9 +353,15 @@ function ScanReview(props: ScanReviewProps) {
     });
   };
 
-  const selectedIngredientsToSave = ingredients.filter(
-    (item, idx) => !excludedIndices.has(idx) && item.isVegetarian && item.freshness !== 'SPOILED'
-  );
+  const isRowSelected = (item: FridgeScanResponse['ingredients'][number], idx: number) => {
+    if (!isIngredientSelectable(item)) return false;
+    const defaultSelected = isIngredientDefaultSelected(item, dietaryPreferences);
+    return toggledIndices.has(idx) ? !defaultSelected : defaultSelected;
+  };
+
+  const selectedIngredientsToSave = ingredients.filter((item, idx) => isRowSelected(item, idx));
+  const hasLactoOvoExcludedForVegan =
+    isStrictVeganDiet(dietaryPreferences) && ingredients.some((item) => item.category === 'LACTO_OVO');
 
   const reliabilities = images.map((img, idx) => evaluateImageReliability(img, imageResults[idx]));
   const currentReliability = reliabilities[activeImageIndex] || { isReliable: true, foodCount: 0 };
@@ -524,7 +582,9 @@ function ScanReview(props: ScanReviewProps) {
 
             <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
               {ingredients.map((item, index) => {
-                const isSelected = !excludedIndices.has(index) && item.isVegetarian && item.freshness !== 'SPOILED';
+                const selectable = isIngredientSelectable(item);
+                const isSelected = isRowSelected(item, index);
+                const reasonText = cleanRejectionReason(item.rejectionReason);
                 return (
                   <article
                     key={`${item.name}-${index}`}
@@ -537,7 +597,7 @@ function ScanReview(props: ScanReviewProps) {
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      disabled={!item.isVegetarian || item.freshness === 'SPOILED'}
+                      disabled={!selectable}
                       onChange={() => toggleSelectIngredient(index)}
                       aria-label={`Chọn ${item.name} để thêm vào tủ lạnh`}
                       className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
@@ -558,14 +618,14 @@ function ScanReview(props: ScanReviewProps) {
                             🔄 Đã có trong tủ {item.previousDaysInFridge ?? 0} ngày
                           </span>
                         )}
-                        {item.rejectionReason && (
+                        {reasonText && (
                           <span className="inline-flex items-center gap-0.5 font-semibold text-rose-800 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 px-1.5 py-0.5 rounded text-[9px]">
-                            🚫 {item.rejectionReason}
+                            🚫 {reasonText}
                           </span>
                         )}
                       </div>
                       <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
-                        {item.isVegetarian ? '🌱 Thuần chay' : '⚠️ Cần kiểm tra'} · {freshness[item.freshness] ?? item.freshness}
+                        {categoryBadgeText(item)} · {freshness[item.freshness] ?? item.freshness}
                         {item.confidence != null
                           ? ` · AI ${Math.round(item.confidence <= 1 ? item.confidence * 100 : item.confidence)}%`
                           : ''}
@@ -625,7 +685,7 @@ function ScanReview(props: ScanReviewProps) {
                       type="button"
                       aria-label={`Xóa ${item.name}`}
                       onClick={() => {
-                        setExcludedIndices((prev) => new Set([...prev].filter((i) => i !== index).map((i) => (i > index ? i - 1 : i))));
+                        setToggledIndices((prev) => new Set([...prev].filter((i) => i !== index).map((i) => (i > index ? i - 1 : i))));
                         removeIngredient(index);
                       }}
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600 transition cursor-pointer"
@@ -663,7 +723,19 @@ function ScanReview(props: ScanReviewProps) {
 
         {result.hasNonVegetarianItem && (
           <p className="mt-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
-            Một số nguyên liệu có thể không phù hợp với chế độ ăn thuần chay và đã được bỏ chọn tự động.
+            Một số nguyên liệu là đồ mặn hoặc không phải thực phẩm nên đã được bỏ chọn tự động và khóa khỏi danh sách nạp tủ lạnh.
+          </p>
+        )}
+
+        {hasLactoOvoExcludedForVegan && (
+          <p className="mt-3 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/80 px-4 py-3 text-xs text-sky-900 dark:text-sky-200">
+            Phát hiện nguyên liệu thuộc nhóm Chay trứng sữa (Lacto-Ovo). Theo hồ sơ Thuần chay (VEGAN) của bạn, hệ thống đã tạm bỏ tick mặc định — bạn vẫn có thể tự tick lại nếu muốn lưu.
+          </p>
+        )}
+
+        {infoMessage && !message && (
+          <p role="status" className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            {infoMessage}
           </p>
         )}
 
@@ -943,6 +1015,8 @@ export function FridgeScanPage() {
   const [newIngredientName, setNewIngredientName] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+  const [dietaryPreferences, setDietaryPreferences] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -950,9 +1024,23 @@ export function FridgeScanPage() {
 
   useEffect(() => () => objectUrls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setDietaryPreferences(null);
+      return;
+    }
+    const controller = new AbortController();
+    userService
+      .getProfile(controller.signal)
+      .then((profile) => setDietaryPreferences(profile.dietaryPreferences ?? null))
+      .catch(() => setDietaryPreferences(null));
+    return () => controller.abort();
+  }, [isAuthenticated]);
+
   const addImages = (files: FileList | File[]) => {
     setError('');
     setMessage('');
+    setInfoMessage('');
     const incoming = Array.from(files);
     if (!incoming.length) return;
     const accepted: SelectedImage[] = [];
@@ -1021,7 +1109,8 @@ export function FridgeScanPage() {
       setResult(null);
       setIngredients([]);
     }
-    setMessage('Đã loại bỏ ảnh được chọn và cập nhật lại danh sách nguyên liệu.');
+    setMessage('');
+    setInfoMessage('Đã loại bỏ ảnh được chọn và cập nhật lại danh sách nguyên liệu.');
   };
 
   const removeAllUnreliableImages = () => {
@@ -1061,7 +1150,8 @@ export function FridgeScanPage() {
     setIngredients(
       scanResult.ingredients.map((item) => ({ ...item, quantity: item.quantity ?? 1, unit: item.unit ?? 'phần' }))
     );
-    setMessage(
+    setMessage('');
+    setInfoMessage(
       `Đã tự động loại bỏ ${removedCount} ảnh lỗi/không đáng tin cậy. Kết quả nguyên liệu đã được tính lại chỉ từ các ảnh đạt chuẩn!`
     );
   };
@@ -1077,6 +1167,7 @@ export function FridgeScanPage() {
     setNewIngredientName('');
     setError('');
     setMessage('');
+    setInfoMessage('');
     setCompletedImages(0);
     if (inputRef.current) inputRef.current.value = '';
     if (cameraRef.current) cameraRef.current.value = '';
@@ -1088,14 +1179,44 @@ export function FridgeScanPage() {
     setBusy(true);
     setError('');
     setMessage('');
+    setInfoMessage('');
     setResult(null);
     setCompletedImages(0);
     try {
+      const succeededImages: SelectedImage[] = [];
+      const failedImages: SelectedImage[] = [];
       const responses: FridgeScanResponse[] = [];
+      const failedNames: string[] = [];
+      let lastErrorMsg = '';
+
       for (let index = 0; index < images.length; index += 1) {
-        responses.push(await aiService.scanFridge(images[index].file));
+        const current = images[index];
+        try {
+          const response = await aiService.scanFridge(current.file);
+          succeededImages.push(current);
+          responses.push(response);
+        } catch (reason) {
+          failedImages.push(current);
+          failedNames.push(current.file.name);
+          lastErrorMsg = errorMessage(reason);
+        }
         setCompletedImages(index + 1);
       }
+
+      if (!responses.length) {
+        setError(lastErrorMsg || 'Không thể quét ảnh tủ lạnh lúc này. Vui lòng thử lại.');
+        return;
+      }
+
+      if (failedNames.length > 0) {
+        failedImages.forEach((img) => {
+          URL.revokeObjectURL(img.preview);
+          objectUrls.current.delete(img.preview);
+        });
+        setImages(succeededImages);
+        setError(`Chưa thể quét ${failedNames.length} ảnh (${failedNames.join(', ')}): ${lastErrorMsg}. Các ảnh quét thành công đã được giữ lại bên dưới.`);
+      }
+
       const scanResult = mergeScanResults(responses);
       if (!scanResult.ingredients.length) {
         setError('AI chưa nhận diện được nguyên liệu trong ảnh. Hãy thử ảnh rõ hơn hoặc nhập nguyên liệu bằng tay.');
@@ -1120,6 +1241,7 @@ export function FridgeScanPage() {
     setSaving(true);
     setError('');
     setMessage('');
+    setInfoMessage('');
     try {
       const saved = await fridgeService.confirmScan({ ...result, ingredients: finalItems });
       setMessage(
@@ -1163,9 +1285,11 @@ export function FridgeScanPage() {
     });
     setIngredients([]);
     setError('');
+    setMessage('');
+    setInfoMessage('');
   };
 
-  const usableItems = ingredients.filter((item) => item.isVegetarian && item.freshness !== 'SPOILED');
+  const usableItems = ingredients.filter((item) => isIngredientDefaultSelected(item, dietaryPreferences));
   const progress = images.length ? Math.round((completedImages / images.length) * 100) : 0;
   const reportedConfidences = ingredients
     .map((item) => item.confidence)
@@ -1325,6 +1449,7 @@ export function FridgeScanPage() {
                   setNewIngredientName={setNewIngredientName}
                   addIngredient={addIngredient}
                   isAuthenticated={isAuthenticated}
+                  dietaryPreferences={dietaryPreferences}
                   usableItems={usableItems}
                   saving={saving}
                   onSave={saveToFridge}
@@ -1333,9 +1458,12 @@ export function FridgeScanPage() {
                     setResult(null);
                     setIngredients([]);
                     setError('');
+                    setMessage('');
+                    setInfoMessage('');
                   }}
                   error={error}
                   message={message}
+                  infoMessage={infoMessage}
                 />
               ) : (
                 <>
@@ -1423,7 +1551,9 @@ export function FridgeScanPage() {
                                           {image.file.name}
                                         </p>
                                         <p className="text-[10px] text-slate-400">
-                                          {(image.file.size / 1024 / 1024).toFixed(1)} MB
+                                          {image.file.size >= 1024 * 1024
+                                            ? `${(image.file.size / 1024 / 1024).toFixed(1)} MB`
+                                            : `${Math.max(1, Math.round(image.file.size / 1024))} KB`}
                                         </p>
                                       </div>
                                       <CheckCircle2 size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />

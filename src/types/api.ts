@@ -80,11 +80,13 @@ export interface FridgeScanResponse {
     matchedExistingFridgeItemId?: string;
     isPreviouslyTracked?: boolean;
     previousDaysInFridge?: number;
+    imageUrl?: string;
   }[];
   suggestedRecipes?: string[];
   warnings?: string[];
   scannedAt: string;
   requiresProfileSetup?: boolean;
+  scanImageUrl?: string;
 }
 
 export interface GenerateRecipeAiRequest {
@@ -117,6 +119,7 @@ export interface FridgeItem {
   storageTip?: string;
   notes?: string;
   confidence?: number;
+  imageUrl?: string;
   warningMessage?: string;
   createdAt?: string;
   updatedAt?: string;

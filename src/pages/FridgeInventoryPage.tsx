@@ -16,6 +16,37 @@ const emptyForm = { name: '', category: 'VEGAN', quantity: '', unit: 'phần', f
 const emptySummary: FridgeSummary = { totalActiveItems: 0, expiringSoonCount: 0, expiredCount: 0, freshCount: 0, usableCount: 0, veganCount: 0, urgentWarnings: [] };
 const NON_VEGETARIAN_PATTERN = /(?:thịt|xúc xích|cá|tôm|mực|gà|bò|heo|lợn|trứng|hải sản|sữa bò|phô mai)/i;
 
+function safeFridgeImageUrl(value?: string): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return /^(\/api\/public\/fridge-scans\/[a-f0-9-]{36}\.(jpg|png|webp)|https?:\/\/.+)$/i.test(trimmed)
+    ? trimmed
+    : undefined;
+}
+
+function FridgeItemBadge({ imageUrl, name, urgent, soon }: { imageUrl?: string; name: string; urgent: boolean; soon: boolean }) {
+  const [broken, setBroken] = useState(false);
+  const safeUrl = safeFridgeImageUrl(imageUrl);
+  if (safeUrl && !broken) {
+    return (
+      <a href={safeUrl} target="_blank" rel="noreferrer" title={`Xem ảnh gốc của ${name}`} className="mt-0.5 shrink-0">
+        <img
+          src={safeUrl}
+          alt={name}
+          loading="lazy"
+          onError={() => setBroken(true)}
+          className="h-11 w-11 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shadow-2xs"
+        />
+      </a>
+    );
+  }
+  return (
+    <span className={`mt-0.5 shrink-0 rounded-xl p-2 ${urgent ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300' : soon ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300' : 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'}`}>
+      <Leaf size={17} />
+    </span>
+  );
+}
+
 export function FridgeInventoryPage() {
   const { isLoading, isAuthenticated } = useAuth();
   const [items, setItems] = useState<FridgeItem[]>([]);
@@ -176,7 +207,7 @@ export function FridgeInventoryPage() {
           const tone = urgent ? 'border-rose-200 dark:border-rose-900 bg-rose-50/30 dark:bg-rose-950/20' : soon ? 'border-amber-200 dark:border-amber-900 bg-amber-50/30 dark:bg-amber-950/20' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#182230]';
           const badgeTone = urgent ? 'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-300' : soon ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300' : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300';
           return <article key={item.itemId} className={`rounded-2xl border p-4 transition hover:shadow-sm ${tone}`}>
-            <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><span className={`mt-0.5 rounded-xl p-2 ${urgent ? 'bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300' : soon ? 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300' : 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300'}`}><Leaf size={17} /></span><div className="min-w-0"><h3 className="truncate font-bold text-slate-900 dark:text-white">{item.name}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.quantity ?? '—'} {item.unit || ''}{item.category ? ` · ${item.category}` : ''}</p>{nonVegetarian && <span className="mt-2 inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300">⚑ Không phải nguyên liệu chay</span>}</div></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${badgeTone}`}>{freshnessLabel}</span></div>
+            <div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><FridgeItemBadge imageUrl={item.imageUrl} name={item.name} urgent={urgent} soon={soon} /><div className="min-w-0"><h3 className="truncate font-bold text-slate-900 dark:text-white">{item.name}</h3><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{item.quantity ?? '—'} {item.unit || ''}{item.category ? ` · ${item.category}` : ''}</p>{nonVegetarian && <span className="mt-2 inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-extrabold text-rose-700 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300">⚑ Không phải nguyên liệu chay</span>}</div></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${badgeTone}`}>{freshnessLabel}</span></div>
             <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-slate-200/70 dark:border-slate-700/70 pt-3 text-xs text-slate-500 dark:text-slate-400">{item.expiryDate && <span className="inline-flex items-center gap-1.5"><CalendarClock size={14} />Hạn {new Date(`${item.expiryDate}T00:00:00`).toLocaleDateString('vi-VN')}</span>}<span className="inline-flex items-center gap-1.5"><Clock3 size={14} />{item.isExpired ? `Quá hạn ${Math.abs(item.daysRemaining)} ngày` : `Còn ${item.daysRemaining} ngày`}</span></div>
             {item.warningMessage && <p className={`mt-3 flex gap-2 text-xs leading-5 ${urgent ? 'text-rose-800 dark:text-rose-300' : 'text-amber-800 dark:text-amber-300'}`}><AlertTriangle size={14} className="mt-0.5 shrink-0" />{item.warningMessage}</p>}
             {item.storageTip && <p className="mt-2 flex gap-2 text-xs leading-5 text-slate-600 dark:text-slate-300"><CircleHelp size={14} className="mt-0.5 shrink-0 text-emerald-700 dark:text-emerald-400" />{item.storageTip}</p>}

@@ -42,6 +42,7 @@ function setup(handler) {
     mealPlans: load('src/services/mealPlanService.ts').mealPlanService,
     community: load('src/services/communityService.ts').communityService,
     cookbook: load('src/services/cookbookService.ts').cookbookService,
+    fridge: load('src/services/fridgeService.ts').fridgeService,
     videoMedia: load('src/utils/communityVideo.ts') };
 }
 const profile = { userId: 'user-1', username: 'member', email: 'member@example.com', fullName: 'Thành viên', role: 'USER', status: 'ACTIVE' };
@@ -655,4 +656,63 @@ test('changeUsername normalizes input and sends PUT /api/users/me/username with 
   assert.equal(fixture.calls[0].method, 'PUT');
   assert.equal(fixture.calls[0].headers.get('Authorization'), 'Bearer token-1');
   assert.deepEqual(JSON.parse(fixture.calls[0].body), { username: 'vege_star' });
+});
+
+test('fridge.confirmScan forwards per-item or fallback scanImageUrl to /api/fridge/confirm-items', async () => {
+  const fixture = setup(() => reply({ totalProcessed: 2, newlyAddedCount: 2, updatedExistingCount: 0, items: [] }, 201));
+  fixture.api.setSession(auth(), true);
+
+  await fixture.fridge.confirmScan({
+    summary: 'Đã quét 2 nguyên liệu',
+    totalItemsDetected: 2,
+    hasNonVegetarianItem: false,
+    scannedAt: '2026-11-22T14:30:00Z',
+    scanImageUrl: '/api/public/fridge-scans/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg',
+    ingredients: [
+      {
+        name: 'Cà chua',
+        category: 'VEGAN',
+        isVegetarian: true,
+        freshness: 'FRESH',
+        imageUrl: '/api/public/fridge-scans/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.png',
+      },
+      {
+        name: 'Cải ngọt',
+        category: 'VEGAN',
+        isVegetarian: true,
+        freshness: 'FRESH',
+      },
+    ],
+  });
+
+  assert.equal(fixture.calls[0].url, '/api/fridge/confirm-items');
+  assert.equal(fixture.calls[0].method, 'POST');
+  const sent = JSON.parse(fixture.calls[0].body);
+  assert.equal(sent.items[0].imageUrl, '/api/public/fridge-scans/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.png');
+  assert.equal(sent.items[1].imageUrl, '/api/public/fridge-scans/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg');
+});
+
+test('fridge.confirmScan converts tuần/tháng/giờ shelfLifeEstimate accurately and forwards matchedExistingFridgeItemId', async () => {
+  const fixture = setup(() => reply({ totalProcessed: 4, newlyAddedCount: 3, updatedExistingCount: 1, items: [] }, 201));
+  fixture.api.setSession(auth(), true);
+
+  await fixture.fridge.confirmScan({
+    summary: 'Đã quét',
+    totalItemsDetected: 4,
+    hasNonVegetarianItem: false,
+    scannedAt: '2026-11-22T14:30:00Z',
+    ingredients: [
+      { name: 'Khoai tây', category: 'VEGAN', isVegetarian: true, freshness: 'FRESH', shelfLifeEstimate: '1-2 tuần' },
+      { name: 'Chanh vàng', category: 'VEGAN', isVegetarian: true, freshness: 'FRESH', shelfLifeEstimate: '1 tuần' },
+      { name: 'Cải thìa', category: 'VEGAN', isVegetarian: true, freshness: 'USABLE', shelfLifeEstimate: '24-48 giờ' },
+      { name: 'Cà chua', category: 'VEGAN', isVegetarian: true, freshness: 'FRESH', shelfLifeEstimate: '1 tháng', matchedExistingFridgeItemId: 'item-123' },
+    ],
+  });
+
+  const sent = JSON.parse(fixture.calls[0].body);
+  assert.equal(sent.items[0].estimatedShelfLifeDays, 7);
+  assert.equal(sent.items[1].estimatedShelfLifeDays, 7);
+  assert.equal(sent.items[2].estimatedShelfLifeDays, 1);
+  assert.equal(sent.items[3].estimatedShelfLifeDays, 30);
+  assert.equal(sent.items[3].matchedExistingFridgeItemId, 'item-123');
 });

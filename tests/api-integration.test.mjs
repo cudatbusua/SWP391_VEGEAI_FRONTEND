@@ -43,6 +43,8 @@ function setup(handler) {
     community: load('src/services/communityService.ts').communityService,
     cookbook: load('src/services/cookbookService.ts').cookbookService,
     fridge: load('src/services/fridgeService.ts').fridgeService,
+    fridgeChatBridge: load('src/features/ai/fridgeChatBridge.ts'),
+    fridgeImageCompress: load('src/utils/fridgeImageCompress.ts'),
     videoMedia: load('src/utils/communityVideo.ts') };
 }
 const profile = { userId: 'user-1', username: 'member', email: 'member@example.com', fullName: 'Thành viên', role: 'USER', status: 'ACTIVE' };
@@ -715,4 +717,175 @@ test('fridge.confirmScan converts tuần/tháng/giờ shelfLifeEstimate accurate
   assert.equal(sent.items[2].estimatedShelfLifeDays, 1);
   assert.equal(sent.items[3].estimatedShelfLifeDays, 30);
   assert.equal(sent.items[3].matchedExistingFridgeItemId, 'item-123');
+});
+
+test('ai.chat includes optional contextScreen and contextData when supplied for fridge sessions', async () => {
+  const fixture = setup(() => reply({ reply: 'Canh cải', sessionId: 's1', recommendedRecipes: ['Canh cải'] }));
+  fixture.api.setSession(auth(), true);
+
+  await fixture.ai.chat('Gợi ý nấu ăn', 's1', undefined, {
+    contextScreen: 'FRIDGE',
+    contextData: 'Cải thìa (1 bó, Dùng sớm)',
+  });
+
+  const sent = JSON.parse(fixture.calls[0].body);
+  assert.equal(sent.contextScreen, 'FRIDGE');
+  assert.equal(sent.contextData, 'Cải thìa (1 bó, Dùng sớm)');
+});
+
+test('fridgeChatBridge builds structured handoff payload with server scan URLs and rejects unsafe URLs', () => {
+  const fixture = setup(() => reply({}));
+  const bridge = fixture.fridgeChatBridge;
+
+  assert.equal(bridge.safeChatImageUrl('/api/public/fridge-scans/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg'), '/api/public/fridge-scans/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg');
+  assert.equal(bridge.safeChatImageUrl('javascript:alert(1)'), undefined);
+  assert.equal(bridge.safeChatImageUrl('data:image/svg+xml;base64,PHN2Zz4='), undefined);
+
+  const handoff = bridge.buildFridgeScanHandoffState({
+    items: [
+      {
+        name: 'Cải thìa',
+        category: 'VEGAN',
+        isVegetarian: true,
+        freshness: 'USABLE',
+        quantity: 2,
+        unit: 'bó',
+        isPreviouslyTracked: true,
+        previousDaysInFridge: 3,
+        imageUrl: '/api/public/fridge-scans/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg',
+      },
+      {
+        name: 'Đậu phụ non',
+        category: 'VEGAN',
+        isVegetarian: true,
+        freshness: 'FRESH',
+        quantity: 1,
+        unit: 'hộp',
+      },
+    ],
+    imageResults: [
+      {
+        summary: 'Scan 1',
+        totalItemsDetected: 1,
+        hasNonVegetarianItem: false,
+        ingredients: [],
+        scannedAt: '2026-11-23T12:00:00Z',
+        scanImageUrl: '/api/public/fridge-scans/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.png',
+      },
+    ],
+    result: {
+      summary: 'Merged',
+      totalItemsDetected: 2,
+      hasNonVegetarianItem: false,
+      ingredients: [],
+      suggestedRecipes: ['Canh cải đậu phụ'],
+      warnings: ['⚠️ LƯU Ý TỦ LẠNH: Cải thìa sắp hết hạn', 'Độ tươi chỉ là ước tính từ ảnh'],
+      scannedAt: '2026-11-23T12:00:00Z',
+      scanImageUrl: 'javascript:alert(1)',
+    },
+    alreadySavedToFridge: true,
+  });
+
+  assert.equal(handoff.source, 'fridge-scan');
+  assert.equal(handoff.alreadySavedToFridge, true);
+  assert.deepEqual([...handoff.scanImageUrls], [
+    '/api/public/fridge-scans/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.png',
+    '/api/public/fridge-scans/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg',
+  ]);
+  assert.match(handoff.initialPrompt, /Cải thìa \(2 bó\)/);
+  assert.match(handoff.initialPrompt, /ưu tiên giải quyết.*Cải thìa/i);
+
+  const ctx = bridge.buildFridgeContextData(handoff.scanItems, handoff.warnings);
+  assert.match(ctx, /Cải thìa \(2 bó, Dùng sớm \(ưu tiên nấu trước\), đã trong tủ 3 ngày\)/);
+  assert.equal(ctx.includes('ước tính từ ảnh'), false);
+
+  const merged = bridge.mergeFridgeItems(handoff.scanItems, [
+    {
+      name: '  cải thìa  ',
+      category: 'VEGAN',
+      isVegetarian: true,
+      freshness: 'FRESH',
+      quantity: 3,
+      unit: 'bó',
+    },
+    {
+      name: 'Nấm rơm',
+      category: 'VEGAN',
+      isVegetarian: true,
+      freshness: 'USABLE',
+      quantity: 200,
+      unit: 'g',
+    },
+  ]);
+  assert.equal(merged.length, 3);
+  assert.equal(merged[0].quantity, 3);
+  assert.equal(merged[0].imageUrl, '/api/public/fridge-scans/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.jpg');
+  assert.equal(merged[2].name, 'Nấm rơm');
+});
+
+test('isIngredientAllowedForDiet handles VEGAN, LACTO, OVO, LACTO_OVO, NON_VEG, and label/five-pungent context markers', () => {
+  const fixture = setup(() => reply({}));
+  const bridge = fixture.fridgeChatBridge;
+
+  const veganItem = { name: 'Cải ngọt', category: 'VEGAN', isVegetarian: true, isEdible: true, freshness: 'FRESH' };
+  const milkItem = { name: 'Sữa tươi bò', category: 'LACTO', isVegetarian: true, isEdible: true, freshness: 'FRESH' };
+  const eggItem = { name: 'Trứng gà', category: 'OVO', isVegetarian: true, isEdible: true, freshness: 'FRESH' };
+  const bothItem = { name: 'Bánh kem trứng sữa', category: 'LACTO_OVO', isVegetarian: true, isEdible: true, freshness: 'FRESH' };
+  const spoiledItem = { name: 'Cà chua mốc', category: 'VEGAN', isVegetarian: true, isEdible: true, freshness: 'SPOILED' };
+
+  assert.equal(bridge.isIngredientAllowedForDiet(veganItem, 'VEGAN'), true);
+  assert.equal(bridge.isIngredientAllowedForDiet(milkItem, 'VEGAN'), false);
+  assert.equal(bridge.isIngredientAllowedForDiet(eggItem, 'VEGAN'), false);
+  assert.equal(bridge.isIngredientAllowedForDiet(milkItem, 'LACTO'), true);
+  assert.equal(bridge.isIngredientAllowedForDiet(eggItem, 'LACTO'), false);
+  assert.equal(bridge.isIngredientAllowedForDiet(bothItem, 'LACTO'), false);
+  assert.equal(bridge.isIngredientAllowedForDiet(eggItem, 'OVO'), true);
+  assert.equal(bridge.isIngredientAllowedForDiet(milkItem, 'OVO'), false);
+  assert.equal(bridge.isIngredientAllowedForDiet(bothItem, 'LACTO_OVO'), true);
+  assert.equal(bridge.isIngredientAllowedForDiet(spoiledItem, 'VEGETARIAN'), false);
+
+  const ctx = bridge.buildFridgeContextData([
+    { ...veganItem, needsLabelVerification: true, containsFivePungent: true },
+  ]);
+  assert.match(ctx, /cần kiểm tra nhãn/);
+  assert.match(ctx, /ngũ vị tân/);
+});
+
+test('fridgeImageCompress computes bounded dimensions and preserves small files safely', async () => {
+  const fixture = setup(() => reply({}));
+  const { computeScaledDimensions, compressImageForUpload } = fixture.fridgeImageCompress;
+
+  assert.deepEqual({ ...computeScaledDimensions(4000, 3000, 1280) }, { width: 1280, height: 960 });
+  assert.deepEqual({ ...computeScaledDimensions(900, 1800, 1280) }, { width: 640, height: 1280 });
+  assert.deepEqual({ ...computeScaledDimensions(800, 600, 1280) }, { width: 800, height: 600 });
+
+  const tinyFile = new File([new Uint8Array(1024)], 'small.jpg', { type: 'image/jpeg' });
+  const returned = await compressImageForUpload(tinyFile);
+  assert.equal(returned, tinyFile);
+});
+
+test('fridgeChatBridge provides integer steppers for discrete units and clean steps for weights', () => {
+  const fixture = setup(() => reply({}));
+  const bridge = fixture.fridgeChatBridge;
+
+  assert.deepEqual({ ...bridge.getQuantityInputRule('phần') }, { min: 1, step: 1, integerOnly: true });
+  assert.deepEqual({ ...bridge.getQuantityInputRule('bó') }, { min: 1, step: 1, integerOnly: true });
+  assert.deepEqual({ ...bridge.getQuantityInputRule('cái') }, { min: 1, step: 1, integerOnly: true });
+  assert.deepEqual({ ...bridge.getQuantityInputRule('quả') }, { min: 1, step: 1, integerOnly: true });
+  assert.deepEqual({ ...bridge.getQuantityInputRule('kg') }, { min: 0.5, step: 0.5, integerOnly: false });
+  assert.deepEqual({ ...bridge.getQuantityInputRule('g') }, { min: 50, step: 50, integerOnly: true });
+  assert.deepEqual({ ...bridge.getQuantityInputRule('ml') }, { min: 50, step: 50, integerOnly: true });
+
+  assert.equal(bridge.normalizeQuantityForUnit(1.3, 'quả'), 1);
+  assert.equal(bridge.normalizeQuantityForUnit(1.6, 'bó'), 2);
+  assert.equal(bridge.normalizeQuantityForUnit(1.5, 'kg'), 1.5);
+  assert.equal(bridge.adjustQuantityForUnitChange(1, 'phần', 'g'), 100);
+  assert.equal(bridge.adjustQuantityForUnitChange(250, 'g', 'bó'), 1);
+  assert.equal(bridge.adjustQuantityForUnitChange(1.6, 'kg', 'quả'), 2);
+
+  assert.equal(bridge.inferIngredientUnit('Cà chua bi'), 'quả');
+  assert.equal(bridge.inferIngredientUnit('Cải ngọt'), 'bó');
+  assert.equal(bridge.inferIngredientUnit('Đậu phụ non'), 'hộp');
+  assert.equal(bridge.inferIngredientUnit('Nước tương Tamari'), 'chai');
+  assert.equal(bridge.inferIngredientUnit('Cà rốt'), 'củ');
 });

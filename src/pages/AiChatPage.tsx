@@ -16,8 +16,10 @@ import {
   Search,
   Camera,
   PenLine,
+  RotateCcw,
   X
 } from 'lucide-react';
+import { compressImageForUpload } from '../utils/fridgeImageCompress';
 import { MainLayout } from '../layouts/MainLayout';
 import { aiService } from '../services/aiService';
 import { ApiError, errorMessage } from '../services/apiClient';
@@ -39,6 +41,19 @@ import type {
   ChatMealScheduleCardData,
   ChatActivityRingsCardData
 } from '../components/ChatInteractiveWidgets';
+import { ChatFridgeScanCardView } from '../components/ChatFridgeScanCardView';
+import {
+  buildFridgeChefInitialPrompt,
+  buildFridgeContextData,
+  collectScanImageUrls,
+  inferIngredientUnit,
+  isIngredientAllowedForDiet,
+  mergeFridgeItems,
+  safeChatImageUrl,
+  type ChatFridgeScanCardData,
+  type ChatFridgeScanItem,
+  type FridgeChatHandoffState
+} from '../features/ai/fridgeChatBridge';
 import { DEFAULT_WEEKLY_SCHEDULE } from '../data/weeklyScheduleData';
 import type { ScheduledDayPlan, ScheduledMealItem } from '../data/weeklyScheduleData';
 import { wearableService } from '../utils/wearableService';
@@ -112,6 +127,7 @@ export interface ChatMessage {
   text: string;
   time: string;
   image?: string;
+  fridgeScanCard?: ChatFridgeScanCardData;
   mealScheduleCard?: ChatMealScheduleCardData;
   activityRingsCard?: ChatActivityRingsCardData;
 }
@@ -123,7 +139,37 @@ export interface ChatSession {
   messages: ChatMessage[];
   sessionId?: string;
   recommendedRecipes?: string[];
+  fridgeContext?: {
+    items: ChatFridgeScanItem[];
+    images: string[];
+    warnings?: string[];
+  };
   updatedAt: number;
+}
+
+function SafeChatBubbleImage({ src }: { src: string }) {
+  const [broken, setBroken] = useState(false);
+  const safe = safeChatImageUrl(src);
+  if (!safe || broken) return null;
+  const imgEl = (
+    <img
+      src={safe}
+      alt="Ảnh đính kèm"
+      onError={() => setBroken(true)}
+      className="w-full h-auto object-cover max-h-56 rounded-lg"
+    />
+  );
+  return (
+    <div className="mb-2.5 overflow-hidden rounded-xl border border-white/20 max-w-xs shadow-xs">
+      {safe.startsWith('data:') ? (
+        imgEl
+      ) : (
+        <a href={safe} target="_blank" rel="noreferrer" title="Mở ảnh gốc">
+          {imgEl}
+        </a>
+      )}
+    </div>
+  );
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -229,6 +275,14 @@ export function AiChatPage() {
   const [isAnalyzingImage, setIsAnalyzingImage] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [pendingRetry, setPendingRetry] = useState<{
+    localSessionId: string;
+    backendSessionId?: string;
+    prompt: string;
+    history?: { role: 'user' | 'model'; text: string }[];
+    context?: { contextScreen?: string; contextData?: string };
+    extraRecipes?: string[];
+  } | null>(null);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   // Route the guest must return to after logging in from a fridge/scan prompt.
   const [fridgeLoginFrom, setFridgeLoginFrom] = useState<string | null>(null);
@@ -293,10 +347,20 @@ export function AiChatPage() {
       source?: string;
       title?: string;
       initialPrompt?: string;
+      ingredients?: string[];
+      scanItems?: ChatFridgeScanItem[];
       recipeContext?: any;
     } | null;
 
-    if (!state?.initialPrompt) return;
+    if (
+      !state?.initialPrompt ||
+      state.source === 'fridge-scan' ||
+      state.ingredients?.length ||
+      state.scanItems?.length ||
+      state.recipeContext
+    ) {
+      return;
+    }
 
     const newSessionId = `handoff-${Date.now()}`;
     const sessionTitle = state.title || 'Tư vấn món ăn từ bài đăng';
@@ -377,7 +441,7 @@ export function AiChatPage() {
   const handledHandoffRef = useRef<string>('');
   useEffect(() => {
     if (isAuthLoading || loadedStorageKeyRef.current !== storageKey) return;
-    const state = location.state as {
+    const state = location.state as (Partial<FridgeChatHandoffState> & {
       source?: string;
       ingredients?: string[];
       title?: string;
@@ -391,7 +455,7 @@ export function AiChatPage() {
         instructions?: string[];
         safetyNotes?: string[];
       };
-    } | null;
+    }) | null;
 
     if (!state) return;
     const stateFingerprint = JSON.stringify({
@@ -399,23 +463,58 @@ export function AiChatPage() {
       t: state.title,
       p: state.initialPrompt,
       i: state.ingredients,
+      imgs: state.scanImageUrls,
+      saved: state.alreadySavedToFridge,
     });
     if (handledHandoffRef.current === stateFingerprint) return;
 
     // 1. Hand-off from FridgeScanPage
-    if (state.ingredients && state.ingredients.length > 0) {
+    const hasRichItems = Array.isArray(state.scanItems) && state.scanItems.length > 0;
+    const hasNameItems = Array.isArray(state.ingredients) && state.ingredients.length > 0;
+    if (hasRichItems || (state.source === 'fridge-scan' && hasNameItems) || hasNameItems) {
       handledHandoffRef.current = stateFingerprint;
-      const ingredientsList = state.ingredients.join(', ');
-      const sessionTitle = state.title || `Quét tủ lạnh (${state.ingredients.length} món)`;
+      const scanItems: ChatFridgeScanItem[] = hasRichItems
+        ? state.scanItems!
+        : state.ingredients!.map((name) => ({
+            name,
+            category: 'VEGAN',
+            isVegetarian: true,
+            freshness: 'FRESH',
+            quantity: 1,
+            unit: 'phần',
+          }));
+      const scanImages = Array.from(
+        new Set([
+          ...((state.scanImageUrls || []).map((u) => safeChatImageUrl(u)).filter((u): u is string => Boolean(u))),
+          ...collectScanImageUrls(undefined, scanItems),
+        ])
+      );
+      const userPromptText = state.initialPrompt || buildFridgeChefInitialPrompt(scanItems);
+      const contextData = buildFridgeContextData(scanItems, state.warnings);
+      const sessionTitle = state.title || `Quét tủ lạnh (${scanItems.length} món)`;
+      const cardData: ChatFridgeScanCardData = {
+        images: scanImages,
+        items: scanItems,
+        warnings: state.warnings ?? [],
+        suggestedRecipes: state.suggestedRecipes ?? [],
+        savedToFridge: Boolean(state.alreadySavedToFridge),
+        savedSummary: state.alreadySavedToFridge ? 'Đã đồng bộ vào Kho Tủ Lạnh (/fridge)' : undefined,
+      };
 
       const newSession: ChatSession = {
         id: `scan-${Date.now()}`,
         title: sessionTitle,
         category: 'fridge-scan',
+        fridgeContext: {
+          items: scanItems,
+          images: scanImages,
+          warnings: state.warnings ?? [],
+        },
         messages: [
           {
             sender: 'user',
-            text: `Tôi vừa quét tủ lạnh và nhận diện được các nguyên liệu: ${ingredientsList}. Hãy phân tích và đề xuất 3 món chay ngon nhất, kèm hướng dẫn chế biến nhanh.`,
+            text: userPromptText,
+            fridgeScanCard: cardData,
             time: formatTime(Date.now())
           }
         ],
@@ -428,14 +527,21 @@ export function AiChatPage() {
 
       setBusy(true);
       setError('');
-      aiService.chat(newSession.messages[0].text)
+      aiService.chat(userPromptText, undefined, undefined, {
+        contextScreen: 'FRIDGE',
+        contextData,
+      })
         .then(res => {
+          const mergedRecipes = Array.from(new Set([
+            ...(res.recommendedRecipes || []),
+            ...(state.suggestedRecipes || []),
+          ]));
           setSessions(prev => prev.map(s => {
             if (s.id === newSession.id) {
               return {
                 ...s,
                 sessionId: res.sessionId,
-                recommendedRecipes: res.recommendedRecipes,
+                recommendedRecipes: mergedRecipes,
                 messages: [
                   ...s.messages,
                   { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
@@ -448,6 +554,15 @@ export function AiChatPage() {
         })
         .catch(err => {
           setError(errorMessage(err));
+          setPendingRetry({
+            localSessionId: newSession.id,
+            prompt: userPromptText,
+            context: {
+              contextScreen: 'FRIDGE',
+              contextData,
+            },
+            extraRecipes: state.suggestedRecipes || [],
+          });
         })
         .finally(() => {
           setBusy(false);
@@ -523,6 +638,11 @@ export function AiChatPage() {
         })
         .catch(err => {
           setError(errorMessage(err));
+          setPendingRetry({
+            localSessionId: newSession.id,
+            prompt: userPromptText,
+            history: historyForAi,
+          });
         })
         .finally(() => {
           setBusy(false);
@@ -541,6 +661,7 @@ export function AiChatPage() {
     };
     setSessions(prev => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
+    setPendingRetry(null);
     setError('');
     setInput('');
     setTimeout(() => fieldRef.current?.focus(), 100);
@@ -587,6 +708,150 @@ export function AiChatPage() {
     }
   };
 
+  const [savingCardKey, setSavingCardKey] = useState<string | null>(null);
+  const [saveCardErrors, setSaveCardErrors] = useState<Record<string, string>>({});
+
+  const handleSaveScanCardToFridge = async (
+    sessionId: string,
+    messageIdx: number,
+    card: ChatFridgeScanCardData
+  ) => {
+    const key = `${sessionId}:${messageIdx}`;
+    if (savingCardKey || card.savedToFridge || !card.items.length) return;
+    const allowedItems = card.items.filter((item) =>
+      isIngredientAllowedForDiet(item, userProfile?.dietaryPreferences)
+    );
+    if (allowedItems.length === 0) {
+      setSaveCardErrors((prev) => ({
+        ...prev,
+        [key]: 'Không có nguyên liệu phù hợp chế độ ăn hiện tại để lưu vào kho (đồ mặn, hỏng hoặc không khớp chế độ chay đã được bỏ qua).',
+      }));
+      return;
+    }
+    setSavingCardKey(key);
+    setSaveCardErrors((prev) => ({ ...prev, [key]: '' }));
+    try {
+      const saved = await fridgeService.confirmScan({
+        summary: `Lưu từ AI Bếp Trưởng (${allowedItems.length} nguyên liệu)`,
+        totalItemsDetected: allowedItems.length,
+        hasNonVegetarianItem: false,
+        scannedAt: new Date().toISOString(),
+        scanImageUrl: card.images[0],
+        ingredients: allowedItems,
+      });
+      const summaryLabel = `Đã lưu ${saved.totalProcessed} món (${saved.newlyAddedCount} mới, ${saved.updatedExistingCount} cập nhật)`;
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id !== sessionId) return s;
+          const nextMessages = [...s.messages];
+          const target = nextMessages[messageIdx];
+          if (target?.fridgeScanCard) {
+            nextMessages[messageIdx] = {
+              ...target,
+              fridgeScanCard: {
+                ...target.fridgeScanCard,
+                savedToFridge: true,
+                savedSummary: summaryLabel,
+              },
+            };
+          }
+          return { ...s, messages: nextMessages, updatedAt: Date.now() };
+        })
+      );
+    } catch (err) {
+      setSaveCardErrors((prev) => ({ ...prev, [key]: errorMessage(err) }));
+    } finally {
+      setSavingCardKey(null);
+    }
+  };
+
+  const handleAddManualIngredientToCard = (
+    sessionId: string,
+    messageIdx: number,
+    ingredientName: string
+  ) => {
+    const cleaned = ingredientName.trim();
+    if (!cleaned) return;
+    const newItem: ChatFridgeScanItem = {
+      name: cleaned,
+      category: 'VEGAN',
+      isVegetarian: true,
+      freshness: 'FRESH',
+      quantity: 1,
+      unit: inferIngredientUnit(cleaned),
+    };
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== sessionId) return s;
+        const nextMessages = [...s.messages];
+        const target = nextMessages[messageIdx];
+        if (!target?.fridgeScanCard) return s;
+        const nextCardItems = mergeFridgeItems(target.fridgeScanCard.items, [newItem]);
+        nextMessages[messageIdx] = {
+          ...target,
+          fridgeScanCard: {
+            ...target.fridgeScanCard,
+            items: nextCardItems,
+            savedToFridge: false,
+            savedSummary: undefined,
+          },
+        };
+        const nextContextItems = mergeFridgeItems(s.fridgeContext?.items || nextCardItems, [newItem]);
+        return {
+          ...s,
+          fridgeContext: {
+            items: nextContextItems,
+            images: s.fridgeContext?.images || target.fridgeScanCard.images || [],
+            warnings: s.fridgeContext?.warnings || target.fridgeScanCard.warnings || [],
+          },
+          messages: nextMessages,
+          updatedAt: Date.now(),
+        };
+      })
+    );
+  };
+
+  const retryPendingChat = async () => {
+    if (!pendingRetry || busy) return;
+    const retryPayload = pendingRetry;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await aiService.chat(
+        retryPayload.prompt,
+        retryPayload.backendSessionId,
+        retryPayload.history,
+        retryPayload.context
+      );
+      setPendingRetry(null);
+      setSessions((prev) =>
+        prev.map((s) => {
+          if (s.id !== retryPayload.localSessionId) return s;
+          const combined = Array.from(
+            new Set([
+              ...(res.recommendedRecipes || []),
+              ...(retryPayload.extraRecipes || []),
+            ])
+          );
+          return {
+            ...s,
+            sessionId: res.sessionId,
+            recommendedRecipes: combined.length > 0 ? combined : s.recommendedRecipes,
+            messages: [
+              ...s.messages,
+              { sender: 'ai', text: res.reply, time: formatTime(Date.now()) },
+            ],
+            updatedAt: Date.now(),
+          };
+        })
+      );
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSubmitWithText = (text: string) => {
     setInput(text);
     setTimeout(() => {
@@ -603,10 +868,14 @@ export function AiChatPage() {
     const userText = effectiveText;
     const currentImg = selectedImage;
     const currentImgPreview = imagePreview;
+    const optimisticMsgTime = formatTime(Date.now());
+    const previousTitle = currentSession.title;
+    const previousCategory = currentSession.category;
 
     setInput('');
     setSelectedImage(null);
     setImagePreview(null);
+    setPendingRetry(null);
     setBusy(true);
     setError('');
 
@@ -614,7 +883,7 @@ export function AiChatPage() {
       sender: 'user',
       text: userText || (currentImg ? 'Đã gửi ảnh nguyên liệu / tủ lạnh để nhờ Bếp Trưởng tư vấn' : ''),
       image: currentImgPreview || undefined,
-      time: formatTime(Date.now()),
+      time: optimisticMsgTime,
     };
 
     // Update session title if first user message
@@ -635,33 +904,157 @@ export function AiChatPage() {
       return s;
     }));
 
-    try {
-      let finalPrompt = userText;
-      let detectedRecipes: string[] = [];
+    let finalPrompt = userText;
+    let detectedRecipes: string[] = [];
+    let chatContext: { contextScreen?: string; contextData?: string } | undefined =
+      currentSession.category === 'fridge-scan' && currentSession.fridgeContext?.items?.length
+        ? {
+            contextScreen: 'FRIDGE',
+            contextData: buildFridgeContextData(
+              currentSession.fridgeContext.items,
+              currentSession.fridgeContext.warnings
+            ),
+          }
+        : undefined;
+    let messageCommittedWithScan = false;
+    const history = currentSession.messages.slice(-10).map(m => ({
+      role: m.sender === 'user' ? ('user' as const) : ('model' as const),
+      text: m.text.slice(0, 4000)
+    }));
 
+    try {
       if (currentImg) {
         setIsAnalyzingImage(true);
         try {
-          const scanRes = await aiService.scanFridge(currentImg);
-          if (scanRes && scanRes.ingredients && scanRes.ingredients.length > 0) {
+          const optimizedImage = await compressImageForUpload(currentImg);
+          const scanRes = await aiService.scanFridge(optimizedImage);
+          const persistedImgUrl = safeChatImageUrl(scanRes?.scanImageUrl);
+          if (scanRes.isFoodScene === false) {
+            if (!userText) {
+              const directReason =
+                scanRes.summary?.trim() ||
+                scanRes.warnings?.[0]?.trim() ||
+                'Hình ảnh tải lên không phải khung cảnh tủ lạnh hoặc nguyên liệu thực phẩm.';
+              const directReply = `🌿 ${directReason}\n\nBạn hãy chụp rõ nguyên liệu nấu ăn (rau củ, đậu hũ, nấm hoặc ngăn tủ lạnh đủ sáng) để Bếp trưởng phân tích và gợi ý món chay chuẩn xác nhé!`;
+              setSessions((prev) =>
+                prev.map((s) => {
+                  if (s.id !== currentSession.id) return s;
+                  const msgs = [...s.messages];
+                  const lastIdx = msgs.length - 1;
+                  if (lastIdx >= 0 && msgs[lastIdx].sender === 'user') {
+                    // Drop heavy inline base64 preview for rejected non-food images to protect localStorage quota
+                    msgs[lastIdx] = { ...msgs[lastIdx], image: undefined };
+                  }
+                  return {
+                    ...s,
+                    messages: [...msgs, { sender: 'ai', text: directReply, time: formatTime(Date.now()) }],
+                    updatedAt: Date.now(),
+                  };
+                })
+              );
+              return;
+            }
+            finalPrompt = `Tôi vừa gửi ảnh nhưng AI nhận diện đây không phải cảnh nguyên liệu hay tủ lạnh. Câu hỏi thêm của tôi: ${userText}`;
+          } else if (scanRes && scanRes.ingredients && scanRes.ingredients.length > 0) {
             const isNonFood = (name: string) => {
               const l = name.toLowerCase();
-              return l.includes('củi') || l.includes('que') || l.includes('gỗ') || l.includes('đá') || l.includes('nhựa') || l.includes('bụi cây') || l.includes('hoạt hình');
+              return l.includes('củi') || l.includes('que củi') || l.includes('cành cây') || l.includes('sỏi đá') || l.includes('rác') || l.includes('hoạt hình');
             };
-            const edibleIngredients = scanRes.ingredients.filter(i => i.isEdible !== false && i.category !== 'NON_FOOD' && !isNonFood(i.name));
-            const nonFoodIngredients = scanRes.ingredients.filter(i => i.isEdible === false || i.category === 'NON_FOOD' || isNonFood(i.name));
+            const edibleIngredients = scanRes.ingredients.filter(
+              (i) => i.isEdible !== false && i.category !== 'NON_FOOD' && !isNonFood(i.name)
+            );
+            const saveableIngredients = edibleIngredients.filter((i) =>
+              isIngredientAllowedForDiet(i, userProfile?.dietaryPreferences)
+            );
+            const nonFoodIngredients = scanRes.ingredients.filter(
+              (i) => i.isEdible === false || i.category === 'NON_FOOD' || isNonFood(i.name)
+            );
 
             if (edibleIngredients.length > 0) {
               const ingNames = edibleIngredients.map(i => i.name).join(', ');
               detectedRecipes = scanRes.suggestedRecipes || [];
+              const fridgeItemsForCard = saveableIngredients.length > 0 ? saveableIngredients : edibleIngredients;
+              const serverImages = persistedImgUrl ? [persistedImgUrl] : [];
+              const previousContextItems =
+                currentSession.category === 'fridge-scan' ? (currentSession.fridgeContext?.items || []) : [];
+              const mergedContextItems = mergeFridgeItems(previousContextItems, fridgeItemsForCard);
+              const mergedContextImages = Array.from(
+                new Set([
+                  ...(currentSession.category === 'fridge-scan' ? (currentSession.fridgeContext?.images || []) : []),
+                  ...serverImages,
+                ])
+              );
+              const mergedWarnings = Array.from(
+                new Set([
+                  ...(currentSession.category === 'fridge-scan' ? (currentSession.fridgeContext?.warnings || []) : []),
+                  ...(scanRes.warnings ?? []),
+                ])
+              );
+              chatContext = {
+                contextScreen: 'FRIDGE',
+                contextData: buildFridgeContextData(mergedContextItems, mergedWarnings),
+              };
+              const scanCard: ChatFridgeScanCardData = {
+                images: serverImages,
+                items: fridgeItemsForCard,
+                warnings: scanRes.warnings ?? [],
+                suggestedRecipes: detectedRecipes,
+                savedToFridge: false,
+              };
+              messageCommittedWithScan = true;
+
+              // Replace heavy base64 preview with lightweight server scanImageUrl & attach interactive scan card
+              setSessions((prev) =>
+                prev.map((s) => {
+                  if (s.id !== currentSession.id) return s;
+                  const msgs = [...s.messages];
+                  const lastIdx = msgs.length - 1;
+                  if (lastIdx >= 0 && msgs[lastIdx].sender === 'user') {
+                    msgs[lastIdx] = {
+                      ...msgs[lastIdx],
+                      image: serverImages.length > 0 ? undefined : msgs[lastIdx].image,
+                      fridgeScanCard: scanCard,
+                    };
+                  }
+                  return {
+                    ...s,
+                    fridgeContext: {
+                      items: mergedContextItems,
+                      images: mergedContextImages,
+                      warnings: mergedWarnings,
+                    },
+                    messages: msgs,
+                    updatedAt: Date.now(),
+                  };
+                })
+              );
+
               let promptIntro = userText
-                ? `Tôi vừa gửi ảnh tủ lạnh/món ăn. AI thị giác nhận diện được các nguyên liệu ăn được: ${ingNames}. Yêu cầu của tôi: ${userText}`
-                : `Tôi vừa gửi ảnh tủ lạnh. Qua hình ảnh nhận diện được các nguyên liệu thực phẩm ăn được: ${ingNames}. Hãy phân tích độ tươi, lưu ý bảo quản và gợi ý 3 món chay ngon nhất, kèm hướng dẫn chế biến nhanh.`;
+                ? `Tôi vừa gửi thêm ảnh tủ lạnh/món ăn. AI thị giác nhận diện được: ${ingNames}. Yêu cầu của tôi: ${userText}`
+                : previousContextItems.length > 0
+                ? `Tôi vừa quét bổ sung thêm ngăn tủ mới gồm: ${ingNames}. Tổng hợp tất cả ${mergedContextItems.length} nguyên liệu đã quét trong phiên này: ${mergedContextItems
+                    .slice(0, 18)
+                    .map((i) => i.name)
+                    .join(', ')}. Hãy gợi ý 3 món chay ngon nhất kết hợp các nguyên liệu đang có nhé!`
+                : buildFridgeChefInitialPrompt(fridgeItemsForCard);
               if (nonFoodIngredients.length > 0) {
                 promptIntro += ` (Lưu ý: Có vật phẩm trong ảnh không ăn được đã được AI tự động loại trừ: ${nonFoodIngredients.map(i => i.name).join(', ')}).`;
               }
-              finalPrompt = promptIntro;
+              finalPrompt = promptIntro.length > 1900 ? `${promptIntro.slice(0, 1897)}...` : promptIntro;
             } else if (nonFoodIngredients.length > 0) {
+              if (persistedImgUrl) {
+                setSessions((prev) =>
+                  prev.map((s) => {
+                    if (s.id !== currentSession.id) return s;
+                    const msgs = [...s.messages];
+                    const lastIdx = msgs.length - 1;
+                    if (lastIdx >= 0 && msgs[lastIdx].sender === 'user') {
+                      msgs[lastIdx] = { ...msgs[lastIdx], image: persistedImgUrl };
+                    }
+                    return { ...s, messages: msgs };
+                  })
+                );
+              }
               const nonFoodNames = nonFoodIngredients.map(i => i.name).join(', ');
               finalPrompt = `Tôi vừa tải lên một hình ảnh và AI nhận diện thấy các vật thể: ${nonFoodNames}. Những thứ này KHÔNG phải là nguyên liệu thực phẩm ăn được để nấu ăn (ví dụ như củi khô, tranh vẽ hoạt hình, hoặc đồ dùng gia đình). Bếp trưởng hãy giải thích lịch sự rằng những vật phẩm này không ăn được và hướng dẫn tôi chụp ảnh nguyên liệu rau củ quả, đậu hũ hoặc thực phẩm ăn được thực tế.`;
             } else {
@@ -670,33 +1063,13 @@ export function AiChatPage() {
           } else {
             finalPrompt = userText || 'Tôi vừa gửi ảnh nguyên liệu nấu ăn, hãy tư vấn giúp tôi các món chay thơm ngon phù hợp.';
           }
-        } catch (scanErr) {
-          console.warn('Vision analysis fallback:', scanErr);
-          finalPrompt = userText || 'Tôi gửi ảnh nguyên liệu nấu ăn, hãy tư vấn giúp tôi các món chay thơm ngon phù hợp.';
         } finally {
           setIsAnalyzingImage(false);
         }
       }
 
-      const isFridgeQuery = /tủ\s*lạnh|nguyên\s*liệu\s*(sẵn\s*có|trong\s*tủ)|món\s*ngon\s*tủ\s*lạnh|kho\s*(tủ\s*lạnh|thực\s*phẩm)/i.test(userText);
-      if (isFridgeQuery && !currentImg) {
-        try {
-          const fItems = await fridgeService.list();
-          const avail = fItems.filter(i => i.status === 'ACTIVE');
-          if (avail.length > 0) {
-            const fNames = avail.map(i => `${i.name}${i.quantity ? ` (${i.quantity} ${i.unit || ''})` : ''}`).join(', ');
-            finalPrompt = `[Dữ liệu thực tế: Trong kho tủ lạnh VEGEAI của tôi hiện có: ${fNames}]. Yêu cầu của tôi: ${userText}`;
-          } else {
-            finalPrompt = `[Dữ liệu thực tế: Kho tủ lạnh VEGEAI của tôi hiện đang TRỐNG, chưa có nguyên liệu nào được lưu trữ]. Yêu cầu của tôi: ${userText}`;
-          }
-        } catch {}
-      }
-
-      const history = currentSession.messages.slice(-10).map(m => ({
-        role: m.sender === 'user' ? ('user' as const) : ('model' as const),
-        text: m.text.slice(0, 4000)
-      }));
-
+      // Backend GeminiAiService.buildUserHealthContext already injects active fridge inventory (or empty state)
+      // for authenticated members, so avoid redundant client-side /fridge/items fetches and duplicate prompt lists.
       
       // Check for interactive rich cards requests
       const isSchedule = /lịch\s*biểu|thực\s*đơn\s*tuần|kế\s*hoạch.*(tuần|7\s*ngày)|thời\s*khóa\s*biểu|menu\s*tuần|lên\s*lịch/i.test(userText);
@@ -768,7 +1141,7 @@ export function AiChatPage() {
         };
       }
 
-      const response = await aiService.chat(finalPrompt, currentSession.sessionId, history);
+      const response = await aiService.chat(finalPrompt, currentSession.sessionId, history, chatContext);
 
       let replyText = response.reply;
       if (isWearable || isRings) {
@@ -837,7 +1210,42 @@ export function AiChatPage() {
         }));
       } else {
         setError(errTxt);
-        setInput(userText);
+        if (messageCommittedWithScan) {
+          setInput('');
+          setPendingRetry({
+            localSessionId: currentSession.id,
+            backendSessionId: currentSession.sessionId,
+            prompt: finalPrompt,
+            history,
+            context: chatContext,
+            extraRecipes: detectedRecipes,
+          });
+        } else {
+          // Roll back optimistic user bubble and restore draft + attachment so retry never duplicates
+          setSessions((prev) =>
+            prev.map((s) => {
+              if (s.id !== currentSession.id) return s;
+              const msgs = [...s.messages];
+              const lastIdx = msgs.length - 1;
+              const matchesOptimistic =
+                lastIdx >= 0 &&
+                msgs[lastIdx].sender === 'user' &&
+                msgs[lastIdx].time === optimisticMsgTime &&
+                msgs[lastIdx].text === userMsg.text;
+              return {
+                ...s,
+                title: previousTitle,
+                category: previousCategory,
+                messages: matchesOptimistic ? msgs.slice(0, -1) : msgs,
+              };
+            })
+          );
+          setInput(userText);
+          if (currentImg) {
+            setSelectedImage(currentImg);
+            setImagePreview(currentImgPreview);
+          }
+        }
       }
     } finally {
       setBusy(false);
@@ -979,7 +1387,11 @@ export function AiChatPage() {
                   return (
                     <div
                       key={sess.id}
-                      onClick={() => setActiveSessionId(sess.id)}
+                      onClick={() => {
+                        setActiveSessionId(sess.id);
+                        setError('');
+                        setPendingRetry(prev => (prev?.localSessionId === sess.id ? prev : null));
+                      }}
                       className={`group relative p-3 rounded-xl border text-left transition cursor-pointer ${
                         isActive
                           ? 'bg-emerald-50/70 dark:bg-slate-800 border-emerald-300 dark:border-emerald-600 ring-1 ring-emerald-200 dark:ring-emerald-800'
@@ -1138,10 +1550,22 @@ export function AiChatPage() {
                       <span className="font-bold">{msg.sender === 'user' ? 'Bạn' : 'Bếp trưởng VEGEAI'}</span>
                       <span>{msg.time}</span>
                     </div>
-                    {msg.image && (
-                      <div className="mb-2.5 overflow-hidden rounded-xl border border-white/20 max-w-xs shadow-xs">
-                        <img src={msg.image} alt="Ảnh đính kèm" className="w-full h-auto object-cover max-h-56 rounded-lg" />
-                      </div>
+                    {msg.fridgeScanCard && (
+                      <ChatFridgeScanCardView
+                        card={msg.fridgeScanCard}
+                        canSaveToFridge={Boolean(user?.id)}
+                        saving={savingCardKey === `${currentSession.id}:${idx}`}
+                        saveError={saveCardErrors[`${currentSession.id}:${idx}`] || ''}
+                        onSaveToFridge={() => handleSaveScanCardToFridge(currentSession.id, idx, msg.fridgeScanCard!)}
+                        onAskCookPriority={(priorityPrompt) => handleSubmitWithText(priorityPrompt)}
+                        onScanMoreInChat={() => fileInputRef.current?.click()}
+                        onAddManualIngredient={(name) =>
+                          handleAddManualIngredientToCard(currentSession.id, idx, name)
+                        }
+                      />
+                    )}
+                    {msg.image && !msg.fridgeScanCard?.images?.length && (
+                      <SafeChatBubbleImage src={msg.image} />
                     )}
                     {msg.sender === 'user' ? (
                       <div className="whitespace-pre-wrap font-sans break-words">{msg.text}</div>
@@ -1239,7 +1663,18 @@ export function AiChatPage() {
                       key={i}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 shadow-2xs"
                     >
-                      <span className="font-bold">{rec}</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSubmitWithText(
+                            `Hãy hướng dẫn tôi công thức chi tiết và các bước nấu món "${rec}" từ nguyên liệu vừa quét nhé!`
+                          )
+                        }
+                        title="Hỏi Bếp trưởng cách nấu món này"
+                        className="font-bold text-left hover:text-emerald-600 dark:hover:text-emerald-300 hover:underline cursor-pointer"
+                      >
+                        {rec}
+                      </button>
                       <Link
                         to={`/explore?keyword=${encodeURIComponent(rec)}`}
                         title="Tìm công thức trong thư viện"
@@ -1276,7 +1711,19 @@ export function AiChatPage() {
             {/* Chat Input Box */}
             <div className="p-4 sm:p-5 border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900">
               {error && (
-                <p className="text-xs text-rose-600 dark:text-rose-400 mb-3 font-semibold">{error}</p>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 dark:border-rose-800/80 bg-rose-50/90 dark:bg-rose-950/40 px-3 py-2">
+                  <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold">{error}</p>
+                  {pendingRetry?.localSessionId === currentSession?.id && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={retryPendingChat}
+                      className="inline-flex items-center gap-1 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 px-2.5 py-1 text-[11px] font-bold text-white transition cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" /> Thử hỏi lại Bếp trưởng
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Image Preview Thumbnail */}
@@ -1361,8 +1808,10 @@ export function AiChatPage() {
                   state={{
                     recipeTitle: currentSession?.title || 'Nguyên liệu từ AI Bếp Trưởng',
                     ingredients:
-                      (location.state as { recipeContext?: { ingredients?: string[] } } | null)?.recipeContext
-                        ?.ingredients || undefined,
+                      currentSession?.fridgeContext?.items && currentSession.fridgeContext.items.length > 0
+                        ? currentSession.fridgeContext.items.map((item) => item.name)
+                        : (location.state as { recipeContext?: { ingredients?: string[] } } | null)?.recipeContext
+                            ?.ingredients || undefined,
                   }}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold border border-emerald-200 dark:border-emerald-800 transition cursor-pointer shadow-2xs"
                 >

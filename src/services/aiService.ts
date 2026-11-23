@@ -2,15 +2,33 @@ import type { AiChatMessage, AiChatResponse, BlogInsightAiResponse, FridgeScanRe
 import { apiRequest } from './apiClient';
 
 export const aiService = {
-  async chat(message: string, sessionId?: string, history?: AiChatMessage[]): Promise<AiChatResponse> {
+  async chat(
+    message: string,
+    sessionId?: string,
+    history?: AiChatMessage[],
+    context?: { contextScreen?: string; contextData?: string }
+  ): Promise<AiChatResponse> {
     if (!message.trim() || message.length > 2000) throw new Error('Tin nhắn cần có từ 1 đến 2.000 ký tự.');
     if (history && (history.length > 10 || history.some(item => !item || !['user', 'model'].includes(item.role) || !item.text?.trim() || item.text.length > 4000))) {
       throw new Error('Ngữ cảnh trò chuyện không hợp lệ. Vui lòng bắt đầu cuộc trò chuyện mới.');
     }
+    const body: {
+      message: string;
+      sessionId?: string;
+      history?: AiChatMessage[];
+      contextScreen?: string;
+      contextData?: string;
+    } = { message: message.trim(), sessionId, history };
+    if (context?.contextScreen?.trim()) {
+      body.contextScreen = context.contextScreen.trim();
+    }
+    if (context?.contextData?.trim()) {
+      body.contextData = context.contextData.trim().slice(0, 1800);
+    }
     // Guests are allowed to chat: the backend grants them 3 trial turns per day and answers
     // 429 (code 1402) after that, which the chat page turns into a login prompt.
     const response = await apiRequest<AiChatResponse>('/ai/chat', {
-      method: 'POST', auth: 'optional', body: { message: message.trim(), sessionId, history }, timeoutMs: 90000,
+      method: 'POST', auth: 'optional', body, timeoutMs: 90000,
     });
     if (!response.data?.reply?.trim()) throw new Error('AI chưa trả về kết quả.');
     return response.data;

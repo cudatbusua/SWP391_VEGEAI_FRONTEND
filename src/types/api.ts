@@ -63,6 +63,7 @@ export interface FridgeScanResponse {
   summary: string;
   totalItemsDetected: number;
   hasNonVegetarianItem: boolean;
+  isFoodScene?: boolean;
   ingredients: {
     name: string;
     quantity?: number;
@@ -70,6 +71,8 @@ export interface FridgeScanResponse {
     category: string;
     isVegetarian: boolean;
     isEdible?: boolean;
+    needsLabelVerification?: boolean;
+    containsFivePungent?: boolean;
     rejectionReason?: string;
     freshness: string;
     freshnessScore?: number;

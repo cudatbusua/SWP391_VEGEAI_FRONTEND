@@ -1132,8 +1132,8 @@ export function AiChatPage() {
           gender: gender,
           steps: w.steps,
           wearableKcal: w.todayActiveCalories,
-          heartRate: w.avgHeartRate,
-          sleepHours: w.sleepHours,
+          totalCalories: w.totalCaloriesExpended,
+          distanceKm: w.distanceKm,
           isConnected: w.isConnected,
           source: w.source,
           lastSyncedAt: w.lastSyncedAt,
@@ -1600,12 +1600,11 @@ export function AiChatPage() {
                         card={msg.activityRingsCard}
                         onSyncLive={async () => {
                           try {
-                            const token = wearableService.getStoredToken();
-                            if (token) {
-                              await wearableService.fetchGoogleFitLive(token);
-                            } else {
-                              await wearableService.openGoogleFitAuthPopup();
+                            let token = wearableService.getStoredToken();
+                            if (!token) {
+                              token = await wearableService.openGoogleFitAuthPopup();
                             }
+                            await wearableService.fetchGoogleFitLive(token);
                             const fresh = wearableService.getMetrics();
                             setSessions(prev => prev.map(s => {
                               if (s.id !== activeSessionId) return s;
@@ -1615,10 +1614,11 @@ export function AiChatPage() {
                                   ...newMsgs[idx],
                                   activityRingsCard: {
                                     ...newMsgs[idx].activityRingsCard!,
-                                    calories: fresh.activeCalories > 0 ? fresh.activeCalories : 0,
+                                    calories: fresh.todayActiveCalories > 0 ? fresh.todayActiveCalories : 0,
                                     steps: fresh.steps,
-                                    wearableKcal: fresh.activeCalories,
-                                    heartRate: fresh.avgHeartRate,
+                                    wearableKcal: fresh.todayActiveCalories,
+                                    totalCalories: fresh.totalCaloriesExpended,
+                                    distanceKm: fresh.distanceKm,
                                     lastSyncedAt: fresh.lastSyncedAt,
                                     isConnected: fresh.isConnected,
                                     advice: fresh.aiAdvice

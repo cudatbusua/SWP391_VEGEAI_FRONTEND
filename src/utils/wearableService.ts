@@ -1,7 +1,11 @@
 /**
- * VEGEAI Omni-Wearable Health Hub & Google Fit Service
- * Syncs 100% real biometric & activity metrics from Google Fit REST API
- * (phone sensors or wearables bridged via Mi Fitness / Zepp / Apple Health / Health Connect).
+ * VEGEAI Google Fit Live Sync Service
+ * Single Source of Truth: Google Fit Cloud REST API (official merged streams).
+ * Syncs ONLY metrics that Google Fit updates reliably & directly:
+ *   - Steps (com.google.step_count.delta -> estimated_steps)
+ *   - Total Calories Expended (com.google.calories.expended -> merge_calories_expended) + BMR active split
+ *   - Distance (com.google.distance.delta -> merge_distance_delta)
+ *   - Active Minutes & Heart Points (com.google.active_minutes, com.google.heart_minutes)
  * Zero fabricated/estimated fallback metrics: missing Google Fit metrics are reported honestly as 0 / '—'.
  */
 
@@ -9,11 +13,7 @@ export const GOOGLE_FIT_CLIENT_ID = '164354959561-84vaff9lo56ummq04itrgq642kmjd4
 
 export const GOOGLE_FIT_SCOPES = [
   'https://www.googleapis.com/auth/fitness.activity.read',
-  'https://www.googleapis.com/auth/fitness.body.read',
-  'https://www.googleapis.com/auth/fitness.heart_rate.read',
-  'https://www.googleapis.com/auth/fitness.sleep.read',
   'https://www.googleapis.com/auth/fitness.location.read',
-  'https://www.googleapis.com/auth/fitness.oxygen_saturation.read',
 ].join(' ');
 
 export interface WearableMetrics {
@@ -26,27 +26,15 @@ export interface WearableMetrics {
   /** true nếu dữ liệu vận động thuộc ngày hôm nay */
   isTodayData: boolean;
   activeMinutes: number;
-  /** Nhịp tim trung bình trong ngày gần nhất có dữ liệu (bpm), 0 nếu chưa có */
-  avgHeartRate: number;
-  /** Nhịp tim đo gần nhất (bpm) — khớp với giá trị vừa đo trên Mi Band / Google Fit */
-  latestHeartRate: number;
-  /** Ghi chú chi tiết về nhịp tim (giờ đo mới nhất, TB ngày, số mẫu, hoặc nhập tay) */
-  heartRateNote?: string;
-  heartRateSource?: 'google-fit' | 'google-fit-resting' | 'manual' | 'none';
   /** Quãng đường thực Google Fit ghi nhận (km), 0 nếu chưa có dữ liệu */
   distanceKm: number;
   /** Tổng năng lượng tiêu hao thực tế từ Google Fit (khớp 1-1 với app Google Fit), 0 nếu chưa có */
   totalCaloriesExpended: number;
   /** Điểm vận động tim mạch (Heart Points) thực tế từ Google Fit, 0 nếu chưa có */
   heartPoints: number;
-  /** Độ bão hòa oxy SpO2 mới nhất (%), 0 nếu chưa có dữ liệu */
-  spo2: number;
-  /** Thời điểm ghi nhận SpO2 mới nhất (VD: "Đo lúc 14:32 hôm nay") */
-  spo2Note?: string;
-  sleepHours: string;
   /** Nhãn ngày ghi nhận dữ liệu (VD: "Hôm nay" hoặc "Gần nhất: 20/11") */
   dataDateLabel?: string;
-  source: 'google-fit' | 'xiaomi-band' | 'none';
+  source: 'google-fit' | 'none';
   lastSyncedAt: string;
   isConnected: boolean;
   deviceModel: string;
@@ -54,23 +42,27 @@ export interface WearableMetrics {
   recommendedSnack: string;
 }
 
+export interface GoogleFitSyncResult {
+  steps: number;
+  /** Calo vận động hôm nay (todayActiveCalories) */
+  calories: number;
+  totalCalories: number;
+  distanceKm: number;
+  activeMinutes: number;
+  heartPoints: number;
+  isTodayData: boolean;
+}
+
 const STORAGE_KEYS = {
   TOKEN: 'google_fit_access_token',
   TOKEN_EXPIRES_AT: 'google_fit_token_expires_at',
   STEPS: 'wearable_steps',
   KCAL: 'wearable_kcal',
-  HEART_RATE: 'wearable_heart_rate',
-  LATEST_HEART_RATE: 'wearable_latest_heart_rate',
-  HEART_RATE_NOTE: 'wearable_heart_rate_note',
-  HEART_RATE_SOURCE: 'wearable_heart_rate_source',
   ACTIVE_MINUTES: 'wearable_active_minutes',
-  SLEEP: 'wearable_sleep',
   KCAL_TOTAL: 'wearable_kcal_total',
   USER_BMR: 'wearable_user_bmr',
   DISTANCE: 'wearable_distance_km',
   HEART_POINTS: 'wearable_heart_points',
-  SPO2: 'wearable_spo2',
-  SPO2_NOTE: 'wearable_spo2_note',
   DATA_DATE: 'wearable_data_date',
   IS_TODAY: 'wearable_is_today',
   SYNC_DATE_KEY: 'wearable_sync_date_key',
@@ -81,10 +73,21 @@ const STORAGE_KEYS = {
   DEVICE: 'wearable_device',
 };
 
+const LEGACY_KEYS_TO_CLEAN = [
+  'wearable_heart_rate',
+  'wearable_latest_heart_rate',
+  'wearable_heart_rate_note',
+  'wearable_heart_rate_source',
+  'wearable_hr_scope_missing',
+  'wearable_spo2',
+  'wearable_spo2_note',
+  'wearable_sleep',
+];
+
 const LOOKBACK_DAYS = 7;
-const AUTO_SYNC_COOLDOWN_MS = 30 * 1000;
+const AUTO_SYNC_COOLDOWN_MS = 10 * 1000;
 const CLOCK_SKEW_BUFFER_MS = 5 * 60 * 1000;
-let inFlightSync: Promise<{ steps: number; calories: number; heartRate: number }> | null = null;
+let inFlightSync: Promise<GoogleFitSyncResult> | null = null;
 
 function formatLocalDateKey(d: Date): string {
   const y = d.getFullYear();
@@ -93,90 +96,10 @@ function formatLocalDateKey(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function formatTimeHHMM(ms: number): string {
-  return new Date(ms).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-}
-
-function formatDayLabel(ms: number, now: Date): string {
-  const d = new Date(ms);
-  return formatLocalDateKey(d) === formatLocalDateKey(now)
-    ? 'hôm nay'
-    : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-}
-
-function normalizeSpo2Percentage(raw: number): number {
-  if (!Number.isFinite(raw) || raw <= 0) return 0;
-  const pct = raw <= 1 ? raw * 100 : raw;
-  return pct >= 50 && pct <= 100 ? Math.round(pct) : 0;
-}
-
-interface HeartRateSummary {
-  avgBpm: number;
-  latestBpm: number;
-  latestEndMs: number;
-  note: string;
-  source: 'google-fit' | 'google-fit-resting';
-}
-
-/**
- * Aggregates raw Google Fit heart rate samples by local calendar day and returns BOTH
- * the strictly latest measurement (matching Mi Band / live reading) and the daily average
- * on the most recent day with valid samples (30–220 bpm).
- */
-function summarizeHeartRatePoints(points: any[], now: Date): HeartRateSummary | null {
-  const deduped = new Map<string, { bpm: number; endMs: number }>();
-  for (const pt of points) {
-    const bpm = pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal || 0;
-    if (bpm < 30 || bpm > 220) continue;
-    const endMs = Number(pt.endTimeNanos || pt.startTimeNanos || 0) / 1e6;
-    if (endMs <= 0) continue;
-    const dedupeKey = `${Math.round(endMs / 1000)}:${Math.round(bpm)}`;
-    if (!deduped.has(dedupeKey)) {
-      deduped.set(dedupeKey, { bpm, endMs });
-    }
+function cleanLegacyBiometricKeys(): void {
+  for (const key of LEGACY_KEYS_TO_CLEAN) {
+    localStorage.removeItem(key);
   }
-
-  const byDay: Record<
-    string,
-    { sum: number; count: number; latestEndMs: number; latestBpm: number }
-  > = {};
-
-  for (const sample of deduped.values()) {
-    const key = formatLocalDateKey(new Date(sample.endMs));
-    if (!byDay[key]) {
-      byDay[key] = {
-        sum: 0,
-        count: 0,
-        latestEndMs: sample.endMs,
-        latestBpm: Math.round(sample.bpm),
-      };
-    }
-    byDay[key].sum += sample.bpm;
-    byDay[key].count += 1;
-    if (sample.endMs >= byDay[key].latestEndMs) {
-      byDay[key].latestEndMs = sample.endMs;
-      byDay[key].latestBpm = Math.round(sample.bpm);
-    }
-  }
-
-  const latest = Object.values(byDay).sort((a, b) => b.latestEndMs - a.latestEndMs)[0];
-  if (!latest || latest.count === 0) return null;
-
-  const avgBpm = Math.round(latest.sum / latest.count);
-  const dayLabel = formatDayLabel(latest.latestEndMs, now);
-  const timeStr = formatTimeHHMM(latest.latestEndMs);
-  const note =
-    latest.count > 1
-      ? `Mới nhất ${latest.latestBpm} bpm (${timeStr}) · TB ${dayLabel}: ${avgBpm} bpm (${latest.count} mẫu)`
-      : `Đo lúc ${timeStr} ${dayLabel} (1 mẫu)`;
-
-  return {
-    avgBpm,
-    latestBpm: latest.latestBpm,
-    latestEndMs: latest.latestEndMs,
-    note,
-    source: 'google-fit',
-  };
 }
 
 const RECOVERY_SNACK_SUGGESTIONS = {
@@ -208,21 +131,9 @@ export const wearableService = {
       storedSource === 'simulator' || Boolean(localStorage.getItem(STORAGE_KEYS.PRESET));
     const storedSteps = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.STEPS);
     const storedKcal = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.KCAL);
-    const storedHeartRate = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.HEART_RATE);
-    const storedLatestHeartRate = isStaleSimulator
-      ? null
-      : localStorage.getItem(STORAGE_KEYS.LATEST_HEART_RATE);
-    const storedHeartRateNote = isStaleSimulator
-      ? undefined
-      : localStorage.getItem(STORAGE_KEYS.HEART_RATE_NOTE) || undefined;
-    const storedHeartRateSource = isStaleSimulator
-      ? undefined
-      : ((localStorage.getItem(STORAGE_KEYS.HEART_RATE_SOURCE) as WearableMetrics['heartRateSource']) ||
-        undefined);
     const storedActiveMinutes = isStaleSimulator
       ? null
       : localStorage.getItem(STORAGE_KEYS.ACTIVE_MINUTES);
-    const storedSleep = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.SLEEP);
     const storedDataDate = isStaleSimulator
       ? undefined
       : localStorage.getItem(STORAGE_KEYS.DATA_DATE) || undefined;
@@ -233,9 +144,7 @@ export const wearableService = {
     const storedSync = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.SYNC_TIME);
     const storedDevice = isStaleSimulator ? null : localStorage.getItem(STORAGE_KEYS.DEVICE);
 
-    const hasManualHeartRate = Boolean(storedHeartRate && Number(storedHeartRate) > 0);
-
-    if (!token && !storedSteps && !hasManualHeartRate) {
+    if (!token && !storedSteps) {
       return {
         steps: 0,
         stepTarget: 10000,
@@ -243,32 +152,22 @@ export const wearableService = {
         todayActiveCalories: 0,
         isTodayData: false,
         activeMinutes: 0,
-        avgHeartRate: 0,
-        latestHeartRate: 0,
-        heartRateNote: undefined,
-        heartRateSource: 'none',
         distanceKm: 0,
         totalCaloriesExpended: 0,
         heartPoints: 0,
-        spo2: 0,
-        spo2Note: undefined,
-        sleepHours: '—',
         dataDateLabel: undefined,
         source: 'none',
-        lastSyncedAt: 'Chưa liên kết thiết bị',
+        lastSyncedAt: 'Chưa liên kết Google Fit',
         isConnected: false,
         deviceModel: 'Chưa kết nối',
         aiAdvice:
-          'Bạn chưa liên kết Google Fit hoặc thiết bị đeo. Hãy bấm "Liên kết Google Fit" để đồng bộ chỉ số vận động thực tế trực tiếp từ Google Fit Cloud.',
+          'Bạn chưa liên kết Google Fit. Hãy bấm "Liên kết Google Fit" để đồng bộ trực tiếp bước chân, tổng tiêu hao calo và quãng đường vận động từ Google Fit Cloud.',
         recommendedSnack: 'Chưa có dữ liệu vận động',
       };
     }
 
     const steps = storedSteps !== null ? Number(storedSteps) : 0;
     const activeCalories = storedKcal !== null ? Number(storedKcal) : 0;
-    const avgHeartRate = storedHeartRate !== null ? Number(storedHeartRate) : 0;
-    const latestHeartRate =
-      storedLatestHeartRate !== null ? Number(storedLatestHeartRate) : avgHeartRate;
     const activeMinutes = storedActiveMinutes !== null ? Number(storedActiveMinutes) : 0;
     const distanceKm = isStaleSimulator ? 0 : Number(localStorage.getItem(STORAGE_KEYS.DISTANCE)) || 0;
     const totalCaloriesExpended = isStaleSimulator
@@ -277,10 +176,6 @@ export const wearableService = {
     const heartPoints = isStaleSimulator
       ? 0
       : Number(localStorage.getItem(STORAGE_KEYS.HEART_POINTS)) || 0;
-    const spo2 = isStaleSimulator ? 0 : Number(localStorage.getItem(STORAGE_KEYS.SPO2)) || 0;
-    const spo2Note = isStaleSimulator
-      ? undefined
-      : localStorage.getItem(STORAGE_KEYS.SPO2_NOTE) || undefined;
 
     const todayKey = formatLocalDateKey(new Date());
     const isTodayData =
@@ -296,15 +191,16 @@ export const wearableService = {
         totalCaloriesExpended > 0
           ? `, tổng tiêu hao Google Fit ${totalCaloriesExpended.toLocaleString('vi-VN')} kcal`
           : '';
+      const distStr = distanceKm > 0 ? `, quãng đường ${distanceKm.toLocaleString('vi-VN')} km` : '';
       const dateStr = !isTodayData && storedDataDate ? ` [${storedDataDate}]` : '';
       adviceText = isTodayData
-        ? `Đã đồng bộ trực tiếp từ ${storedDevice || 'Google Fit'}: ${steps.toLocaleString('vi-VN')} bước chân${totalStr}${activeStr}.`
+        ? `Đã đồng bộ trực tiếp từ ${storedDevice || 'Google Fit'}: ${steps.toLocaleString('vi-VN')} bước chân${totalStr}${activeStr}${distStr}.`
         : `Hiển thị dữ liệu gần nhất từ ${storedDevice || 'Google Fit'}${dateStr}: ${steps.toLocaleString('vi-VN')} bước chân${totalStr}. Hôm nay chưa có đồng bộ mới nên calo ngày cũ không cộng vào ngân sách hôm nay.`;
     } else if (token) {
-      adviceText = `Đã liên kết Google Fit (${storedDevice || 'Thiết bị đeo'}). Hôm nay trên Google Fit Cloud chưa có dữ liệu bước chân mới. Hãy mở Mi Fitness / Zepp Life và Google Fit trên điện thoại để đồng bộ lên Cloud rồi nhấn "Đồng bộ ngay".`;
+      adviceText = `Đã liên kết ${storedDevice || 'Google Fit'}. Hôm nay trên Google Fit Cloud chưa có dữ liệu bước chân mới. Hãy mở app Google Fit trên điện thoại để đồng bộ lên Cloud rồi nhấn "Đồng bộ ngay".`;
     } else {
       adviceText =
-        'Bạn chưa liên kết Google Fit hoặc thiết bị đeo. Hãy bấm "Liên kết Google Fit" ở trên để kết nối theo dõi sức khỏe.';
+        'Bạn chưa liên kết Google Fit. Hãy bấm "Liên kết Google Fit" ở trên để kết nối theo dõi sức khỏe.';
     }
 
     return {
@@ -314,24 +210,14 @@ export const wearableService = {
       todayActiveCalories,
       isTodayData,
       activeMinutes,
-      avgHeartRate,
-      latestHeartRate,
-      heartRateNote:
-        avgHeartRate > 0
-          ? storedHeartRateNote || 'Giá trị gần nhất (đồng bộ hoặc nhập tay)'
-          : undefined,
-      heartRateSource: avgHeartRate > 0 ? storedHeartRateSource || 'google-fit' : 'none',
       distanceKm,
       totalCaloriesExpended,
       heartPoints,
-      spo2,
-      spo2Note: spo2 > 0 ? spo2Note : undefined,
-      sleepHours: storedSleep || '—',
       dataDateLabel: storedDataDate,
-      source: (!isStaleSimulator && (storedSource as WearableMetrics['source'])) || (token ? 'google-fit' : 'none'),
+      source: token ? 'google-fit' : 'none',
       lastSyncedAt: storedSync || (token ? 'Đã liên kết tài khoản' : 'Chưa đồng bộ'),
       isConnected: Boolean(token),
-      deviceModel: token ? storedDevice || 'Thiết bị đồng bộ qua Google Fit' : 'Chưa kết nối thiết bị',
+      deviceModel: token ? storedDevice || 'Google Fit (Đồng bộ điện thoại / thiết bị)' : 'Chưa kết nối',
       aiAdvice: adviceText,
       recommendedSnack:
         steps > 11000
@@ -348,11 +234,11 @@ export const wearableService = {
     Object.values(STORAGE_KEYS).forEach(key => {
       if (key !== STORAGE_KEYS.USER_BMR) localStorage.removeItem(key);
     });
-    localStorage.removeItem('wearable_hr_scope_missing');
+    cleanLegacyBiometricKeys();
     window.dispatchEvent(new Event('wearable_sync_updated'));
   },
 
-  fetchGoogleFitLive(token: string): Promise<{ steps: number; calories: number; heartRate: number }> {
+  fetchGoogleFitLive(token: string): Promise<GoogleFitSyncResult> {
     if (inFlightSync) {
       return inFlightSync;
     }
@@ -362,9 +248,7 @@ export const wearableService = {
     return inFlightSync;
   },
 
-  async _performGoogleFitSync(
-    token: string,
-  ): Promise<{ steps: number; calories: number; heartRate: number }> {
+  async _performGoogleFitSync(token: string): Promise<GoogleFitSyncResult> {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
     const startTimeMillis = startOfDay.getTime();
@@ -417,31 +301,31 @@ export const wearableService = {
     const formatDeviceLabel = (rawSrc: string): string => {
       const s = rawSrc.toLowerCase();
       if (s.includes('xiaomi') || s.includes('mi.health') || s.includes('mi fitness') || s.includes('mi band')) {
-        return 'Xiaomi Smart Band (Mi Fitness qua Google Fit)';
+        return 'Google Fit (tổng hợp Điện thoại + Xiaomi Smart Band)';
       }
       if (s.includes('amazfit') || s.includes('zepp')) {
-        return 'Amazfit / Zepp Tracker';
+        return 'Google Fit (tổng hợp Điện thoại + Amazfit / Zepp)';
       }
       if (s.includes('samsung') || s.includes('shealth')) {
-        return 'Samsung Galaxy Watch (qua Samsung Health)';
+        return 'Google Fit (tổng hợp Điện thoại + Samsung Galaxy Watch)';
       }
       if (s.includes('apple') || s.includes('healthkit')) {
-        return 'Apple Watch (qua Apple Health)';
+        return 'Google Fit (tổng hợp iPhone + Apple Watch)';
       }
       if (s.includes('garmin')) {
-        return 'Garmin Watch (qua Garmin Connect)';
+        return 'Google Fit (tổng hợp Điện thoại + Garmin Watch)';
       }
       if (s.includes('fitbit')) {
-        return 'Fitbit Tracker';
+        return 'Google Fit (tổng hợp Điện thoại + Fitbit)';
       }
       if (s.includes('huawei')) {
-        return 'Huawei Health';
+        return 'Google Fit (tổng hợp Điện thoại + Huawei Health)';
       }
       if (s.includes('oppo')) {
-        return 'OPPO Watch';
+        return 'Google Fit (tổng hợp Điện thoại + OPPO Watch)';
       }
       if (s.includes('healthdata') || s.includes('health_connect') || s.includes('wearable')) {
-        return 'Thiết bị đeo thông minh (qua Health Connect)';
+        return 'Google Fit (tổng hợp qua Health Connect)';
       }
       if (s.includes('estimated_steps') || s.includes('android.gms') || s.includes('internal_sensor')) {
         return 'Google Fit (Đồng bộ điện thoại / thiết bị)';
@@ -552,10 +436,7 @@ export const wearableService = {
         }
         if (res.ok) {
           const json = await res.json();
-          const buckets = (json.bucket || []) as any[];
-          // If the first attempt returned empty buckets, still allow fallback only on HTTP error;
-          // an OK response with empty buckets simply means 0 activity in that period.
-          return buckets;
+          return (json.bucket || []) as any[];
         }
       }
 
@@ -605,14 +486,15 @@ export const wearableService = {
     }
 
     let steps = chosenSummary.steps;
-    let calories = chosenSummary.calories;
-    let activeMinutes = chosenSummary.activeMinutes;
-    let distanceMeters = chosenSummary.distanceMeters;
-    let heartPoints = chosenSummary.heartPoints;
+    const calories = chosenSummary.calories;
+    const activeMinutes = chosenSummary.activeMinutes;
+    const distanceMeters = chosenSummary.distanceMeters;
+    const heartPoints = chosenSummary.heartPoints;
     let detectedDevice = chosenSummary.detectedDevice;
+    let hasSpecificWearable = chosenSummary.hasWearable;
     let detectedWearableLabel = chosenSummary.hasWearable ? chosenSummary.detectedDevice : '';
 
-    // 1c. Raw dataSources fallback for steps if aggregate returned 0
+    // 1c. Raw dataSources fallback for steps ONLY if aggregate returned 0
     if (steps === 0) {
       try {
         const stepDsRes = await fetch(
@@ -661,6 +543,7 @@ export const wearableService = {
                     })}`;
                 if (isWearableStream(streamId)) {
                   detectedDevice = formatDeviceLabel(streamId);
+                  hasSpecificWearable = true;
                 }
               }
             }
@@ -671,350 +554,13 @@ export const wearableService = {
       }
     }
 
-    // 2. SpO2 (Oxygen Saturation): ALWAYS query raw dataSources FIRST + aggregate backup,
-    // pick the STRICTLY NEWEST sample by endTimeNanos so rush measurements on Mi Band appear immediately.
-    let bestSpo2 = { pct: 0, endMs: 0 };
-    const winStartNanos = BigInt(lookbackStartMillis) * 1000000n;
-    const winEndNanos = BigInt(endWithSkewMillis) * 1000000n;
-
-    try {
-      const spo2DsRes = await fetch(
-        'https://fitness.googleapis.com/fitness/v1/users/me/dataSources?dataTypeName=com.google.oxygen_saturation',
-        { cache: 'no-store', headers: authHeaders },
-      );
-      if (spo2DsRes.ok) {
-        const spo2DsJson = await spo2DsRes.json();
-        for (const ds of spo2DsJson.dataSource || []) {
-          const streamId: string = ds.dataStreamId || '';
-          if (!streamId) continue;
-          if (isWearableStream(streamId)) {
-            detectedWearableLabel = detectedWearableLabel || formatDeviceLabel(streamId);
-          }
-          const rawRes = await fetch(
-            `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(
-              streamId,
-            )}/datasets/${winStartNanos}-${winEndNanos}`,
-            { cache: 'no-store', headers: authHeaders },
-          );
-          if (rawRes.ok) {
-            const rawJson = await rawRes.json();
-            for (const pt of rawJson.point || []) {
-              const rawVal = pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal || 0;
-              const pct = normalizeSpo2Percentage(rawVal);
-              const endMs = Number(pt.endTimeNanos || pt.startTimeNanos || 0) / 1e6;
-              if (pct > 0 && endMs >= bestSpo2.endMs) {
-                bestSpo2 = { pct, endMs };
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('SpO2 raw dataSources query failed:', err);
-    }
-
-    // SpO2 aggregate backup (picks newest timestamp if raw returned nothing or aggregate has newer)
-    try {
-      const spo2Res = await fetch(
-        'https://fitness.googleapis.com/fitness/v1/users/me/dataset:aggregate',
-        {
-          method: 'POST',
-          cache: 'no-store',
-          headers: jsonHeaders,
-          body: JSON.stringify({
-            aggregateBy: [{ dataTypeName: 'com.google.oxygen_saturation' }],
-            bucketByTime: { durationMillis: 86400000 },
-            startTimeMillis: lookbackStartMillis,
-            endTimeMillis: endWithSkewMillis,
-          }),
-        },
-      );
-      if (spo2Res.ok) {
-        const spo2Json = await spo2Res.json();
-        for (const b of spo2Json.bucket || []) {
-          for (const ds of b.dataset || []) {
-            for (const pt of ds.point || []) {
-              const rawVal = pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal || 0;
-              const pct = normalizeSpo2Percentage(rawVal);
-              const endMs =
-                Number(pt.endTimeNanos || pt.startTimeNanos || 0) / 1e6 ||
-                Number(b.endTimeMillis || b.startTimeMillis || 0);
-              if (pct > 0 && endMs > bestSpo2.endMs) {
-                bestSpo2 = { pct, endMs };
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('SpO2 aggregate query failed:', err);
-    }
-
-    const spo2 = bestSpo2.pct;
-    const spo2Note =
-      spo2 > 0 && bestSpo2.endMs > 0
-        ? `Đo lúc ${formatTimeHHMM(bestSpo2.endMs)} ${formatDayLabel(bestSpo2.endMs, now)}`
-        : spo2 > 0
-        ? 'Ghi nhận từ Google Fit'
-        : '';
-
-    // 3. SMART MULTI-TIER HEART RATE ENGINE:
-    // Collect BOTH merged stream AND raw wearable dataSources so newly synced Mi Band BPM is NEVER missed.
-    let heartRate = 0;
-    let latestHeartRate = 0;
-    let heartRateNote = '';
-    let heartRateSource: 'google-fit' | 'google-fit-resting' = 'google-fit';
-    let heartRateScopeMissing = false;
-
-    const hrStartNanos = BigInt(lookbackStartMillis) * 1000000n;
-    const hrEndNanos = BigInt(endWithSkewMillis) * 1000000n;
-    const allHrPoints: any[] = [];
-
-    // Tier 1a: Merged HR stream
-    try {
-      const mergedStreamUrl = `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.heart_rate.bpm:com.google.android.gms:merge_heart_rate_bpm/datasets/${hrStartNanos}-${hrEndNanos}`;
-      const streamRes = await fetch(mergedStreamUrl, { cache: 'no-store', headers: authHeaders });
-      if (streamRes.status === 403) {
-        heartRateScopeMissing = true;
-      } else if (streamRes.ok) {
-        const streamData = await streamRes.json();
-        if (Array.isArray(streamData.point)) {
-          allHrPoints.push(...streamData.point);
-        }
-      }
-    } catch (err) {
-      console.warn('Tier 1a Merged HR query failed:', err);
-    }
-
-    // Tier 1b: Direct wearable / third-party HR dataSources (always checked for fresher raw samples)
-    if (!heartRateScopeMissing) {
-      try {
-        const dsRes = await fetch(
-          'https://fitness.googleapis.com/fitness/v1/users/me/dataSources?dataTypeName=com.google.heart_rate.bpm',
-          { cache: 'no-store', headers: authHeaders },
-        );
-        if (dsRes.status === 403) {
-          heartRateScopeMissing = true;
-        } else if (dsRes.ok) {
-          const dsData = await dsRes.json();
-          for (const ds of dsData.dataSource || []) {
-            const streamId = ds.dataStreamId;
-            if (!streamId || streamId.includes('merge_heart_rate_bpm')) continue;
-            if (isWearableStream(streamId)) {
-              detectedWearableLabel = detectedWearableLabel || formatDeviceLabel(streamId);
-            }
-            const rawDsUrl = `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(
-              streamId,
-            )}/datasets/${hrStartNanos}-${hrEndNanos}`;
-            const rawRes = await fetch(rawDsUrl, { cache: 'no-store', headers: authHeaders });
-            if (rawRes.ok) {
-              const rawJson = await rawRes.json();
-              if (Array.isArray(rawJson.point) && rawJson.point.length > 0) {
-                allHrPoints.push(...rawJson.point);
-                if (isWearableStream(streamId)) {
-                  detectedWearableLabel = detectedWearableLabel || formatDeviceLabel(streamId);
-                }
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Tier 1b Direct dataSources HR query:', err);
-      }
-    }
-
-    if (allHrPoints.length > 0) {
-      const summary = summarizeHeartRatePoints(allHrPoints, now);
-      if (summary) {
-        heartRate = summary.avgBpm;
-        latestHeartRate = summary.latestBpm;
-        heartRateNote = summary.note;
-      }
-    }
-
-    // Tier 2: Aggregate Summary API fallback
-    if (heartRate === 0 && !heartRateScopeMissing) {
-      try {
-        const hrRes = await fetch(
-          'https://fitness.googleapis.com/fitness/v1/users/me/dataset:aggregate',
-          {
-            method: 'POST',
-            cache: 'no-store',
-            headers: jsonHeaders,
-            body: JSON.stringify({
-              aggregateBy: [{ dataTypeName: 'com.google.heart_rate.bpm' }],
-              bucketByTime: { durationMillis: 86400000 },
-              startTimeMillis: lookbackStartMillis,
-              endTimeMillis: endWithSkewMillis,
-            }),
-          },
-        );
-        if (hrRes.status === 403) {
-          heartRateScopeMissing = true;
-        } else if (hrRes.ok) {
-          const hrData = await hrRes.json();
-          const buckets = hrData.bucket || [];
-          for (let i = buckets.length - 1; i >= 0 && heartRate === 0; i--) {
-            const b = buckets[i];
-            for (const ds of b.dataset || []) {
-              for (const pt of ds.point || []) {
-                if (pt.dataTypeName && pt.dataTypeName.includes('heart_rate')) {
-                  const bpm = pt.value?.[0]?.fpVal || pt.value?.[0]?.intVal || 0;
-                  if (bpm >= 30 && bpm <= 220) {
-                    heartRate = Math.round(bpm);
-                    latestHeartRate = heartRate;
-                    const bStartMs = Number(b.startTimeMillis || 0);
-                    heartRateNote =
-                      bStartMs > 0
-                        ? `TB ${formatDayLabel(bStartMs, now)} (tổng hợp Google Fit)`
-                        : 'TB ngày gần nhất (Google Fit)';
-                    break;
-                  }
-                }
-              }
-              if (heartRate > 0) break;
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Tier 2 Aggregate HR query failed:', err);
-      }
-    }
-
-    // Tier 3: Resting Heart Rate stream fallback
-    if (heartRate === 0 && !heartRateScopeMissing) {
-      try {
-        const restingStreamUrl = `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/derived:com.google.heart_rate.bpm:com.google.android.gms:resting_heart_rate<-merge_heart_rate_bpm/datasets/${hrStartNanos}-${hrEndNanos}`;
-        const restRes = await fetch(restingStreamUrl, { cache: 'no-store', headers: authHeaders });
-        if (restRes.ok) {
-          const restData = await restRes.json();
-          if (restData.point && restData.point.length > 0) {
-            const latestRest = restData.point[restData.point.length - 1];
-            const bpm = latestRest.value?.[0]?.fpVal || latestRest.value?.[0]?.intVal || 0;
-            if (bpm >= 30 && bpm <= 220) {
-              heartRate = Math.round(bpm);
-              latestHeartRate = heartRate;
-              heartRateSource = 'google-fit-resting';
-              const restEndMs = Number(latestRest.endTimeNanos || latestRest.startTimeNanos || 0) / 1e6;
-              heartRateNote =
-                restEndMs > 0
-                  ? `Nhịp tim nghỉ ngơi · ${formatTimeHHMM(restEndMs)} ${formatDayLabel(restEndMs, now)}`
-                  : 'Nhịp tim nghỉ ngơi (Google Fit)';
-            }
-          }
-        }
-      } catch {
-        // Ignored
-      }
-    }
-
-    if (heartRateScopeMissing) {
-      localStorage.setItem('wearable_hr_scope_missing', 'true');
-    } else {
-      localStorage.removeItem('wearable_hr_scope_missing');
-    }
-
-    // 4. Query Sleep Sessions & Sleep Segments (7-day window)
-    let sleepHours = '—';
-    try {
-      const sleepStartIso = new Date(lookbackStartMillis).toISOString();
-      const sleepEndIso = new Date(endWithSkewMillis).toISOString();
-      const sleepRes = await fetch(
-        `https://fitness.googleapis.com/fitness/v1/users/me/sessions?startTime=${encodeURIComponent(
-          sleepStartIso,
-        )}&endTime=${encodeURIComponent(sleepEndIso)}`,
-        { cache: 'no-store', headers: authHeaders },
-      );
-      if (sleepRes.ok) {
-        const sleepJson = await sleepRes.json();
-        if (sleepJson.session && sleepJson.session.length > 0) {
-          const sleepSessions = sleepJson.session
-            .filter(
-              (s: any) =>
-                s.activityType === 72 ||
-                (s.name && s.name.toLowerCase().includes('sleep')) ||
-                (s.description && s.description.toLowerCase().includes('sleep')),
-            )
-            .sort((a: any, b: any) => Number(a.endTimeMillis) - Number(b.endTimeMillis));
-          if (sleepSessions.length > 0) {
-            const latest = sleepSessions[sleepSessions.length - 1];
-            const startMs = Number(latest.startTimeMillis);
-            const endMs = Number(latest.endTimeMillis);
-            if (endMs > startMs) {
-              const diffMs = endMs - startMs;
-              const h = Math.floor(diffMs / (1000 * 60 * 60));
-              const m = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-              if (h > 0 || m >= 30) {
-                sleepHours = `${h}h ${m}m`;
-              }
-            }
-          }
-        }
-      }
-    } catch {
-      // Ignored
-    }
-
-    if (sleepHours === '—') {
-      try {
-        const dsRes = await fetch(
-          'https://fitness.googleapis.com/fitness/v1/users/me/dataSources?dataTypeName=com.google.sleep.segment',
-          { cache: 'no-store', headers: authHeaders },
-        );
-        if (dsRes.ok) {
-          const dsJson = await dsRes.json();
-          let bestMs = 0;
-          let latestNightEnd = 0;
-          for (const ds of dsJson.dataSource || []) {
-            if (!ds.dataStreamId) continue;
-            if (isWearableStream(ds.dataStreamId)) {
-              detectedWearableLabel = detectedWearableLabel || formatDeviceLabel(ds.dataStreamId);
-            }
-            const segRes = await fetch(
-              `https://fitness.googleapis.com/fitness/v1/users/me/dataSources/${encodeURIComponent(
-                ds.dataStreamId,
-              )}/datasets/${winStartNanos}-${winEndNanos}`,
-              { cache: 'no-store', headers: authHeaders },
-            );
-            if (!segRes.ok) continue;
-            const segJson = await segRes.json();
-            const points: any[] = segJson.point || [];
-            if (points.length === 0) continue;
-
-            const latestEndMs = Math.max(0, ...points.map(pt => Number(pt.endTimeNanos) / 1e6));
-            if (latestEndMs <= 0) continue;
-
-            let asleepMs = 0;
-            for (const pt of points) {
-              const stage = pt.value?.[0]?.intVal;
-              const startMs = Number(pt.startTimeNanos) / 1e6;
-              const endMs = Number(pt.endTimeNanos) / 1e6;
-              if (
-                startMs >= latestEndMs - 20 * 60 * 60 * 1000 &&
-                (stage === 2 || stage === 4 || stage === 5 || stage === 6)
-              ) {
-                asleepMs += endMs - startMs;
-              }
-            }
-            if (asleepMs > 0 && latestEndMs >= latestNightEnd) {
-              latestNightEnd = latestEndMs;
-              bestMs = Math.max(bestMs, asleepMs);
-            }
-          }
-          if (bestMs > 0) {
-            const h = Math.floor(bestMs / 3600000);
-            const m = Math.floor((bestMs % 3600000) / 60000);
-            sleepHours = `${h}h ${m}m`;
-          }
-        }
-      } catch (err) {
-        console.warn('Sleep segment fallback failed:', err);
-      }
-    }
-
-    // 5. Real values ONLY (ZERO fabricated estimates for distance, activeMinutes, heartPoints, or calories)
+    // 2. Real values ONLY (ZERO fabricated estimates for distance, activeMinutes, heartPoints, or calories)
     const finalSteps = Math.max(0, Math.round(steps));
     const totalKcal = Math.max(0, Math.round(calories));
+    const finalActiveMinutes = Math.max(0, Math.round(activeMinutes));
+    const finalDistanceKm = distanceMeters > 0 ? Math.round(distanceMeters / 10) / 100 : 0;
+    const finalHeartPoints = Math.max(0, Math.round(heartPoints));
+
     const userBmr = Number(localStorage.getItem(STORAGE_KEYS.USER_BMR)) || 0;
     const dayFraction = isFromToday
       ? Math.min(1, Math.max(0, (now.getTime() - startOfDay.getTime()) / 86400000))
@@ -1028,60 +574,20 @@ export const wearableService = {
       isFromToday = false;
     }
 
-    // Persist exact real values (and clear stale values when Google Fit returns none)
+    let deviceName = detectedDevice || 'Google Fit Cloud';
+    if (detectedWearableLabel && !hasSpecificWearable) {
+      deviceName = detectedWearableLabel;
+    }
+
+    // Persist exact real values and clean any legacy incomplete biometric keys (HR/SpO2/Sleep)
+    cleanLegacyBiometricKeys();
     localStorage.setItem(STORAGE_KEYS.TOKEN, token);
     localStorage.setItem(STORAGE_KEYS.STEPS, String(finalSteps));
     localStorage.setItem(STORAGE_KEYS.KCAL, String(finalActiveKcal));
     localStorage.setItem(STORAGE_KEYS.KCAL_TOTAL, String(totalKcal));
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_MINUTES, String(Math.max(0, Math.round(activeMinutes))));
-    localStorage.setItem(
-      STORAGE_KEYS.DISTANCE,
-      String(distanceMeters > 0 ? Math.round(distanceMeters / 10) / 100 : 0),
-    );
-    localStorage.setItem(STORAGE_KEYS.HEART_POINTS, String(Math.max(0, Math.round(heartPoints))));
-
-    if (spo2 > 0) {
-      localStorage.setItem(STORAGE_KEYS.SPO2, String(spo2));
-      localStorage.setItem(STORAGE_KEYS.SPO2_NOTE, spo2Note);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.SPO2);
-      localStorage.removeItem(STORAGE_KEYS.SPO2_NOTE);
-    }
-
-    if (sleepHours !== '—') {
-      localStorage.setItem(STORAGE_KEYS.SLEEP, sleepHours);
-    } else {
-      localStorage.removeItem(STORAGE_KEYS.SLEEP);
-    }
-
-    if (heartRate > 0) {
-      localStorage.setItem(STORAGE_KEYS.HEART_RATE, String(heartRate));
-      localStorage.setItem(STORAGE_KEYS.LATEST_HEART_RATE, String(latestHeartRate || heartRate));
-      localStorage.setItem(STORAGE_KEYS.HEART_RATE_NOTE, heartRateNote || 'Ghi nhận từ Google Fit');
-      localStorage.setItem(STORAGE_KEYS.HEART_RATE_SOURCE, heartRateSource);
-    } else {
-      const prevHrSource = localStorage.getItem(STORAGE_KEYS.HEART_RATE_SOURCE);
-      const stored = localStorage.getItem(STORAGE_KEYS.HEART_RATE);
-      if (prevHrSource === 'manual' && stored && Number(stored) > 0) {
-        heartRate = Number(stored);
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.HEART_RATE);
-        localStorage.removeItem(STORAGE_KEYS.LATEST_HEART_RATE);
-        localStorage.removeItem(STORAGE_KEYS.HEART_RATE_NOTE);
-        localStorage.removeItem(STORAGE_KEYS.HEART_RATE_SOURCE);
-      }
-    }
-
-    let deviceName = detectedDevice || 'Google Fit Cloud';
-    const dLower = deviceName.toLowerCase();
-    const isGenericDevice =
-      dLower.includes('google fit') ||
-      dLower.includes('cảm biến bước chân') ||
-      dLower.includes('thiết bị đeo thông minh');
-    if (detectedWearableLabel && isGenericDevice) {
-      deviceName = detectedWearableLabel;
-    }
-
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_MINUTES, String(finalActiveMinutes));
+    localStorage.setItem(STORAGE_KEYS.DISTANCE, String(finalDistanceKm));
+    localStorage.setItem(STORAGE_KEYS.HEART_POINTS, String(finalHeartPoints));
     localStorage.setItem(STORAGE_KEYS.DATA_DATE, dataDateLabel);
     localStorage.setItem(STORAGE_KEYS.IS_TODAY, String(isFromToday));
     localStorage.setItem(STORAGE_KEYS.SYNC_DATE_KEY, formatLocalDateKey(now));
@@ -1098,27 +604,31 @@ export const wearableService = {
       }),
     );
 
+    const todayActiveKcal = isFromToday ? finalActiveKcal : 0;
+
     console.info('[wearable] Google Fit live sync result:', {
       steps: finalSteps,
       totalKcal,
       activeKcal: finalActiveKcal,
-      todayActiveKcal: isFromToday ? finalActiveKcal : 0,
+      todayActiveKcal,
       isFromToday,
-      activeMinutes,
-      distanceMeters,
-      heartPoints,
-      spo2,
-      spo2Note,
-      heartRate,
-      latestHeartRate,
-      heartRateNote,
-      sleepHours,
+      activeMinutes: finalActiveMinutes,
+      distanceKm: finalDistanceKm,
+      heartPoints: finalHeartPoints,
       dataDateLabel,
       deviceName,
     });
 
     window.dispatchEvent(new Event('wearable_sync_updated'));
-    return { steps: finalSteps, calories: isFromToday ? finalActiveKcal : 0, heartRate };
+    return {
+      steps: finalSteps,
+      calories: todayActiveKcal,
+      totalCalories: totalKcal,
+      distanceKm: finalDistanceKm,
+      activeMinutes: finalActiveMinutes,
+      heartPoints: finalHeartPoints,
+      isTodayData: isFromToday,
+    };
   },
 
   /** Remember the user's deterministic BMR so Google Fit total calories can be split cleanly into basal vs. active. */
@@ -1126,26 +636,6 @@ export const wearableService = {
     if (bmr > 0) {
       localStorage.setItem(STORAGE_KEYS.USER_BMR, String(Math.round(bmr)));
     }
-  },
-
-  setManualHeartRate(bpm: number): number {
-    if (bpm > 0) {
-      const val = Math.round(bpm);
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-      const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-      localStorage.setItem(STORAGE_KEYS.HEART_RATE, String(val));
-      localStorage.setItem(STORAGE_KEYS.LATEST_HEART_RATE, String(val));
-      localStorage.setItem(STORAGE_KEYS.HEART_RATE_NOTE, `Nhập tay lúc ${timeStr} (${dateStr})`);
-      localStorage.setItem(STORAGE_KEYS.HEART_RATE_SOURCE, 'manual');
-      localStorage.setItem(
-        STORAGE_KEYS.SYNC_TIME,
-        now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      );
-      window.dispatchEvent(new Event('wearable_sync_updated'));
-      return val;
-    }
-    return 0;
   },
 
   openGoogleFitAuthPopup(): Promise<string> {

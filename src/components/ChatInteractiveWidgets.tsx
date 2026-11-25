@@ -9,7 +9,7 @@ import {
   Sparkles,
   Watch,
   Footprints,
-  Heart,
+  Route,
   Check,
   ChevronRight
 } from 'lucide-react';
@@ -42,8 +42,10 @@ export interface ChatActivityRingsCardData {
   gender?: string;
   steps: number;
   wearableKcal: number;
-  heartRate: number;
-  sleepHours: string;
+  totalCalories?: number;
+  distanceKm?: number;
+  heartRate?: number;
+  sleepHours?: string;
   isConnected: boolean;
   source: string;
   lastSyncedAt: string;
@@ -335,13 +337,18 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 
   const effectiveFiberTarget = serverTargets ? Math.round(serverTargets.fiberTargetG) : (effectiveCalorieTarget > 0 ? 35 : 0);
 
-  // Active calories from wearable / live sync
-  const currentActiveKcal = liveMetrics.activeCalories > 0
-    ? liveMetrics.activeCalories
+  // Active calories from wearable / live sync (today only, isolated from previous days)
+  const currentActiveKcal = liveMetrics.todayActiveCalories > 0
+    ? liveMetrics.todayActiveCalories
     : (card.calories === 1420 ? 0 : (card.calories > 0 ? card.calories : card.wearableKcal));
 
   const currentSteps = liveMetrics.steps > 0 ? liveMetrics.steps : card.steps;
-  const currentHeartRate = liveMetrics.avgHeartRate > 0 ? liveMetrics.avgHeartRate : card.heartRate;
+  const currentTotalKcal =
+    liveMetrics.totalCaloriesExpended > 0
+      ? liveMetrics.totalCaloriesExpended
+      : (card.totalCalories || 0);
+  const currentDistanceKm =
+    liveMetrics.distanceKm > 0 ? liveMetrics.distanceKm : (card.distanceKm || 0);
   const isConnected = liveMetrics.isConnected || card.isConnected;
   const lastSyncedAt = liveMetrics.lastSyncedAt || card.lastSyncedAt;
   const currentAdvice = liveMetrics.aiAdvice || card.advice;
@@ -362,8 +369,13 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 
   const handleAskAdvice = () => {
     sfx.playTap();
-    const heartRateText = currentHeartRate > 0 ? `, Nhịp tim: ${currentHeartRate} bpm` : '';
-    const prompt = `Dựa vào vòng Ring hoạt động hôm nay của tôi (Bước chân: ${currentSteps.toLocaleString('vi-VN')}, Calo tiêu hao: ${currentActiveKcal} kcal${heartRateText}), Bếp trưởng hãy tư vấn thực đơn bữa tối chay để bù đắp năng lượng và hồi phục cơ bắp tối ưu nhé!`;
+    const distanceText =
+      currentDistanceKm > 0 ? `, Quãng đường: ${currentDistanceKm.toLocaleString('vi-VN')} km` : '';
+    const kcalText =
+      currentTotalKcal > 0
+        ? `Tổng tiêu hao Google Fit: ${currentTotalKcal.toLocaleString('vi-VN')} kcal`
+        : `Calo vận động: ${currentActiveKcal} kcal`;
+    const prompt = `Dựa vào dữ liệu Google Fit hôm nay của tôi (Bước chân: ${currentSteps.toLocaleString('vi-VN')}, ${kcalText}${distanceText}), Bếp trưởng hãy tư vấn thực đơn bữa tối chay để bù đắp năng lượng và hồi phục cơ bắp tối ưu nhé!`;
     onAskAiAdvice?.(prompt);
   };
 
@@ -449,19 +461,22 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 
           <div className="p-2 rounded-xl bg-white/5 border border-white/10">
             <span className="text-[10px] text-slate-400 block flex items-center justify-center gap-1">
-              <Flame className="w-3 h-3 text-amber-400" /> Tiêu hao
+              <Flame className="w-3 h-3 text-amber-400" /> Tổng tiêu hao
             </span>
             <strong className="text-sm sm:text-base font-extrabold text-amber-300 block mt-0.5">
-              +{currentActiveKcal.toLocaleString('vi-VN')} <span className="text-[10px] text-slate-400">kcal</span>
+              {currentTotalKcal > 0
+                ? currentTotalKcal.toLocaleString('vi-VN')
+                : `+${currentActiveKcal.toLocaleString('vi-VN')}`}{' '}
+              <span className="text-[10px] text-slate-400">kcal</span>
             </strong>
           </div>
 
           <div className="p-2 rounded-xl bg-white/5 border border-white/10">
             <span className="text-[10px] text-slate-400 block flex items-center justify-center gap-1">
-              <Heart className="w-3 h-3 text-rose-400" /> Nhịp tim
+              <Route className="w-3 h-3 text-emerald-400" /> Quãng đường
             </span>
-            <strong className="text-sm sm:text-base font-extrabold text-rose-300 block mt-0.5">
-              {currentHeartRate > 0 ? `${currentHeartRate} bpm` : '—'}
+            <strong className="text-sm sm:text-base font-extrabold text-emerald-300 block mt-0.5">
+              {currentDistanceKm > 0 ? `${currentDistanceKm.toLocaleString('vi-VN')} km` : '—'}
             </strong>
           </div>
         </div>

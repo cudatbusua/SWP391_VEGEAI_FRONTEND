@@ -70,14 +70,14 @@ function isActivityAggregate(body) {
   );
 }
 
-test('heart rate computes both strictly latest BPM and daily average, and queries official Google Fit merged streams', async () => {
+test('queries official Google Fit merged activity streams only, matches real numbers 1-to-1, and skips incomplete HR/SpO2/Sleep APIs', async () => {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
-  const sample1Ns = String((todayStart + 3600_000) * 1e6);
-  const sample2Ns = String((todayStart + 7200_000) * 1e6);
+  const requestedUrls = [];
   let sawEstimatedStepsStream = false;
 
   const mockFetch = async (url, opts) => {
+    requestedUrls.push(url);
     if (url.includes('dataset:aggregate')) {
       const body = JSON.parse(opts.body);
       if (isActivityAggregate(body)) {
@@ -97,12 +97,17 @@ test('heart rate computes both strictly latest BPM and daily average, and querie
                       {
                         dataTypeName: 'com.google.step_count.delta',
                         originDataSourceId: 'raw:com.google.step_count.delta:com.mi.health',
-                        value: [{ intVal: 4200 }],
+                        value: [{ intVal: 2698 }],
                       },
                       {
                         dataTypeName: 'com.google.calories.expended',
                         originDataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended',
-                        value: [{ fpVal: 1850 }],
+                        value: [{ fpVal: 1325.4 }],
+                      },
+                      {
+                        dataTypeName: 'com.google.distance.delta',
+                        originDataSourceId: 'derived:com.google.distance.delta:com.google.android.gms:merge_distance_delta',
+                        value: [{ fpVal: 1612.8 }],
                       },
                     ],
                   },
@@ -112,40 +117,34 @@ test('heart rate computes both strictly latest BPM and daily average, and querie
           }),
         };
       }
-      return { ok: true, status: 200, json: async () => ({ bucket: [] }) };
     }
-    if (url.includes('merge_heart_rate_bpm/datasets')) {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          point: [
-            { endTimeNanos: sample1Ns, value: [{ fpVal: 41 }] },
-            { endTimeNanos: sample2Ns, value: [{ fpVal: 79 }] },
-          ],
-        }),
-      };
-    }
-    return { ok: true, status: 200, json: async () => ({ session: [], dataSource: [] }) };
+    return { ok: true, status: 200, json: async () => ({ bucket: [] }) };
   };
 
-  const { wearableService } = loadWearableService(mockFetch);
+  const { wearableService, GOOGLE_FIT_SCOPES } = loadWearableService(mockFetch);
+  assert.match(GOOGLE_FIT_SCOPES, /fitness\.activity\.read/);
+  assert.match(GOOGLE_FIT_SCOPES, /fitness\.location\.read/);
+  assert.doesNotMatch(GOOGLE_FIT_SCOPES, /heart_rate|oxygen_saturation|sleep/);
+
   wearableService.setUserBmr(1500);
   const res = await wearableService.fetchGoogleFitLive('tok-1');
 
   assert.equal(sawEstimatedStepsStream, true);
-  assert.equal(res.heartRate, 60);
+  assert.equal(requestedUrls.length, 1);
+  assert.equal(res.steps, 2698);
+  assert.equal(res.totalCalories, 1325);
+  assert.equal(res.distanceKm, 1.61);
+  assert.equal(res.isTodayData, true);
+
   const metrics = wearableService.getMetrics();
-  assert.equal(metrics.avgHeartRate, 60);
-  assert.equal(metrics.latestHeartRate, 79);
-  assert.equal(metrics.totalCaloriesExpended, 1850);
+  assert.equal(metrics.steps, 2698);
+  assert.equal(metrics.totalCaloriesExpended, 1325);
+  assert.equal(metrics.distanceKm, 1.61);
   assert.equal(metrics.isTodayData, true);
-  assert.ok(metrics.todayActiveCalories > 0);
-  // Zero fabricated distance / heartPoints / activeMinutes when not provided by Google Fit
-  assert.equal(metrics.distanceKm, 0);
-  assert.equal(metrics.heartPoints, 0);
+  assert.equal(metrics.deviceModel, 'Google Fit (tổng hợp Điện thoại + Xiaomi Smart Band)');
+  // Zero fabricated activeMinutes / heartPoints when absent from Google Fit
   assert.equal(metrics.activeMinutes, 0);
-  assert.match(metrics.heartRateNote, /Mới nhất 79 bpm.*TB hôm nay: 60 bpm \(2 mẫu\)/);
+  assert.equal(metrics.heartPoints, 0);
 });
 
 test('fallback to previous day within 7 days marks isTodayData=false and sets todayActiveCalories=0', async () => {
@@ -183,6 +182,16 @@ test('fallback to previous day within 7 days marks isTodayData=false and sets to
                         originDataSourceId: 'derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended',
                         value: [{ fpVal: 1900 }],
                       },
+                      {
+                        dataTypeName: 'com.google.active_minutes',
+                        originDataSourceId: 'derived:com.google.active_minutes:com.google.android.gms:merge_active_minutes',
+                        value: [{ intVal: 32 }],
+                      },
+                      {
+                        dataTypeName: 'com.google.heart_minutes',
+                        originDataSourceId: 'derived:com.google.heart_minutes:com.google.android.gms:merge_heart_minutes',
+                        value: [{ fpVal: 14 }],
+                      },
                     ],
                   },
                 ],
@@ -191,9 +200,8 @@ test('fallback to previous day within 7 days marks isTodayData=false and sets to
           }),
         };
       }
-      return { ok: true, status: 200, json: async () => ({ bucket: [] }) };
     }
-    return { ok: true, status: 200, json: async () => ({ point: [], session: [], dataSource: [] }) };
+    return { ok: true, status: 200, json: async () => ({ bucket: [], dataSource: [] }) };
   };
 
   const { wearableService } = loadWearableService(mockFetch);
@@ -201,106 +209,26 @@ test('fallback to previous day within 7 days marks isTodayData=false and sets to
   const res = await wearableService.fetchGoogleFitLive('tok-2');
   assert.equal(res.steps, 5500);
   assert.equal(res.calories, 0);
+  assert.equal(res.totalCalories, 1900);
+  assert.equal(res.activeMinutes, 32);
+  assert.equal(res.heartPoints, 14);
+  assert.equal(res.isTodayData, false);
+
   const metrics = wearableService.getMetrics();
   assert.equal(metrics.isTodayData, false);
   assert.equal(metrics.totalCaloriesExpended, 1900);
   assert.equal(metrics.activeCalories, 400);
   assert.equal(metrics.todayActiveCalories, 0);
+  assert.equal(metrics.activeMinutes, 32);
+  assert.equal(metrics.heartPoints, 14);
   assert.match(metrics.dataDateLabel, /^Gần nhất:/);
 });
 
-test('SpO2 prefers strictly newest raw wearable sample over older aggregate and clears stale SpO2 when absent', async () => {
-  const now = new Date();
-  const oldNs = String((now.getTime() - 2 * 86400_000) * 1e6);
-  const freshNs = String((now.getTime() - 30_000) * 1e6);
-
-  const mockFetchWithFreshSpo2 = async (url, opts) => {
-    if (url.includes('dataSources?dataTypeName=com.google.oxygen_saturation')) {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          dataSource: [{ dataStreamId: 'raw:com.google.oxygen_saturation:com.mi.health:xiaomi' }],
-        }),
-      };
-    }
-    if (url.includes('com.google.oxygen_saturation') && url.includes('/datasets/')) {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          point: [
-            { endTimeNanos: oldNs, value: [{ fpVal: 95 }] },
-            { endTimeNanos: freshNs, value: [{ fpVal: 0.99 }] }, // fractional format supported
-          ],
-        }),
-      };
-    }
-    if (url.includes('dataset:aggregate')) {
-      const body = JSON.parse(opts.body);
-      if (body.aggregateBy.some((a) => a.dataTypeName === 'com.google.oxygen_saturation')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            bucket: [
-              {
-                startTimeMillis: String(now.getTime() - 2 * 86400_000),
-                dataset: [{ point: [{ endTimeNanos: oldNs, value: [{ fpVal: 94 }] }] }],
-              },
-            ],
-          }),
-        };
-      }
-    }
-    return { ok: true, status: 200, json: async () => ({ bucket: [], point: [], session: [], dataSource: [] }) };
-  };
-
-  const { wearableService } = loadWearableService(mockFetchWithFreshSpo2);
-  await wearableService.fetchGoogleFitLive('tok-spo2');
-  const m = wearableService.getMetrics();
-  assert.equal(m.spo2, 99);
-  assert.match(m.spo2Note, /^Đo lúc .* hôm nay$/);
-
-  // Subsequent sync with no SpO2 clears stale value
-  const mockFetchEmpty = async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({ bucket: [], point: [], session: [], dataSource: [] }),
-  });
-  const emptyHarness = loadWearableService(mockFetchEmpty);
-  emptyHarness.localStorage.setItem('wearable_spo2', '97');
-  await emptyHarness.wearableService.fetchGoogleFitLive('tok-spo2-empty');
-  assert.equal(emptyHarness.wearableService.getMetrics().spo2, 0);
-});
-
-test('manual heart rate is preserved across syncs with 0 HR, while stale Google Fit HR is cleared', async () => {
-  const mockFetchEmptyHr = async () => ({
-    ok: true,
-    status: 200,
-    json: async () => ({ bucket: [], point: [], session: [], dataSource: [] }),
-  });
-
-  const { wearableService, localStorage } = loadWearableService(mockFetchEmptyHr);
-  wearableService.setManualHeartRate(72);
-  await wearableService.fetchGoogleFitLive('tok-3');
-  assert.equal(wearableService.getMetrics().avgHeartRate, 72);
-  assert.equal(wearableService.getMetrics().latestHeartRate, 72);
-  assert.match(wearableService.getMetrics().heartRateNote, /^Nhập tay lúc/);
-
-  localStorage.setItem('wearable_heart_rate', '41');
-  localStorage.setItem('wearable_latest_heart_rate', '41');
-  localStorage.setItem('wearable_heart_rate_source', 'google-fit');
-  await wearableService.fetchGoogleFitLive('tok-3');
-  assert.equal(wearableService.getMetrics().avgHeartRate, 0);
-  assert.equal(wearableService.getMetrics().latestHeartRate, 0);
-});
-
-test('concurrent fetchGoogleFitLive calls deduplicate and shouldAutoSync enforces cooldown', async () => {
+test('concurrent fetchGoogleFitLive calls deduplicate and shouldAutoSync enforces 10s cooldown', async () => {
   let calls = 0;
   const mockFetch = async () => {
     calls += 1;
-    return { ok: true, status: 200, json: async () => ({ bucket: [], point: [], session: [], dataSource: [] }) };
+    return { ok: true, status: 200, json: async () => ({ bucket: [], dataSource: [] }) };
   };
   const { wearableService, localStorage } = loadWearableService(mockFetch);
   localStorage.setItem('google_fit_access_token', 'tok-4');
@@ -316,7 +244,7 @@ test('concurrent fetchGoogleFitLive calls deduplicate and shouldAutoSync enforce
   assert.ok(calls > 0);
 });
 
-test('stale simulator storage is ignored and Apple/Huawei device labels are never overwritten by Xiaomi', async () => {
+test('stale simulator & legacy biometric storage are cleared, and unified Google Fit SSOT device labels are preserved', async () => {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
   const mockFetch = async (url, opts) => {
@@ -346,24 +274,18 @@ test('stale simulator storage is ignored and Apple/Huawei device labels are neve
           }),
         };
       }
-      return { ok: true, status: 200, json: async () => ({ bucket: [] }) };
     }
-    if (url.includes('dataSources?dataTypeName=com.google.sleep.segment')) {
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          dataSource: [{ dataStreamId: 'raw:com.google.sleep.segment:com.huawei.health:wearable' }],
-        }),
-      };
-    }
-    return { ok: true, status: 200, json: async () => ({ point: [], session: [], dataSource: [] }) };
+    return { ok: true, status: 200, json: async () => ({ bucket: [], dataSource: [] }) };
   };
 
   const { wearableService, localStorage } = loadWearableService(mockFetch);
   localStorage.setItem('wearable_source', 'simulator');
   localStorage.setItem('wearable_preset', 'intense');
   localStorage.setItem('wearable_steps', '13600');
+  localStorage.setItem('wearable_spo2', '98');
+  localStorage.setItem('wearable_heart_rate', '75');
+  localStorage.setItem('wearable_sleep', '7h 30m');
+
   const cleanMetrics = wearableService.getMetrics();
   assert.equal(cleanMetrics.steps, 0);
   assert.equal(cleanMetrics.source, 'none');
@@ -371,5 +293,8 @@ test('stale simulator storage is ignored and Apple/Huawei device labels are neve
   await wearableService.fetchGoogleFitLive('tok-5');
   const synced = wearableService.getMetrics();
   assert.equal(synced.steps, 3200);
-  assert.equal(synced.deviceModel, 'Apple Watch (qua Apple Health)');
+  assert.equal(synced.deviceModel, 'Google Fit (tổng hợp iPhone + Apple Watch)');
+  assert.equal(localStorage.getItem('wearable_spo2'), null);
+  assert.equal(localStorage.getItem('wearable_heart_rate'), null);
+  assert.equal(localStorage.getItem('wearable_sleep'), null);
 });

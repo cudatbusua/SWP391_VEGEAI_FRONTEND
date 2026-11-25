@@ -44,6 +44,7 @@ function setup(handler) {
     cookbook: load('src/services/cookbookService.ts').cookbookService,
     fridge: load('src/services/fridgeService.ts').fridgeService,
     fridgeChatBridge: load('src/features/ai/fridgeChatBridge.ts'),
+    fridgeScanDraftStore: load('src/features/ai/fridgeScanDraftStore.ts'),
     fridgeImageCompress: load('src/utils/fridgeImageCompress.ts'),
     videoMedia: load('src/utils/communityVideo.ts') };
 }
@@ -888,4 +889,98 @@ test('fridgeChatBridge provides integer steppers for discrete units and clean st
   assert.equal(bridge.inferIngredientUnit('Đậu phụ non'), 'hộp');
   assert.equal(bridge.inferIngredientUnit('Nước tương Tamari'), 'chai');
   assert.equal(bridge.inferIngredientUnit('Cà rốt'), 'củ');
+});
+
+test('fridgeScanDraftStore isolates drafts per account, strips temporary blob/data URLs, and expires stale drafts', () => {
+  const fixture = setup(() => reply({}));
+  const store = fixture.fridgeScanDraftStore;
+  const storage = fixture.context.sessionStorage;
+
+  const baseTime = 1_700_000_000_000;
+  const serverUrl = '/api/public/fridge-scans/11111111-1111-1111-1111-111111111111.jpg';
+  const scanRes = {
+    summary: 'Phát hiện 2 nguyên liệu tươi',
+    totalItemsDetected: 2,
+    hasNonVegetarianItem: false,
+    isFoodScene: true,
+    ingredients: [
+      {
+        name: 'Cà chua bi',
+        category: 'VEGAN',
+        isVegetarian: true,
+        isEdible: true,
+        freshness: 'FRESH',
+        quantity: 6,
+        unit: 'quả',
+        imageUrl: serverUrl,
+      },
+    ],
+    scannedAt: '2026-11-25T05:00:00Z',
+    scanImageUrl: serverUrl,
+  };
+
+  // Guests never persist drafts
+  store.writeFridgeScanDraft(
+    storage,
+    null,
+    { result: scanRes, imageResults: [scanRes], images: [], ingredients: scanRes.ingredients, activeImageIndex: 0 },
+    baseTime
+  );
+  assert.equal(store.readFridgeScanDraft(storage, null, baseTime), null);
+
+  // Member draft replaces expiring blob:/data: preview with persisted server scanImageUrl and clamps index
+  store.writeFridgeScanDraft(
+    storage,
+    'user-1',
+    {
+      result: scanRes,
+      imageResults: [scanRes],
+      images: [
+        { id: 'img-1', name: 'fridge.jpg', size: 204800, preview: 'blob:http://localhost:5173/abc-123' },
+        { id: 'img-2', name: 'nonfood.png', size: 1024, preview: 'data:image/png;base64,AAAA' },
+      ],
+      ingredients: scanRes.ingredients,
+      activeImageIndex: 99,
+    },
+    baseTime
+  );
+
+  // Account isolation: user-2 cannot see user-1's draft
+  assert.equal(store.readFridgeScanDraft(storage, 'user-2', baseTime), null);
+
+  const restored = store.readFridgeScanDraft(storage, 'user-1', baseTime + 60_000);
+  assert.ok(restored);
+  assert.equal(restored.ingredients.length, 1);
+  assert.equal(restored.ingredients[0].name, 'Cà chua bi');
+  assert.equal(restored.images[0].preview, serverUrl);
+  assert.equal(restored.images[1].preview, '');
+  assert.equal(restored.activeImageIndex, 1);
+
+  // Expired drafts (> 12h) are discarded and cleaned up
+  assert.equal(
+    store.readFridgeScanDraft(storage, 'user-1', baseTime + store.FRIDGE_SCAN_DRAFT_TTL_MS + 1000),
+    null
+  );
+  assert.equal(storage.getItem(store.fridgeScanDraftKey('user-1')), null);
+
+  // Writing an empty ingredients list clears an existing draft
+  store.writeFridgeScanDraft(
+    storage,
+    'user-1',
+    { result: scanRes, imageResults: [scanRes], images: [], ingredients: scanRes.ingredients, activeImageIndex: 0 },
+    baseTime
+  );
+  assert.ok(store.readFridgeScanDraft(storage, 'user-1', baseTime));
+  store.writeFridgeScanDraft(
+    storage,
+    'user-1',
+    { result: scanRes, imageResults: [scanRes], images: [], ingredients: [], activeImageIndex: 0 },
+    baseTime
+  );
+  assert.equal(store.readFridgeScanDraft(storage, 'user-1', baseTime), null);
+
+  // Corrupted storage payload is safely rejected and removed
+  storage.setItem(store.fridgeScanDraftKey('user-1'), '{broken-json');
+  assert.equal(store.readFridgeScanDraft(storage, 'user-1', baseTime), null);
+  assert.equal(storage.getItem(store.fridgeScanDraftKey('user-1')), null);
 });

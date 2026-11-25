@@ -38,6 +38,11 @@ import {
   isIngredientAllowedForDiet,
   normalizeQuantityForUnit,
 } from '../features/ai/fridgeChatBridge';
+import {
+  clearFridgeScanDraft,
+  readFridgeScanDraft,
+  writeFridgeScanDraft,
+} from '../features/ai/fridgeScanDraftStore';
 import { compressImageForUpload } from '../utils/fridgeImageCompress';
 import { errorMessage } from '../services/apiClient';
 import { useAuth } from '../hooks/useAuth';
@@ -47,7 +52,14 @@ import '../styles/fridge-scan.css';
 const MAX_IMAGES = 5;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-type SelectedImage = { id: string; file: File; preview: string };
+type SelectedImage = {
+  id: string;
+  file?: File;
+  name: string;
+  size?: number;
+  preview: string;
+  isObjectUrl?: boolean;
+};
 
 function ingredientIllustration(name: string) {
   const normalized = name.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -325,6 +337,8 @@ type ScanReviewProps = {
   onSave: (itemsToSave: FridgeScanResponse['ingredients']) => Promise<void> | void;
   onUploadMore: () => void;
   onBack: () => void;
+  restoredFromDraft?: boolean;
+  onDiscardDraft?: () => void;
   error: string;
   message: string;
   infoMessage: string;
@@ -352,6 +366,8 @@ function ScanReview(props: ScanReviewProps) {
     onSave,
     onUploadMore,
     onBack,
+    restoredFromDraft,
+    onDiscardDraft,
     error,
     message,
     infoMessage,
@@ -481,7 +497,7 @@ function ScanReview(props: ScanReviewProps) {
               </div>
 
               <div className="relative">
-                {currentImage ? (
+                {currentImage && currentImage.preview ? (
                   <img
                     src={currentImage.preview}
                     alt={`Ảnh nguyên liệu ngăn ${activeImageIndex + 1}`}
@@ -490,7 +506,7 @@ function ScanReview(props: ScanReviewProps) {
                 ) : (
                   <div className="fridge-review-image flex h-[260px] flex-col items-center justify-center rounded-lg bg-white dark:bg-slate-800 text-slate-400 sm:h-[300px]">
                     <ImagePlus size={32} className="mb-2" />
-                    <p className="text-sm">Nguyên liệu nhập thủ công</p>
+                    <p className="text-sm">{currentImage ? 'Ảnh đã được AI phân tích' : 'Nguyên liệu nhập thủ công'}</p>
                   </div>
                 )}
 
@@ -531,7 +547,13 @@ function ScanReview(props: ScanReviewProps) {
                             : 'border-rose-300 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/40 hover:bg-rose-50'
                         }`}
                       >
-                        <img src={image.preview} alt="" className="h-8 w-10 shrink-0 rounded object-cover" />
+                        {image.preview ? (
+                          <img src={image.preview} alt="" className="h-8 w-10 shrink-0 rounded object-cover" />
+                        ) : (
+                          <span className="flex h-8 w-10 shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-700 text-slate-400">
+                            <ImagePlus size={14} />
+                          </span>
+                        )}
                         <div className="min-w-0 flex-1">
                           <span className="block truncate text-[10px] font-bold text-slate-700 dark:text-slate-200">Ảnh {index + 1}</span>
                           <span className={`block text-[9px] ${rel.isReliable ? 'text-emerald-700 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-bold'}`}>
@@ -784,9 +806,21 @@ function ScanReview(props: ScanReviewProps) {
         )}
 
         {infoMessage && !message && (
-          <p role="status" className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200">
-            {infoMessage}
-          </p>
+          <div
+            role="status"
+            className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-200"
+          >
+            <span>{infoMessage}</span>
+            {restoredFromDraft && onDiscardDraft && (
+              <button
+                type="button"
+                onClick={onDiscardDraft}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:border-rose-300 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+              >
+                <Trash2 size={12} /> Bắt đầu lượt quét mới
+              </button>
+            )}
+          </div>
         )}
 
         {error && (
@@ -1051,7 +1085,7 @@ function ScanReview(props: ScanReviewProps) {
 }
 
 export function FridgeScanPage() {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef(new Set<string>());
@@ -1070,6 +1104,34 @@ export function FridgeScanPage() {
   const [saving, setSaving] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [completedImages, setCompletedImages] = useState(0);
+  const [draftReadyForUserId, setDraftReadyForUserId] = useState<string | null>(null);
+  const [restoredFromDraft, setRestoredFromDraft] = useState(false);
+
+  const revokePreviewIfOwned = (preview?: string) => {
+    if (preview && objectUrls.current.has(preview)) {
+      URL.revokeObjectURL(preview);
+      objectUrls.current.delete(preview);
+    }
+  };
+
+  const clearLocalScanState = () => {
+    objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.current.clear();
+    scannedByIdRef.current.clear();
+    setImages([]);
+    setResult(null);
+    setImageResults([]);
+    setActiveImageIndex(0);
+    setIngredients([]);
+    setNewIngredientName('');
+    setError('');
+    setMessage('');
+    setInfoMessage('');
+    setCompletedImages(0);
+    setRestoredFromDraft(false);
+    if (inputRef.current) inputRef.current.value = '';
+    if (cameraRef.current) cameraRef.current.value = '';
+  };
 
   useEffect(() => () => objectUrls.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
@@ -1086,14 +1148,101 @@ export function FridgeScanPage() {
     return () => controller.abort();
   }, [isAuthenticated]);
 
+  // Hydrate an unsaved scan draft once per authenticated account so navigating away doesn't lose results.
+  useEffect(() => {
+    if (authLoading) return;
+    const ownerId = isAuthenticated ? user?.id ?? null : null;
+    if (!ownerId) {
+      if (draftReadyForUserId !== null) {
+        clearLocalScanState();
+        setDraftReadyForUserId(null);
+      }
+      return;
+    }
+    if (draftReadyForUserId === ownerId) return;
+    if (draftReadyForUserId !== null) {
+      clearLocalScanState();
+    }
+
+    const draft = readFridgeScanDraft(sessionStorage, ownerId);
+    if (draft) {
+      objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrls.current.clear();
+      scannedByIdRef.current.clear();
+      draft.images.forEach((img, idx) => {
+        const imgRes = draft.imageResults[idx];
+        if (imgRes) {
+          scannedByIdRef.current.set(img.id, imgRes);
+        }
+      });
+      setImages(draft.images);
+      setImageResults(draft.imageResults);
+      setResult(draft.result);
+      setIngredients(draft.ingredients.map(withNormalizedIngredientDefaults));
+      setActiveImageIndex(draft.activeImageIndex);
+      setRestoredFromDraft(true);
+      setInfoMessage('Đã tự động khôi phục kết quả quét gần nhất chưa lưu vào tủ lạnh.');
+    }
+    setDraftReadyForUserId(ownerId);
+  }, [authLoading, draftReadyForUserId, isAuthenticated, user?.id]);
+
+  // Persist unsaved scan review state (with server image URLs only) and clear once saved or discarded.
+  useEffect(() => {
+    const ownerId = isAuthenticated ? user?.id ?? null : null;
+    if (!ownerId || draftReadyForUserId !== ownerId || busy) return;
+    if (result && ingredients.length > 0 && !message) {
+      writeFridgeScanDraft(sessionStorage, ownerId, {
+        result,
+        imageResults,
+        images: images.map((img, idx) => ({
+          id: img.id,
+          name: img.name,
+          size: img.size,
+          preview: img.isObjectUrl ? imageResults[idx]?.scanImageUrl ?? '' : img.preview,
+        })),
+        ingredients,
+        activeImageIndex,
+      });
+    } else {
+      clearFridgeScanDraft(sessionStorage, ownerId);
+    }
+  }, [
+    activeImageIndex,
+    busy,
+    draftReadyForUserId,
+    imageResults,
+    images,
+    ingredients,
+    isAuthenticated,
+    message,
+    result,
+    user?.id,
+  ]);
+
+  // Warn only if the user tries to close/reload the tab while AI Vision is actively scanning.
+  useEffect(() => {
+    if (!busy) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [busy]);
+
   const addImages = (files: FileList | File[]) => {
     setError('');
     setMessage('');
     setInfoMessage('');
+    setRestoredFromDraft(false);
     const incoming = Array.from(files);
     if (!incoming.length) return;
     const fileSig = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
-    const existingSigs = new Set(images.map((img) => fileSig(img.file)));
+    const existingSigs = new Set(
+      images
+        .filter((img): img is SelectedImage & { file: File } => Boolean(img.file))
+        .map((img) => fileSig(img.file))
+    );
     const accepted: SelectedImage[] = [];
     const duplicateNames: string[] = [];
 
@@ -1118,7 +1267,14 @@ export function FridgeScanPage() {
       existingSigs.add(sig);
       const preview = URL.createObjectURL(file);
       objectUrls.current.add(preview);
-      accepted.push({ id: `${Date.now()}-${accepted.length}-${file.name}`, file, preview });
+      accepted.push({
+        id: `${Date.now()}-${accepted.length}-${file.name}`,
+        file,
+        name: file.name,
+        size: file.size,
+        preview,
+        isObjectUrl: true,
+      });
     }
     if (duplicateNames.length > 0) {
       setInfoMessage(
@@ -1143,8 +1299,7 @@ export function FridgeScanPage() {
     setImages((current) => {
       const removed = current.find((image) => image.id === id);
       if (removed) {
-        URL.revokeObjectURL(removed.preview);
-        objectUrls.current.delete(removed.preview);
+        revokePreviewIfOwned(removed.preview);
       }
       return current.filter((image) => image.id !== id);
     });
@@ -1154,8 +1309,7 @@ export function FridgeScanPage() {
     const imageToRemove = images[index];
     if (imageToRemove) {
       scannedByIdRef.current.delete(imageToRemove.id);
-      URL.revokeObjectURL(imageToRemove.preview);
-      objectUrls.current.delete(imageToRemove.preview);
+      revokePreviewIfOwned(imageToRemove.preview);
     }
     const nextImages = images.filter((_, i) => i !== index);
     const nextImageResults = imageResults.filter((_, i) => i !== index);
@@ -1179,6 +1333,7 @@ export function FridgeScanPage() {
       setIngredients([]);
     }
     setMessage('');
+    setRestoredFromDraft(false);
     setInfoMessage('Đã loại bỏ ảnh được chọn và cập nhật lại danh sách nguyên liệu.');
   };
 
@@ -1203,8 +1358,7 @@ export function FridgeScanPage() {
     images.forEach((img, idx) => {
       if (!reliablePairs.some((r) => r.idx === idx)) {
         scannedByIdRef.current.delete(img.id);
-        URL.revokeObjectURL(img.preview);
-        objectUrls.current.delete(img.preview);
+        revokePreviewIfOwned(img.preview);
       }
     });
 
@@ -1219,27 +1373,15 @@ export function FridgeScanPage() {
     setResult(scanResult);
     setIngredients(scanResult.ingredients.map(withNormalizedIngredientDefaults));
     setMessage('');
+    setRestoredFromDraft(false);
     setInfoMessage(
       `Đã tự động loại bỏ ${removedCount} ảnh lỗi/không đáng tin cậy. Kết quả nguyên liệu đã được tính lại chỉ từ các ảnh đạt chuẩn!`
     );
   };
 
   const reset = () => {
-    objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
-    objectUrls.current.clear();
-    scannedByIdRef.current.clear();
-    setImages([]);
-    setResult(null);
-    setImageResults([]);
-    setActiveImageIndex(0);
-    setIngredients([]);
-    setNewIngredientName('');
-    setError('');
-    setMessage('');
-    setInfoMessage('');
-    setCompletedImages(0);
-    if (inputRef.current) inputRef.current.value = '';
-    if (cameraRef.current) cameraRef.current.value = '';
+    clearLocalScanState();
+    clearFridgeScanDraft(sessionStorage, user?.id);
   };
 
   const scan = async (event: React.FormEvent) => {
@@ -1249,6 +1391,7 @@ export function FridgeScanPage() {
     setError('');
     setMessage('');
     setInfoMessage('');
+    setRestoredFromDraft(false);
     setResult(null);
     setCompletedImages(0);
     try {
@@ -1269,6 +1412,9 @@ export function FridgeScanPage() {
             const cached = scannedByIdRef.current.get(current.id);
             let response = cached;
             if (!response) {
+              if (!current.file) {
+                throw new Error('Không tìm thấy tệp ảnh gốc để quét lại. Vui lòng chọn lại ảnh.');
+              }
               if (idx > 0) {
                 // Brief spacing between uncached images reduces Free-Tier burst 429s
                 await new Promise((resolve) => setTimeout(resolve, 500));
@@ -1301,7 +1447,7 @@ export function FridgeScanPage() {
           responses.push(entry.response);
         } else {
           failedImages.push(entry.image);
-          failedNames.push(entry.image.file.name);
+          failedNames.push(entry.image.name);
           lastErrorMsg = entry.errMsg || lastErrorMsg;
         }
       });
@@ -1314,8 +1460,7 @@ export function FridgeScanPage() {
       if (failedNames.length > 0) {
         failedImages.forEach((img) => {
           scannedByIdRef.current.delete(img.id);
-          URL.revokeObjectURL(img.preview);
-          objectUrls.current.delete(img.preview);
+          revokePreviewIfOwned(img.preview);
         });
         setImages(succeededImages);
         setError(`Chưa thể quét ${failedNames.length} ảnh (${failedNames.join(', ')}): ${lastErrorMsg}. Các ảnh quét thành công đã được giữ lại bên dưới.`);
@@ -1354,6 +1499,8 @@ export function FridgeScanPage() {
     setInfoMessage('');
     try {
       const saved = await fridgeService.confirmScan({ ...result, ingredients: finalItems });
+      clearFridgeScanDraft(sessionStorage, user?.id);
+      setRestoredFromDraft(false);
       setMessage(
         `Đã xác nhận và thêm thành công ${saved.totalProcessed} nguyên liệu vào Kho Tủ Lạnh (${saved.newlyAddedCount} nguyên liệu mới, ${saved.updatedExistingCount} nguyên liệu được cộng dồn/cập nhật).`
       );
@@ -1570,12 +1717,16 @@ export function FridgeScanPage() {
                   onSave={saveToFridge}
                   onUploadMore={() => inputRef.current?.click()}
                   onBack={() => {
+                    clearFridgeScanDraft(sessionStorage, user?.id);
+                    setRestoredFromDraft(false);
                     setResult(null);
                     setIngredients([]);
                     setError('');
                     setMessage('');
                     setInfoMessage('');
                   }}
+                  restoredFromDraft={restoredFromDraft}
+                  onDiscardDraft={reset}
                   error={error}
                   message={message}
                   infoMessage={infoMessage}
@@ -1636,14 +1787,20 @@ export function FridgeScanPage() {
                                   key={image.id}
                                   className="relative overflow-hidden rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
                                 >
-                                  <img
-                                    src={image.preview}
-                                    alt={`Ảnh nguyên liệu ${index + 1}`}
-                                    className="h-28 w-full object-cover"
-                                  />
+                                  {image.preview ? (
+                                    <img
+                                      src={image.preview}
+                                      alt={`Ảnh nguyên liệu ${index + 1}`}
+                                      className="h-28 w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-28 w-full items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-400">
+                                      <ImagePlus size={22} />
+                                    </div>
+                                  )}
                                   <button
                                     type="button"
-                                    aria-label={`Xóa ảnh ${image.file.name}`}
+                                    aria-label={`Xóa ảnh ${image.name}`}
                                     onClick={() => removeImage(image.id)}
                                     className="absolute right-1.5 top-1.5 rounded-full bg-white/95 dark:bg-slate-700 p-1 text-slate-500 dark:text-slate-300 shadow hover:text-red-600 cursor-pointer"
                                     title="Xóa ảnh này"
@@ -1653,12 +1810,14 @@ export function FridgeScanPage() {
                                   <div className="flex items-center justify-between gap-1 px-2 py-2">
                                     <div className="min-w-0">
                                       <p className="truncate text-[10px] font-semibold text-slate-700 dark:text-slate-200">
-                                        {image.file.name}
+                                        {image.name}
                                       </p>
                                       <p className="text-[10px] text-slate-400">
-                                        {image.file.size >= 1024 * 1024
-                                          ? `${(image.file.size / 1024 / 1024).toFixed(1)} MB`
-                                          : `${Math.max(1, Math.round(image.file.size / 1024))} KB`}
+                                        {image.size != null && image.size > 0
+                                          ? image.size >= 1024 * 1024
+                                            ? `${(image.size / 1024 / 1024).toFixed(1)} MB`
+                                            : `${Math.max(1, Math.round(image.size / 1024))} KB`
+                                          : 'Đã quét AI'}
                                       </p>
                                     </div>
                                     <CheckCircle2 size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" />

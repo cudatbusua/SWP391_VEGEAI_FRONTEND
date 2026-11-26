@@ -337,18 +337,26 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 
   const effectiveFiberTarget = serverTargets ? Math.round(serverTargets.fiberTargetG) : (effectiveCalorieTarget > 0 ? 35 : 0);
 
-  // Active calories from wearable / live sync (today only, isolated from previous days)
-  const currentActiveKcal = liveMetrics.todayActiveCalories > 0
+  // Active calories from wearable / live sync (today only, exact snapshot at sync time)
+  const currentActiveKcal = liveMetrics.hasSyncedToday
+    ? liveMetrics.todayActiveCalories
+    : liveMetrics.todayActiveCalories > 0
     ? liveMetrics.todayActiveCalories
     : (card.calories === 1420 ? 0 : (card.calories > 0 ? card.calories : card.wearableKcal));
 
-  const currentSteps = liveMetrics.steps > 0 ? liveMetrics.steps : card.steps;
-  const currentTotalKcal =
-    liveMetrics.totalCaloriesExpended > 0
-      ? liveMetrics.totalCaloriesExpended
-      : (card.totalCalories || 0);
-  const currentDistanceKm =
-    liveMetrics.distanceKm > 0 ? liveMetrics.distanceKm : (card.distanceKm || 0);
+  const currentSteps = liveMetrics.hasSyncedToday
+    ? liveMetrics.steps
+    : (liveMetrics.steps > 0 ? liveMetrics.steps : card.steps);
+  const currentTotalKcal = liveMetrics.hasSyncedToday
+    ? liveMetrics.totalCaloriesExpended
+    : liveMetrics.totalCaloriesExpended > 0
+    ? liveMetrics.totalCaloriesExpended
+    : (card.totalCalories || 0);
+  const currentDistanceKm = liveMetrics.hasSyncedToday
+    ? liveMetrics.distanceKm
+    : liveMetrics.distanceKm > 0
+    ? liveMetrics.distanceKm
+    : (card.distanceKm || 0);
   const isConnected = liveMetrics.isConnected || card.isConnected;
   const lastSyncedAt = liveMetrics.lastSyncedAt || card.lastSyncedAt;
   const currentAdvice = liveMetrics.aiAdvice || card.advice;
@@ -464,7 +472,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
               <Flame className="w-3 h-3 text-amber-400" /> Tổng tiêu hao
             </span>
             <strong className="text-sm sm:text-base font-extrabold text-amber-300 block mt-0.5">
-              {currentTotalKcal > 0
+              {liveMetrics.hasSyncedToday || currentTotalKcal > 0
                 ? currentTotalKcal.toLocaleString('vi-VN')
                 : `+${currentActiveKcal.toLocaleString('vi-VN')}`}{' '}
               <span className="text-[10px] text-slate-400">kcal</span>
@@ -476,7 +484,9 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
               <Route className="w-3 h-3 text-emerald-400" /> Quãng đường
             </span>
             <strong className="text-sm sm:text-base font-extrabold text-emerald-300 block mt-0.5">
-              {currentDistanceKm > 0 ? `${currentDistanceKm.toLocaleString('vi-VN')} km` : '—'}
+              {liveMetrics.hasSyncedToday || currentDistanceKm > 0
+                ? `${currentDistanceKm.toLocaleString('vi-VN')} km`
+                : '—'}
             </strong>
           </div>
         </div>

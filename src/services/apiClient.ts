@@ -64,6 +64,7 @@ export function clearSession(): void {
   localStorage.removeItem('wearable_last_synced');
   localStorage.removeItem('wearable_preset');
   localStorage.removeItem('wearable_device');
+  localStorage.removeItem('wearable_daily_history');
   window.dispatchEvent(new Event('wearable_sync_updated'));
 }
 function expireSession(): void {

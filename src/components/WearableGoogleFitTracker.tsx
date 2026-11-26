@@ -1,32 +1,51 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Watch,
   Flame,
   Footprints,
   RefreshCw,
   Sparkles,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Link2,
   Unlink,
-  Layers,
   Info,
   Smartphone,
   Route,
   Timer,
-  Activity
+  Activity,
+  CalendarDays,
+  AlertCircle,
+  Check,
+  X,
 } from 'lucide-react';
 import { sfx } from '../utils/soundEffects';
 import { wearableService } from '../utils/wearableService';
-import type { GoogleFitSyncResult, WearableMetrics } from '../utils/wearableService';
+import type {
+  DailyActivityRecord,
+  GoogleFitSyncResult,
+  WearableMetrics,
+} from '../utils/wearableService';
 
 const LIVE_SYNC_DURATION_SEC = 15;
 const LIVE_SYNC_POLL_STEP_SEC = 5;
 
+const SHORT_WEEKDAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'] as const;
+const FULL_WEEKDAYS = [
+  'Chủ Nhật',
+  'Thứ Hai',
+  'Thứ Ba',
+  'Thứ Tư',
+  'Thứ Năm',
+  'Thứ Sáu',
+  'Thứ Bảy',
+] as const;
+
+type ChartMetricKey = 'steps' | 'calories' | 'distance';
+
 interface WearableTrackerProps {
   plannedCalorieIntake?: number;
   userBmr?: number;
+  userTdee?: number;
+  isCustomCalorieTarget?: boolean;
   onSyncMetrics?: (metrics: {
     steps: number;
     calories: number;
@@ -38,72 +57,231 @@ interface WearableTrackerProps {
 interface MetricCardProps {
   title: string;
   icon: React.ReactNode;
-  /** null = no data available yet (renders an em dash) */
+  /** null = not connected/synced yet (renders an em dash) */
   value: string | null;
   unit: string;
   valueClass: string;
-  note: string;
+  note?: string;
   children?: React.ReactNode;
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ title, icon, value, unit, valueClass, note, children }) => (
+const MetricCard: React.FC<MetricCardProps> = ({
+  title,
+  icon,
+  value,
+  unit,
+  valueClass,
+  note,
+  children,
+}) => (
   <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#182230] border border-slate-200/80 dark:border-slate-800 space-y-2">
-    <div className="flex items-center justify-between text-slate-500">
+    <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
       <span className="text-xs font-bold">{title}</span>
       {icon}
     </div>
-    <div className={`text-2xl font-black flex items-baseline gap-1 ${value === null ? 'text-slate-300 dark:text-slate-600' : valueClass}`}>
+    <div
+      className={`text-2xl font-black tabular-nums flex items-baseline gap-1 ${
+        value === null ? 'text-slate-300 dark:text-slate-600' : valueClass
+      }`}
+    >
       <span>{value ?? '—'}</span>
       {value !== null && unit && <span className="text-xs font-bold text-slate-400">{unit}</span>}
     </div>
     {children}
-    <p className="text-[11px] text-slate-500 leading-snug">{note}</p>
+    {note && <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">{note}</p>}
   </div>
 );
 
-function buildSnapshotFromMetrics(m: WearableMetrics): string {
-  return `${m.steps}|${m.totalCaloriesExpended}|${m.distanceKm}|${m.activeMinutes}|${m.heartPoints}`;
+function buildFallbackSevenDaySkeleton(stepTarget: number): DailyActivityRecord[] {
+  const now = new Date();
+  const list: DailyActivityRecord[] = [];
+  for (let offset = 6; offset >= 0; offset--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset, 0, 0, 0, 0);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dow = d.getDay();
+    list.push({
+      dateKey: `${y}-${m}-${day}`,
+      weekdayLabel: SHORT_WEEKDAYS[dow],
+      fullWeekdayLabel: FULL_WEEKDAYS[dow],
+      shortDateLabel: `${day}/${m}`,
+      isToday: offset === 0,
+      steps: 0,
+      stepTarget,
+      totalCalories: 0,
+      activeCalories: 0,
+      distanceKm: 0,
+      activeMinutes: 0,
+      heartPoints: 0,
+      hasActivityData: false,
+    });
+  }
+  return list;
 }
 
-function buildSnapshotFromResult(r: GoogleFitSyncResult): string {
-  return `${r.steps}|${r.totalCalories}|${r.distanceKm}|${r.activeMinutes}|${r.heartPoints}`;
+function formatCompactChartValue(metric: ChartMetricKey, day: DailyActivityRecord): string {
+  if (metric === 'steps') {
+    if (day.steps >= 10000) {
+      return `${(day.steps / 1000).toFixed(1).replace('.', ',')}k`;
+    }
+    return day.steps.toLocaleString('vi-VN');
+  }
+  if (metric === 'calories') {
+    return day.totalCalories.toLocaleString('vi-VN');
+  }
+  return day.distanceKm.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
 }
 
-function formatSyncSummary(live: GoogleFitSyncResult): string {
-  const parts: string[] = [`${live.steps.toLocaleString('vi-VN')} bước`];
-  if (live.totalCalories > 0) {
-    const activePart =
-      live.isTodayData && live.calories > 0
-        ? ` (vận động +${live.calories.toLocaleString('vi-VN')} kcal)`
-        : '';
-    parts.push(`tổng tiêu hao ${live.totalCalories.toLocaleString('vi-VN')} kcal${activePart}`);
-  }
-  if (live.distanceKm > 0) {
-    parts.push(`${live.distanceKm.toLocaleString('vi-VN')} km`);
-  }
-  if (live.activeMinutes > 0) {
-    parts.push(`${live.activeMinutes} phút vận động`);
-  }
-  return parts.join(' · ');
+interface DailyGoalRingProps {
+  stepRatio: number;
+  calorieRatio: number;
+  distanceRatio: number;
+  goalMet: boolean;
+  muted: boolean;
+  isSelected: boolean;
 }
+
+const DailyGoalRing: React.FC<DailyGoalRingProps> = ({
+  stepRatio,
+  calorieRatio,
+  distanceRatio,
+  goalMet,
+  muted,
+  isSelected,
+}) => {
+  const outerR = 20.5;
+  const middleR = 15.6;
+  const innerR = 11;
+  const outerC = 2 * Math.PI * outerR;
+  const middleC = 2 * Math.PI * middleR;
+  const innerC = 2 * Math.PI * innerR;
+  const outerPct = Math.min(1, Math.max(0, stepRatio));
+  const middlePct = Math.min(1, Math.max(0, calorieRatio));
+  const innerPct = Math.min(1, Math.max(0, distanceRatio));
+
+  return (
+    <div className="relative w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center">
+      <svg viewBox="0 0 48 48" className="w-full h-full -rotate-90" aria-hidden="true">
+        {/* Outer ring (Steps — Emerald) */}
+        <circle
+          cx="24"
+          cy="24"
+          r={outerR}
+          fill="none"
+          strokeWidth="3.2"
+          className={
+            muted
+              ? 'stroke-slate-200/80 dark:stroke-slate-800'
+              : 'stroke-slate-200 dark:stroke-slate-700/80'
+          }
+        />
+        {!muted && outerPct > 0 && (
+          <circle
+            cx="24"
+            cy="24"
+            r={outerR}
+            fill="none"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+            stroke={goalMet ? '#059669' : '#10b981'}
+            strokeDasharray={outerC}
+            strokeDashoffset={outerC * (1 - outerPct)}
+            className="transition-all duration-500"
+          />
+        )}
+
+        {/* Middle ring (Calories Burned vs. TDEE — Amber) */}
+        <circle
+          cx="24"
+          cy="24"
+          r={middleR}
+          fill="none"
+          strokeWidth="3.0"
+          className={
+            muted
+              ? 'stroke-slate-200/60 dark:stroke-slate-800/80'
+              : 'stroke-slate-200/80 dark:stroke-slate-700/65'
+          }
+        />
+        {!muted && middlePct > 0 && (
+          <circle
+            cx="24"
+            cy="24"
+            r={middleR}
+            fill="none"
+            strokeWidth="3.0"
+            strokeLinecap="round"
+            stroke={calorieRatio >= 1 ? '#d97706' : '#f59e0b'}
+            strokeDasharray={middleC}
+            strokeDashoffset={middleC * (1 - middlePct)}
+            className="transition-all duration-500"
+          />
+        )}
+
+        {/* Inner ring (Distance / Movement — Cyan) */}
+        <circle
+          cx="24"
+          cy="24"
+          r={innerR}
+          fill="none"
+          strokeWidth="2.8"
+          className={
+            muted
+              ? 'stroke-slate-200/45 dark:stroke-slate-800/65'
+              : 'stroke-slate-200/65 dark:stroke-slate-700/50'
+          }
+        />
+        {!muted && innerPct > 0 && (
+          <circle
+            cx="24"
+            cy="24"
+            r={innerR}
+            fill="none"
+            strokeWidth="2.8"
+            strokeLinecap="round"
+            stroke={isSelected ? '#0284c7' : '#06b6d4'}
+            strokeDasharray={innerC}
+            strokeDashoffset={innerC * (1 - innerPct)}
+            className="transition-all duration-500"
+          />
+        )}
+      </svg>
+
+      {/* Center indicator */}
+      {!muted && goalMet ? (
+        <span className="absolute inset-0 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+          <Check className="w-3.5 h-3.5 stroke-[3]" />
+        </span>
+      ) : muted ? (
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-300 dark:text-slate-600">
+          —
+        </span>
+      ) : null}
+    </div>
+  );
+};
 
 export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
   plannedCalorieIntake = 0,
   userBmr = 0,
-  onSyncMetrics
+  userTdee = 0,
+  isCustomCalorieTarget = false,
+  onSyncMetrics,
 }) => {
   const [metrics, setMetrics] = useState<WearableMetrics>(() => wearableService.getMetrics());
   const [isSyncing, setIsSyncing] = useState(false);
   const [liveSyncSecondsLeft, setLiveSyncSecondsLeft] = useState(0);
-  const [statusMessage, setStatusMessage] = useState<string>('');
-  const [showArchitectureGuide, setShowArchitectureGuide] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const [showHubInfo, setShowHubInfo] = useState(false);
-  const [activeGuideTab, setActiveGuideTab] = useState<'phone' | 'apple' | 'samsung' | 'xiaomi' | 'garmin'>('phone');
+  const [activeGuideTab, setActiveGuideTab] = useState<
+    'phone' | 'apple' | 'samsung' | 'xiaomi' | 'garmin'
+  >('phone');
+  const [chartMetric, setChartMetric] = useState<ChartMetricKey>('steps');
+  const [selectedDateKey, setSelectedDateKey] = useState<string>('');
 
   const liveTimerRef = useRef<number | null>(null);
   const liveSyncRunIdRef = useRef<number>(0);
-  const baselineSnapshotRef = useRef<string>('');
-  const hadUpdateInWindowRef = useRef<boolean>(false);
 
   const stopLiveSyncWindow = useCallback(() => {
     liveSyncRunIdRef.current += 1;
@@ -121,14 +299,14 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
     wearableService.setUserBmr(userBmr);
   }, [userBmr]);
 
-  // Auto-sync live metrics on page load/refresh and when returning to the tab/app ("out ra vô lại")
+  // Auto-sync live metrics on page load/refresh and when returning to the tab/app
   useEffect(() => {
     const token = wearableService.getStoredToken();
     if (token) {
-      wearableService.fetchGoogleFitLive(token).catch(err => {
+      wearableService.fetchGoogleFitLive(token, { includeHistory: true }).catch(err => {
         console.warn('Background auto-sync with Google Fit:', err);
         if (err?.message?.includes('hết hạn')) {
-          setStatusMessage(err.message);
+          setErrorMessage(err.message);
         }
       });
     }
@@ -137,7 +315,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
       if (document.visibilityState !== 'visible') return;
       const latestToken = wearableService.getStoredToken();
       if (latestToken && wearableService.shouldAutoSync()) {
-        wearableService.fetchGoogleFitLive(latestToken).catch(err => {
+        wearableService.fetchGoogleFitLive(latestToken, { includeHistory: true }).catch(err => {
           console.warn('Return auto-sync with Google Fit:', err);
         });
       }
@@ -159,104 +337,110 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         steps: updated.steps,
         calories: updated.todayActiveCalories,
         totalCalories: updated.totalCaloriesExpended,
-        distanceKm: updated.distanceKm
+        distanceKm: updated.distanceKm,
       });
     };
     window.addEventListener('wearable_sync_updated', handleUpdate);
-    return () => window.removeEventListener('wearable_sync_updated', handleUpdate);
+    window.addEventListener('user_profile_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('wearable_sync_updated', handleUpdate);
+      window.removeEventListener('user_profile_updated', handleUpdate);
+    };
   }, [onSyncMetrics]);
 
   /**
-   * Starts a 15-second automatic Live Sync window right after clicking "Đồng bộ ngay":
-   * polls Google Fit Cloud at t = 5s, 10s, and 15s, then automatically stops cleanly.
+   * Starts a quiet 15-second Live Sync window right after connecting or clicking "Đồng bộ ngay":
+   * polls today's exact snapshot at t = 5s, 10s, and 15s, updating today's cards & 7-day map in place.
    */
-  const startAutoLiveSyncWindow = useCallback(
-    (initialLive: GoogleFitSyncResult, initialChanged: boolean) => {
-      stopLiveSyncWindow();
-      const runId = liveSyncRunIdRef.current;
-      hadUpdateInWindowRef.current = initialChanged;
-      baselineSnapshotRef.current = buildSnapshotFromResult(initialLive);
-      setLiveSyncSecondsLeft(LIVE_SYNC_DURATION_SEC);
+  const startAutoLiveSyncWindow = useCallback(() => {
+    stopLiveSyncWindow();
+    const runId = liveSyncRunIdRef.current;
+    setLiveSyncSecondsLeft(LIVE_SYNC_DURATION_SEC);
 
-      let elapsedSec = 0;
-      liveTimerRef.current = window.setInterval(() => {
-        elapsedSec += 1;
-        const remaining = Math.max(0, LIVE_SYNC_DURATION_SEC - elapsedSec);
-        const isFinalTick = elapsedSec >= LIVE_SYNC_DURATION_SEC;
-        setLiveSyncSecondsLeft(remaining);
+    let elapsedSec = 0;
+    liveTimerRef.current = window.setInterval(() => {
+      elapsedSec += 1;
+      const remaining = Math.max(0, LIVE_SYNC_DURATION_SEC - elapsedSec);
+      const isFinalTick = elapsedSec >= LIVE_SYNC_DURATION_SEC;
+      setLiveSyncSecondsLeft(remaining);
 
-        if (isFinalTick && liveTimerRef.current !== null) {
-          window.clearInterval(liveTimerRef.current);
-          liveTimerRef.current = null;
+      if (isFinalTick && liveTimerRef.current !== null) {
+        window.clearInterval(liveTimerRef.current);
+        liveTimerRef.current = null;
+      }
+
+      if (elapsedSec % LIVE_SYNC_POLL_STEP_SEC === 0 || isFinalTick) {
+        const latestToken = wearableService.getStoredToken();
+        if (!latestToken) {
+          stopLiveSyncWindow();
+          return;
         }
+        wearableService
+          .fetchGoogleFitLive(latestToken, { includeHistory: false })
+          .catch((err: any) => {
+            if (liveSyncRunIdRef.current !== runId) return;
+            console.warn('Auto Live Sync poll error:', err);
+            if (err?.message?.includes('hết hạn')) {
+              stopLiveSyncWindow();
+              setErrorMessage(err.message);
+            }
+          });
+      }
+    }, 1000);
+  }, [stopLiveSyncWindow]);
 
-        if (elapsedSec % LIVE_SYNC_POLL_STEP_SEC === 0 || isFinalTick) {
-          const latestToken = wearableService.getStoredToken();
-          if (!latestToken) {
-            stopLiveSyncWindow();
-            return;
-          }
-          wearableService
-            .fetchGoogleFitLive(latestToken)
-            .then(live => {
-              if (liveSyncRunIdRef.current !== runId) return;
-              const nextSnap = buildSnapshotFromResult(live);
-              if (nextSnap !== baselineSnapshotRef.current) {
-                hadUpdateInWindowRef.current = true;
-                baselineSnapshotRef.current = nextSnap;
-              }
-              const timeStr = new Date().toLocaleTimeString('vi-VN');
-              if (isFinalTick) {
-                setStatusMessage(
-                  hadUpdateInWindowRef.current
-                    ? `Hoàn tất Live Sync lúc ${timeStr} (Google Fit): ${formatSyncSummary(live)}.`
-                    : `Đã kiểm tra Google Fit lúc ${timeStr}: ${formatSyncSummary(live)} (chưa có dữ liệu mới trên Google Fit Cloud). Bấm "Đồng bộ ngay" hoặc tải lại trang khi muốn cập nhật tiếp.`
-                );
-              } else {
-                setStatusMessage(
-                  `Đang tự động Live Sync với Google Fit (cập nhật lúc ${timeStr}): ${formatSyncSummary(live)}.`
-                );
-              }
-            })
-            .catch(err => {
-              if (liveSyncRunIdRef.current !== runId) return;
-              console.warn('Auto Live Sync poll error:', err);
-              if (err?.message?.includes('hết hạn')) {
-                stopLiveSyncWindow();
-                setStatusMessage(err.message);
-              }
-            });
-        }
-      }, 1000);
-    },
-    [stopLiveSyncWindow]
-  );
+  // Sanitize incoming numeric props so NaN/negative/undefined values can never distort charts or balances
+  const safePlannedIntake =
+    Number.isFinite(plannedCalorieIntake) && plannedCalorieIntake > 0
+      ? Math.round(plannedCalorieIntake)
+      : 0;
+  const safeUserBmr = Number.isFinite(userBmr) && userBmr > 0 ? Math.round(userBmr) : 0;
+  const safeUserTdee = Number.isFinite(userTdee) && userTdee > 0 ? Math.round(userTdee) : 0;
 
+  // Unified expenditure baseline matching AccountSettingsPage (TDEE + todayActiveCalories, avoiding double-counting BMR)
+  const baseDailyExpenditure = safeUserTdee > 0 ? safeUserTdee : safeUserBmr;
+  const scientificTdee =
+    safeUserTdee > 0 ? safeUserTdee : safeUserBmr > 0 ? Math.round(safeUserBmr * 1.375) : 0;
+  const usingCustomCalorieGoal = Boolean(isCustomCalorieTarget && safePlannedIntake > 0);
+  // Dynamically follow the user's active profile target:
+  // - Custom slider override -> reflect the user's chosen personal calorie target immediately (no refresh needed)
+  // - Scientific default -> use the profile's computed TDEE
+  const calorieBurnGoal = usingCustomCalorieGoal
+    ? safePlannedIntake
+    : scientificTdee > 0
+    ? scientificTdee
+    : safePlannedIntake > 0
+    ? safePlannedIntake
+    : 2000;
+  const distanceGoalKm = 5;
+
+  const todayActiveBurn = Math.max(0, Number(metrics?.todayActiveCalories) || 0);
   const totalCaloriesBurned =
-    userBmr > 0 || metrics.todayActiveCalories > 0 ? userBmr + metrics.todayActiveCalories : 0;
+    baseDailyExpenditure > 0 || todayActiveBurn > 0 ? baseDailyExpenditure + todayActiveBurn : 0;
   const netCalorieBalance =
-    plannedCalorieIntake > 0 && totalCaloriesBurned > 0
-      ? plannedCalorieIntake - totalCaloriesBurned
+    safePlannedIntake > 0 && totalCaloriesBurned > 0
+      ? Math.round(safePlannedIntake - totalCaloriesBurned)
       : null;
 
   const handleConnectOAuth = async () => {
     sfx.playTap();
     stopLiveSyncWindow();
     setIsSyncing(true);
-    setStatusMessage('Đang mở cửa sổ kết nối tài khoản Google Fit...');
+    setErrorMessage('');
     try {
       const token = await wearableService.openGoogleFitAuthPopup();
-      setStatusMessage('Kết nối thành công! Đang đồng bộ trực tiếp dữ liệu từ Google Fit...');
-      const live = await wearableService.fetchGoogleFitLive(token);
+      const live: GoogleFitSyncResult = await wearableService.fetchGoogleFitLive(token, {
+        includeHistory: true,
+      });
+      if (Array.isArray(live?.dailyHistory) && live.dailyHistory.length > 0) {
+        setSelectedDateKey(live.dailyHistory[live.dailyHistory.length - 1].dateKey);
+      }
       sfx.playSuccess();
-      setStatusMessage(
-        `Kết nối thành công · Đang tự động Live Sync (${LIVE_SYNC_DURATION_SEC}s): ${formatSyncSummary(live)}.`
-      );
-      startAutoLiveSyncWindow(live, true);
+      startAutoLiveSyncWindow();
     } catch (err: any) {
       console.warn('OAuth connect info:', err);
-      setStatusMessage(
-        err.message || 'Không thể kết nối với tài khoản Google lúc này. Vui lòng thử lại sau.'
+      setErrorMessage(
+        err.message || 'Không thể kết nối tài khoản Google Fit lúc này. Vui lòng thử lại.',
       );
     } finally {
       setIsSyncing(false);
@@ -272,21 +456,15 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
     }
 
     stopLiveSyncWindow();
-    const beforeSnapshot = buildSnapshotFromMetrics(wearableService.getMetrics());
     setIsSyncing(true);
-    setStatusMessage('Đang đồng bộ trực tiếp từ Google Fit Cloud...');
+    setErrorMessage('');
     try {
-      const live = await wearableService.fetchGoogleFitLive(token);
-      const afterSnapshot = buildSnapshotFromResult(live);
-      const changedImmediately = afterSnapshot !== beforeSnapshot;
+      await wearableService.fetchGoogleFitLive(token, { includeHistory: true });
       sfx.playSuccess();
-      setStatusMessage(
-        `Đang tự động Live Sync (${LIVE_SYNC_DURATION_SEC}s) với Google Fit: ${formatSyncSummary(live)}.`
-      );
-      startAutoLiveSyncWindow(live, changedImmediately);
+      startAutoLiveSyncWindow();
     } catch (err: any) {
-      setStatusMessage(
-        err.message || 'Chưa thể cập nhật dữ liệu từ Google Fit. Vui lòng thử lại sau.'
+      setErrorMessage(
+        err.message || 'Chưa thể cập nhật dữ liệu từ Google Fit. Vui lòng thử lại sau.',
       );
     } finally {
       setIsSyncing(false);
@@ -296,19 +474,90 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
   const handleDisconnect = () => {
     sfx.playTap();
     stopLiveSyncWindow();
+    setErrorMessage('');
+    setSelectedDateKey('');
     wearableService.disconnect();
-    setStatusMessage('Đã ngắt liên kết và đặt lại dữ liệu Google Fit.');
   };
 
   const isAutoLiveSyncing = liveSyncSecondsLeft > 0;
+  const safeSteps = Math.max(0, Number(metrics?.steps) || 0);
+  const safeStepTarget = Math.max(1, Number(metrics?.stepTarget) || 10000);
+  const safeTotalCalories = Math.max(0, Number(metrics?.totalCaloriesExpended) || 0);
+  const safeActiveCalories = Math.max(0, Number(metrics?.activeCalories) || 0);
+  const safeDistanceKm = Math.max(0, Number(metrics?.distanceKm) || 0);
+  const safeActiveMinutes = Math.max(0, Number(metrics?.activeMinutes) || 0);
+  const safeHeartPoints = Math.max(0, Number(metrics?.heartPoints) || 0);
+  const showSyncedNumbers = Boolean(metrics?.isConnected && (metrics?.hasSyncedToday ?? metrics?.isTodayData));
+  const pendingSyncNote = metrics?.isConnected
+    ? isSyncing
+      ? 'Đang đồng bộ...'
+      : 'Bấm Đồng bộ ngay để cập nhật'
+    : 'Liên kết để đồng bộ';
+
+  const sevenDays = useMemo(() => {
+    const history = Array.isArray(metrics?.dailyHistory) ? metrics.dailyHistory : [];
+    if (metrics?.isConnected && history.length === 7) {
+      return history;
+    }
+    return buildFallbackSevenDaySkeleton(safeStepTarget);
+  }, [metrics?.isConnected, metrics?.dailyHistory, safeStepTarget]);
+
+  const activeDay = useMemo(() => {
+    const found = sevenDays.find(d => d.dateKey === selectedDateKey);
+    return found || sevenDays[sevenDays.length - 1];
+  }, [sevenDays, selectedDateKey]);
+
+  const chartGoalValue =
+    chartMetric === 'steps'
+      ? safeStepTarget
+      : chartMetric === 'calories'
+      ? calorieBurnGoal
+      : distanceGoalKm;
+
+  const maxChartValue = useMemo(() => {
+    const vals = sevenDays.map(d =>
+      chartMetric === 'steps'
+        ? d.steps
+        : chartMetric === 'calories'
+        ? d.totalCalories
+        : d.distanceKm,
+    );
+    const peak = Math.max(...vals, 0);
+    return Math.max(peak, chartGoalValue, 1);
+  }, [sevenDays, chartMetric, chartGoalValue]);
+
+  const goalsMetCount = useMemo(
+    () => sevenDays.filter(d => d.steps >= d.stepTarget).length,
+    [sevenDays],
+  );
+
+  const calorieGoalsMetCount = useMemo(
+    () => sevenDays.filter(d => d.totalCalories >= calorieBurnGoal).length,
+    [sevenDays, calorieBurnGoal],
+  );
+
+  const totalWeekSteps = useMemo(
+    () => sevenDays.reduce((sum, d) => sum + d.steps, 0),
+    [sevenDays],
+  );
+
+  const totalWeekDistanceKm = useMemo(
+    () => Math.round(sevenDays.reduce((sum, d) => sum + d.distanceKm, 0) * 100) / 100,
+    [sevenDays],
+  );
+
+  const selectedDayIntakeDelta =
+    activeDay && !activeDay.isToday && activeDay.totalCalories > 0 && safePlannedIntake > 0
+      ? Math.round(safePlannedIntake - activeDay.totalCalories)
+      : null;
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
-      {/* Top Banner: Connection & Unified Live Sync */}
+    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-start sm:items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shrink-0">
-            <Watch className="w-6 h-6" />
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shrink-0">
+            <Watch className="w-5 h-5" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -316,190 +565,42 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
                 Đồng Bộ Vận Động Google Fit
               </h2>
               <span
-                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border transition ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${
                   metrics.isConnected
-                    ? 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-emerald-300'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                 }`}
               >
                 <span
-                  className={`w-2 h-2 rounded-full ${
-                    metrics.isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    metrics.isConnected ? 'bg-emerald-500' : 'bg-slate-400'
                   }`}
                 />
-                {metrics.isConnected ? 'Đã liên kết Google Fit' : 'Chưa kết nối thiết bị'}
+                {metrics.isConnected ? 'Đã liên kết' : 'Chưa kết nối'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
               <span>
-                Nguồn đồng bộ:{' '}
-                <strong className="text-slate-700 dark:text-slate-200">{metrics.deviceModel}</strong> ·{' '}
-                {metrics.lastSyncedAt}
+                {metrics.isConnected ? (
+                  <>
+                    <strong className="text-slate-700 dark:text-slate-200 font-semibold">
+                      {metrics.deviceModel}
+                    </strong>{' '}
+                    · Cập nhật {metrics.lastSyncedAt}
+                  </>
+                ) : (
+                  'Kết nối Google Fit để theo dõi vận động hằng ngày'
+                )}
               </span>
               <button
                 type="button"
                 onClick={() => setShowHubInfo(prev => !prev)}
-                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800 transition"
-                title="Xem hướng dẫn kết nối cho Điện thoại & Thiết bị đeo (Apple Watch, Galaxy, Xiaomi, Garmin...)"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
               >
-                <Info className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>(i) Hướng dẫn kết nối thiết bị &amp; điện thoại</span>
+                <Info className="w-3.5 h-3.5" />
+                <span>Hướng dẫn kết nối</span>
               </button>
-            </p>
-            {showHubInfo && (
-              <div className="mt-3 p-4 rounded-2xl bg-emerald-50/95 dark:bg-slate-900 border border-emerald-300 dark:border-emerald-800 text-[11px] text-slate-800 dark:text-slate-200 shadow-md space-y-3 animate-in fade-in">
-                {/* Header */}
-                <div className="flex items-center justify-between font-extrabold text-xs border-b border-emerald-200 dark:border-slate-800 pb-2">
-                  <span className="flex items-center gap-1.5 text-emerald-900 dark:text-emerald-300">
-                    <Sparkles className="w-4 h-4 text-emerald-600" /> Hướng dẫn đồng bộ dữ liệu vận động qua Google Fit
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowHubInfo(false)}
-                    className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer px-1.5 py-0.5 rounded text-sm transition"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <p className="leading-relaxed text-slate-600 dark:text-slate-300">
-                  VEGEAI thống nhất 1 nguồn dữ liệu chuẩn duy nhất là <strong>Google Fit Cloud</strong> (tính từ 00:00 sáng nay, lấy trực tiếp các chỉ số Google Fit cập nhật chính xác: <em>Bước chân, Tổng tiêu hao calo, Quãng đường &amp; Phút vận động</em>). Bạn <strong>không bắt buộc</strong> phải có đồng hồ thông minh — hãy chọn thiết bị bạn đang dùng bên dưới:
-                </p>
-
-                {/* Device Selector Tabs */}
-                <div className="flex flex-wrap gap-1.5 border-b border-emerald-200 dark:border-slate-800 pb-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setActiveGuideTab('phone')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                      activeGuideTab === 'phone'
-                        ? 'bg-emerald-700 text-white shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-slate-700 border border-emerald-200 dark:border-slate-700'
-                    }`}
-                  >
-                    <Smartphone className="w-3.5 h-3.5" />
-                    <span>📱 Chỉ dùng Điện thoại</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveGuideTab('apple')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                      activeGuideTab === 'apple'
-                        ? 'bg-emerald-700 text-white shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-slate-700 border border-emerald-200 dark:border-slate-700'
-                    }`}
-                  >
-                    <Watch className="w-3.5 h-3.5" />
-                    <span>🍎 Apple Watch &amp; iOS</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveGuideTab('samsung')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                      activeGuideTab === 'samsung'
-                        ? 'bg-emerald-700 text-white shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-slate-700 border border-emerald-200 dark:border-slate-700'
-                    }`}
-                  >
-                    <Watch className="w-3.5 h-3.5" />
-                    <span>🔷 Samsung Galaxy Watch</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveGuideTab('xiaomi')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                      activeGuideTab === 'xiaomi'
-                        ? 'bg-emerald-700 text-white shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-slate-700 border border-emerald-200 dark:border-slate-700'
-                    }`}
-                  >
-                    <Watch className="w-3.5 h-3.5" />
-                    <span>🟠 Xiaomi / Amazfit / Redmi</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveGuideTab('garmin')}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
-                      activeGuideTab === 'garmin'
-                        ? 'bg-emerald-700 text-white shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-slate-700 border border-emerald-200 dark:border-slate-700'
-                    }`}
-                  >
-                    <Watch className="w-3.5 h-3.5" />
-                    <span>🏃 Garmin / Fitbit / Huawei / Khác</span>
-                  </button>
-                </div>
-
-                {/* Tab 1: Phone Only */}
-                {activeGuideTab === 'phone' && (
-                  <div className="space-y-2 animate-in fade-in">
-                    <div className="p-2.5 rounded-xl bg-emerald-100/70 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200 font-medium">
-                      💡 <strong>Không cần mua thêm vòng tay hay smartwatch!</strong> Mọi điện thoại đều có sẵn cảm biến chuyển động đếm bước chân, quãng đường và calo tiêu hao khi mang theo bên người.
-                    </div>
-                    <ol className="list-decimal pl-4 space-y-1 font-medium leading-relaxed">
-                      <li>Tải miễn phí app <strong>Google Fit</strong> từ <em>Google Play Store</em> hoặc <em>App Store</em>.</li>
-                      <li>Đăng nhập Google Fit bằng tài khoản Google của bạn và bật quyền <em>"Hoạt động thể chất"</em>.</li>
-                      <li>Trên VEGEAI, bấm <strong>"Liên kết Google Fit"</strong>. Mỗi khi bấm <strong>"Đồng bộ ngay"</strong>, hệ thống tự động Live Sync 15 giây với Google Fit Cloud để lấy số liệu mới nhất!</li>
-                    </ol>
-                  </div>
-                )}
-
-                {/* Tab 2: Apple Watch */}
-                {activeGuideTab === 'apple' && (
-                  <div className="space-y-2 animate-in fade-in">
-                    <p className="font-semibold text-emerald-900 dark:text-emerald-300">
-                      Đồng bộ từ Apple Watch qua Apple Health &gt; Google Fit:
-                    </p>
-                    <ol className="list-decimal pl-4 space-y-1 font-medium leading-relaxed">
-                      <li>Apple Watch tự đẩy dữ liệu bước chân và calo vào ứng dụng <strong>Apple Health (Sức khỏe)</strong> trên iPhone.</li>
-                      <li>Mở <strong>Google Fit</strong> trên iPhone và cấp quyền đọc dữ liệu từ <strong>Apple Health</strong>.</li>
-                      <li>Trên VEGEAI, bấm <strong>"Đồng bộ ngay"</strong> để kéo dữ liệu tổng hợp từ Google Fit Cloud.</li>
-                    </ol>
-                  </div>
-                )}
-
-                {/* Tab 3: Samsung Galaxy Watch */}
-                {activeGuideTab === 'samsung' && (
-                  <div className="space-y-2 animate-in fade-in">
-                    <p className="font-semibold text-emerald-900 dark:text-emerald-300">
-                      Đồng bộ từ Samsung Galaxy Watch qua Health Connect:
-                    </p>
-                    <ol className="list-decimal pl-4 space-y-1 font-medium leading-relaxed">
-                      <li>Mở <strong>Samsung Health</strong> &gt; Cài đặt &gt; <strong>Health Connect</strong>.</li>
-                      <li>Bật chia sẻ <em>Số bước, Quãng đường &amp; Calo</em> sang Health Connect, và cho phép <strong>Google Fit</strong> đọc từ Health Connect.</li>
-                      <li>Trên VEGEAI, bấm <strong>"Đồng bộ ngay"</strong> để lấy dữ liệu mới nhất từ Google Fit!</li>
-                    </ol>
-                  </div>
-                )}
-
-                {/* Tab 4: Xiaomi / Amazfit / Redmi */}
-                {activeGuideTab === 'xiaomi' && (
-                  <div className="space-y-2 animate-in fade-in">
-                    <p className="font-semibold text-emerald-900 dark:text-emerald-300">
-                      Dành cho Mi Band (7/8/9), Amazfit, Redmi Watch qua Health Connect → Google Fit:
-                    </p>
-                    <ol className="list-decimal pl-4 space-y-1 font-medium leading-relaxed">
-                      <li>Mở <strong>Mi Fitness</strong> hoặc <strong>Zepp / Zepp Life</strong> &gt; <strong>Hồ sơ</strong> &gt; <strong>Dữ liệu bên thứ ba / Health Connect</strong>.</li>
-                      <li>Bật đồng bộ sang <strong>Health Connect</strong> và cho phép <strong>Google Fit</strong> đọc dữ liệu vận động.</li>
-                      <li>Mỗi khi cần cập nhật mới, vuốt làm mới trong app <strong>Google Fit</strong> trên điện thoại rồi bấm <strong>"Đồng bộ ngay"</strong> trên VEGEAI (số liệu luôn khớp theo nguồn chuẩn Google Fit).</li>
-                    </ol>
-                  </div>
-                )}
-
-                {/* Tab 5: Garmin / Fitbit / Huawei / Other */}
-                {activeGuideTab === 'garmin' && (
-                  <div className="space-y-2 animate-in fade-in">
-                    <p className="font-semibold text-emerald-900 dark:text-emerald-300">
-                      Đồng bộ từ các thiết bị thể thao chuyên dụng khác:
-                    </p>
-                    <ul className="list-disc pl-4 space-y-1 font-medium leading-relaxed">
-                      <li><strong>Garmin / Fitbit / Huawei:</strong> Bật chia sẻ dữ liệu vận động sang <strong>Health Connect (Android)</strong> hoặc <strong>Apple Health (iOS)</strong>, sau đó liên kết vào <strong>Google Fit</strong>.</li>
-                      <li>VEGEAI chỉ lấy số liệu tổng hợp đã khử trùng lặp từ <strong>Google Fit Cloud</strong> để đảm bảo nhất quán đa thiết bị.</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -512,10 +613,10 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
                 disabled={isSyncing}
                 className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50 ${
                   isAutoLiveSyncing
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300 dark:ring-emerald-700'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300/70 dark:ring-emerald-700'
                     : 'bg-emerald-700 hover:bg-emerald-800 text-white'
                 }`}
-                title="Đồng bộ trực tiếp và tự động Live Sync với Google Fit Cloud trong 15 giây"
+                title="Đồng bộ số liệu mới nhất ngay tại thời điểm hiện tại"
               >
                 {isAutoLiveSyncing && !isSyncing ? (
                   <span className="w-2 h-2 rounded-full bg-white animate-ping" />
@@ -530,6 +631,17 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
                     : 'Đồng bộ ngay'}
                 </span>
               </button>
+              {isAutoLiveSyncing && (
+                <button
+                  type="button"
+                  onClick={stopLiveSyncWindow}
+                  className="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
+                  title="Dừng Live Sync sớm"
+                  aria-label="Dừng Live Sync sớm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleDisconnect}
@@ -545,7 +657,7 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
               type="button"
               onClick={handleConnectOAuth}
               disabled={isSyncing}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs cursor-pointer shadow-emerald-700/20"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-xs cursor-pointer shadow-emerald-700/20 disabled:opacity-50"
             >
               <Link2 className="w-4 h-4" />
               <span>{isSyncing ? 'Đang kết nối...' : 'Liên kết Google Fit'}</span>
@@ -554,131 +666,170 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         </div>
       </div>
 
-      {/* Status banner */}
-      {statusMessage && (
-        <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-200 flex items-center justify-between gap-3 animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{statusMessage}</span>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {isAutoLiveSyncing && (
-              <button
-                type="button"
-                onClick={() => {
-                  stopLiveSyncWindow();
-                  setStatusMessage(
-                    `Đã dừng Live Sync sớm lúc ${new Date().toLocaleTimeString('vi-VN')}. Bấm "Đồng bộ ngay" hoặc tải lại trang khi muốn cập nhật tiếp.`
-                  );
-                }}
-                className="text-slate-600 dark:text-slate-300 hover:underline font-bold text-[11px] cursor-pointer"
-              >
-                Dừng ({liveSyncSecondsLeft}s)
-              </button>
-            )}
+      {/* Collapsible Device Connection Guide (only opens on demand) */}
+      {showHubInfo && (
+        <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-slate-800/70 border border-emerald-200 dark:border-emerald-800/70 text-[11px] text-slate-800 dark:text-slate-200 space-y-3 animate-in fade-in">
+          <div className="flex items-center justify-between font-extrabold text-xs border-b border-emerald-200/80 dark:border-slate-700 pb-2">
+            <span className="flex items-center gap-1.5 text-emerald-900 dark:text-emerald-300">
+              <Sparkles className="w-4 h-4 text-emerald-600" /> Hướng dẫn kết nối thiết bị qua Google Fit
+            </span>
             <button
               type="button"
-              onClick={() => setStatusMessage('')}
-              className="text-emerald-700 dark:text-emerald-300 hover:underline font-bold text-[11px] cursor-pointer"
+              onClick={() => setShowHubInfo(false)}
+              className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer p-0.5 rounded transition"
+              aria-label="Đóng hướng dẫn"
             >
-              Đóng
+              <X className="w-4 h-4" />
             </button>
           </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                ['phone', 'Chỉ dùng Điện thoại', Smartphone],
+                ['apple', 'Apple Watch / iOS', Watch],
+                ['samsung', 'Samsung Galaxy', Watch],
+                ['xiaomi', 'Xiaomi / Amazfit', Watch],
+                ['garmin', 'Garmin / Fitbit / Khác', Watch],
+              ] as const
+            ).map(([key, label, Icon]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveGuideTab(key)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition cursor-pointer ${
+                  activeGuideTab === key
+                    ? 'bg-emerald-700 text-white shadow-xs'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-slate-700 border border-emerald-200/80 dark:border-slate-700'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {activeGuideTab === 'phone' && (
+            <ol className="list-decimal pl-4 space-y-1 font-medium leading-relaxed text-slate-700 dark:text-slate-300">
+              <li>Tải app <strong>Google Fit</strong> (Google Play / App Store) và đăng nhập tài khoản Google.</li>
+              <li>Bật quyền <em>Hoạt động thể chất</em> để điện thoại tự đếm bước chân, quãng đường và calo.</li>
+              <li>Bấm <strong>Liên kết Google Fit</strong> hoặc <strong>Đồng bộ ngay</strong> trên VEGEAI.</li>
+            </ol>
+          )}
+          {activeGuideTab === 'apple' && (
+            <ol className="list-decimal pl-4 space-y-1 font-medium leading-relaxed text-slate-700 dark:text-slate-300">
+              <li>Apple Watch tự đồng bộ bước chân và calo vào <strong>Apple Health</strong> trên iPhone.</li>
+              <li>Mở <strong>Google Fit</strong> trên iPhone và cấp quyền đọc dữ liệu từ <strong>Apple Health</strong>.</li>
+              <li>Bấm <strong>Đồng bộ ngay</strong> trên VEGEAI để cập nhật số liệu mới nhất.</li>
+            </ol>
+          )}
+          {activeGuideTab === 'samsung' && (
+            <ol className="list-decimal pl-4 space-y-1 font-medium leading-relaxed text-slate-700 dark:text-slate-300">
+              <li>Mở <strong>Samsung Health</strong> &gt; Cài đặt &gt; <strong>Health Connect</strong> và bật chia sẻ vận động.</li>
+              <li>Cho phép <strong>Google Fit</strong> đọc từ Health Connect, sau đó bấm <strong>Đồng bộ ngay</strong>.</li>
+            </ol>
+          )}
+          {activeGuideTab === 'xiaomi' && (
+            <ol className="list-decimal pl-4 space-y-1 font-medium leading-relaxed text-slate-700 dark:text-slate-300">
+              <li>Mở <strong>Mi Fitness</strong> / <strong>Zepp Life</strong> &gt; Hồ sơ &gt; <strong>Health Connect</strong> và bật đồng bộ.</li>
+              <li>Cho phép <strong>Google Fit</strong> đọc dữ liệu từ Health Connect, sau đó bấm <strong>Đồng bộ ngay</strong>.</li>
+            </ol>
+          )}
+          {activeGuideTab === 'garmin' && (
+            <p className="font-medium leading-relaxed text-slate-700 dark:text-slate-300">
+              Bật chia sẻ dữ liệu vận động sang <strong>Health Connect (Android)</strong> hoặc <strong>Apple Health (iOS)</strong>, liên kết vào <strong>Google Fit</strong> rồi bấm <strong>Đồng bộ ngay</strong>.
+            </p>
+          )}
         </div>
       )}
 
-      {metrics.isConnected && !metrics.isTodayData && metrics.steps > 0 && (
-        <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-center gap-2">
-          <Info className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>
-            Đang hiển thị dữ liệu <strong>{metrics.dataDateLabel || 'ngày trước'}</strong> (hôm nay chưa có bước chân mới trên Google Fit Cloud). Chỉ số ngày cũ chỉ để tham khảo, không cộng vào cân bằng calo hôm nay.
-          </span>
+      {/* Error-only alert (no noisy persistent sync banners) */}
+      {errorMessage && (
+        <div
+          role="alert"
+          className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-200 flex items-center justify-between gap-3 animate-in fade-in"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorMessage('')}
+            className="text-rose-700 dark:text-rose-300 hover:underline font-bold text-[11px] cursor-pointer shrink-0"
+          >
+            Đóng
+          </button>
         </div>
       )}
 
-      {/* Core Direct Google Fit Live-Sync Metric Cards (3 unified cards) */}
+      {/* Core Today Metrics (3 unified cards — exact live snapshot at sync time, including 0) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <MetricCard
-          title={
-            metrics.isTodayData || !metrics.dataDateLabel
-              ? 'Bước chân hôm nay'
-              : `Bước chân (${metrics.dataDateLabel})`
-          }
+          title="Bước chân hôm nay"
           icon={<Footprints className="w-4 h-4 text-emerald-600" />}
-          value={metrics.steps > 0 ? metrics.steps.toLocaleString('vi-VN') : null}
+          value={showSyncedNumbers ? safeSteps.toLocaleString('vi-VN') : null}
           unit="bước"
           valueClass="text-slate-900 dark:text-white"
           note={
-            metrics.steps > 0
-              ? `Mục tiêu ${metrics.stepTarget.toLocaleString('vi-VN')} bước (${Math.round(
-                  (metrics.steps / metrics.stepTarget) * 100
+            showSyncedNumbers
+              ? `Mục tiêu ${safeStepTarget.toLocaleString('vi-VN')} bước (${Math.round(
+                  (safeSteps / safeStepTarget) * 100,
                 )}%)`
-              : 'Chưa có dữ liệu bước chân từ Google Fit'
+              : pendingSyncNote
           }
         >
-          {metrics.steps > 0 && (
+          {showSyncedNumbers && (
             <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
               <div
                 className="bg-emerald-600 h-full rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(100, (metrics.steps / metrics.stepTarget) * 100)}%` }}
+                style={{ width: `${Math.min(100, (safeSteps / safeStepTarget) * 100)}%` }}
               />
             </div>
           )}
         </MetricCard>
 
         <MetricCard
-          title={
-            metrics.isTodayData || !metrics.dataDateLabel
-              ? 'Tổng tiêu hao (Google Fit)'
-              : `Tổng tiêu hao (${metrics.dataDateLabel})`
-          }
+          title="Tổng tiêu hao hôm nay"
           icon={<Flame className="w-4 h-4 text-amber-500" />}
-          value={
-            metrics.totalCaloriesExpended > 0
-              ? metrics.totalCaloriesExpended.toLocaleString('vi-VN')
-              : null
-          }
+          value={showSyncedNumbers ? safeTotalCalories.toLocaleString('vi-VN') : null}
           unit="kcal"
           valueClass="text-amber-500"
           note={
-            !metrics.isTodayData && metrics.totalCaloriesExpended > 0
-              ? `Ghi nhận ${metrics.dataDateLabel || 'ngày trước'} · Không cộng vào ngân sách hôm nay`
-              : metrics.totalCaloriesExpended > 0 && metrics.activeCalories > 0
-              ? `Khớp tổng tiêu hao app Google Fit (gồm BMR). Ước tách vận động: +${metrics.activeCalories.toLocaleString(
-                  'vi-VN'
-                )} kcal.`
-              : metrics.totalCaloriesExpended > 0
-              ? `Khớp tổng tiêu hao app Google Fit (gồm trao đổi chất cơ bản). ${
-                  userBmr === 0 ? 'Cập nhật BMR hồ sơ để tách calo vận động.' : ''
-                }`
-              : 'Chưa có dữ liệu tiêu hao từ Google Fit'
+            showSyncedNumbers
+              ? safeActiveCalories > 0
+                ? `Vận động: +${safeActiveCalories.toLocaleString('vi-VN')} kcal`
+                : 'Tính từ 00:00 hôm nay (gồm BMR)'
+              : pendingSyncNote
           }
         />
 
         <MetricCard
-          title="Quãng đường vận động"
+          title="Quãng đường hôm nay"
           icon={<Route className="w-4 h-4 text-cyan-600" />}
-          value={metrics.distanceKm > 0 ? metrics.distanceKm.toLocaleString('vi-VN') : null}
+          value={showSyncedNumbers ? safeDistanceKm.toLocaleString('vi-VN') : null}
           unit="km"
           valueClass="text-slate-900 dark:text-white"
           note={
-            metrics.distanceKm > 0 || metrics.activeMinutes > 0 || metrics.heartPoints > 0
-              ? 'Đồng bộ trực tiếp từ luồng vận động chuẩn của Google Fit'
-              : 'Chưa có dữ liệu quãng đường từ Google Fit'
+            showSyncedNumbers
+              ? safeActiveMinutes === 0 && safeHeartPoints === 0
+                ? 'Tính từ 00:00 hôm nay'
+                : undefined
+              : pendingSyncNote
           }
         >
-          {(metrics.activeMinutes > 0 || metrics.heartPoints > 0) && (
+          {showSyncedNumbers && (safeActiveMinutes > 0 || safeHeartPoints > 0) && (
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              {metrics.activeMinutes > 0 && (
+              {safeActiveMinutes > 0 && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border border-cyan-200/70 dark:border-cyan-800 text-[11px] font-bold">
                   <Timer className="w-3 h-3" />
-                  {metrics.activeMinutes} phút vận động
+                  {safeActiveMinutes} phút
                 </span>
               )}
-              {metrics.heartPoints > 0 && (
+              {safeHeartPoints > 0 && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-300 border border-rose-200/70 dark:border-rose-800 text-[11px] font-bold">
                   <Activity className="w-3 h-3" />
-                  {metrics.heartPoints} Heart Points
+                  {safeHeartPoints} Heart Pts
                 </span>
               )}
             </div>
@@ -686,18 +837,329 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
         </MetricCard>
       </div>
 
-      {/* AI Nutrition Advice Card */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 space-y-3">
-        <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
-          <Sparkles className="w-4 h-4 text-emerald-600" />
-          Tư vấn AI Dinh Dưỡng Thích Ứng (Adaptive Nutrition Engine)
+      {/* Last 7 Days Daily Goals & Activity Map (Google Fit "Your Daily Goals · Last 7 Days" style) */}
+      <section
+        aria-label="Lịch biểu vận động 7 ngày gần nhất"
+        className="p-4 sm:p-5 rounded-2xl bg-slate-50/90 dark:bg-[#182230] border border-slate-200/80 dark:border-slate-800 space-y-4"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100/80 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+              <CalendarDays className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                Mục tiêu hằng ngày · 7 ngày gần nhất
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {!metrics.isConnected ? (
+                  'Hiển thị bước chân, tiêu hao và quãng đường sau khi liên kết'
+                ) : chartMetric === 'calories' ? (
+                  <>
+                    {usingCustomCalorieGoal ? 'Mục tiêu tùy chỉnh:' : 'Mốc TDEE hồ sơ:'}{' '}
+                    <strong className="text-amber-600 dark:text-amber-400 tabular-nums">
+                      {calorieBurnGoal.toLocaleString('vi-VN')} kcal
+                    </strong>
+                    {' · '}
+                    <strong className="text-slate-700 dark:text-slate-200">
+                      {calorieGoalsMetCount}/7
+                    </strong>{' '}
+                    ngày đạt mốc
+                    {usingCustomCalorieGoal && scientificTdee > 0 && (
+                      <>
+                        {' · '}TDEE hồ sơ{' '}
+                        <strong className="text-slate-700 dark:text-slate-200 tabular-nums">
+                          {scientificTdee.toLocaleString('vi-VN')} kcal
+                        </strong>
+                      </>
+                    )}
+                    {!usingCustomCalorieGoal &&
+                      safePlannedIntake > 0 &&
+                      safePlannedIntake !== calorieBurnGoal && (
+                        <>
+                          {' · '}Nạp mục tiêu{' '}
+                          <strong className="text-slate-700 dark:text-slate-200 tabular-nums">
+                            {safePlannedIntake.toLocaleString('vi-VN')} kcal
+                          </strong>
+                        </>
+                      )}
+                  </>
+                ) : chartMetric === 'distance' ? (
+                  <>
+                    Mốc vận động{' '}
+                    <strong className="text-cyan-700 dark:text-cyan-400">
+                      {distanceGoalKm} km/ngày
+                    </strong>{' '}
+                    · Tổng 7 ngày{' '}
+                    <strong className="text-slate-700 dark:text-slate-200 tabular-nums">
+                      {totalWeekDistanceKm.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} km
+                    </strong>
+                  </>
+                ) : (
+                  <>
+                    <strong className="text-emerald-700 dark:text-emerald-400">
+                      {goalsMetCount}/7
+                    </strong>{' '}
+                    ngày đạt {safeStepTarget.toLocaleString('vi-VN')} bước · Tổng{' '}
+                    <strong className="text-slate-700 dark:text-slate-200 tabular-nums">
+                      {totalWeekSteps.toLocaleString('vi-VN')}
+                    </strong>{' '}
+                    bước
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {metrics.isConnected && (
+            <div className="inline-flex p-1 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700 self-start sm:self-auto">
+              {(
+                [
+                  ['steps', 'Bước chân'],
+                  ['calories', 'Tiêu hao'],
+                  ['distance', 'Quãng đường'],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    sfx.playTap();
+                    setChartMetric(key);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                    chartMetric === key
+                      ? key === 'steps'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : key === 'calories'
+                        ? 'bg-amber-500 text-white shadow-2xs'
+                        : 'bg-cyan-600 text-white shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-          {metrics.aiAdvice}
-        </p>
+
+        {/* 7-Day Visual Map (Bars + Concentric Daily Goal Rings) */}
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          {sevenDays.map(day => {
+            const isSelected = metrics.isConnected && activeDay?.dateKey === day.dateKey;
+            const val =
+              chartMetric === 'steps'
+                ? day.steps
+                : chartMetric === 'calories'
+                ? day.totalCalories
+                : day.distanceKm;
+            const barPct =
+              metrics.isConnected && val > 0
+                ? Math.min(100, Math.max(10, Math.round((val / maxChartValue) * 100)))
+                : 0;
+            const stepRatio = day.stepTarget > 0 ? day.steps / day.stepTarget : 0;
+            const calorieRatio = calorieBurnGoal > 0 ? day.totalCalories / calorieBurnGoal : 0;
+            const distanceRatio =
+              day.distanceKm > 0
+                ? day.distanceKm / distanceGoalKm
+                : day.activeMinutes > 0
+                ? day.activeMinutes / 30
+                : 0;
+            const goalMet = day.steps >= day.stepTarget;
+            const goalLinePct =
+              maxChartValue > chartGoalValue
+                ? Math.round((chartGoalValue / maxChartValue) * 100)
+                : null;
+
+            const barColorClass =
+              chartMetric === 'steps'
+                ? goalMet
+                  ? 'bg-emerald-600 dark:bg-emerald-400'
+                  : 'bg-emerald-500/85 dark:bg-emerald-500'
+                : chartMetric === 'calories'
+                ? calorieRatio >= 1
+                  ? 'bg-amber-600 dark:bg-amber-400'
+                  : 'bg-amber-500/85 dark:bg-amber-500'
+                : 'bg-cyan-500 dark:bg-cyan-400';
+
+            return (
+              <button
+                key={day.dateKey}
+                type="button"
+                disabled={!metrics.isConnected}
+                onClick={() => {
+                  sfx.playTap();
+                  setSelectedDateKey(day.dateKey);
+                }}
+                aria-pressed={isSelected}
+                className={`group flex flex-col items-center gap-1.5 p-1.5 sm:p-2.5 rounded-2xl border transition ${
+                  metrics.isConnected ? 'cursor-pointer' : 'cursor-default opacity-75'
+                } ${
+                  isSelected
+                    ? 'bg-white dark:bg-slate-800/95 border-emerald-400 dark:border-emerald-600 shadow-xs'
+                    : day.isToday && metrics.isConnected
+                    ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/70 dark:border-emerald-800/50 hover:bg-white dark:hover:bg-slate-800/70'
+                    : 'bg-transparent border-transparent hover:bg-white/80 dark:hover:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-700'
+                }`}
+              >
+                {/* Metric value above bar */}
+                <span
+                  className={`text-[10px] sm:text-[11px] font-bold tabular-nums leading-none truncate max-w-full ${
+                    !metrics.isConnected
+                      ? 'text-slate-300 dark:text-slate-600'
+                      : val > 0
+                      ? 'text-slate-700 dark:text-slate-200'
+                      : 'text-slate-400 dark:text-slate-500'
+                  }`}
+                >
+                  {metrics.isConnected ? formatCompactChartValue(chartMetric, day) : '—'}
+                </span>
+
+                {/* Vertical bar scaled against real daily target (Steps / TDEE / 5km) */}
+                <div className="relative w-2.5 sm:w-3.5 h-16 sm:h-[72px] rounded-full bg-slate-200/70 dark:bg-slate-800 flex items-end overflow-hidden">
+                  {goalLinePct !== null && (
+                    <span
+                      className="absolute inset-x-0 border-t border-dashed border-slate-400/70 dark:border-slate-500/70 pointer-events-none z-10"
+                      style={{ bottom: `${goalLinePct}%` }}
+                    />
+                  )}
+                  <div
+                    className={`w-full rounded-full transition-all duration-500 ${barColorClass}`}
+                    style={{ height: `${barPct}%` }}
+                  />
+                </div>
+
+                {/* 3-Ring Daily Goal Indicator (Steps · Calories/TDEE · Distance) */}
+                <DailyGoalRing
+                  stepRatio={stepRatio}
+                  calorieRatio={calorieRatio}
+                  distanceRatio={distanceRatio}
+                  goalMet={goalMet}
+                  muted={!metrics.isConnected}
+                  isSelected={isSelected}
+                />
+
+                {/* Day & Short Date */}
+                <div className="text-center leading-tight">
+                  <span
+                    className={`block text-[11px] font-extrabold ${
+                      day.isToday
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    {day.weekdayLabel}
+                  </span>
+                  <span className="block text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">
+                    {day.shortDateLabel}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Selected Day Breakdown Row + 3-Ring Legend */}
+        {metrics.isConnected && activeDay && (
+          <div className="pt-3 border-t border-slate-200/70 dark:border-slate-700/70 space-y-2.5 text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-extrabold text-slate-900 dark:text-white">
+                  {activeDay.fullWeekdayLabel}, {activeDay.shortDateLabel}
+                </span>
+                {activeDay.isToday && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 text-[10px] font-extrabold">
+                    Hôm nay
+                  </span>
+                )}
+                {activeDay.steps >= activeDay.stepTarget && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                    Đạt mục tiêu
+                  </span>
+                )}
+                {selectedDayIntakeDelta !== null && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums ${
+                      selectedDayIntakeDelta <= 0
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                    }`}
+                    title={`Đối chiếu mục tiêu nạp ${safePlannedIntake.toLocaleString('vi-VN')} kcal với tiêu hao thực tế Google Fit`}
+                  >
+                    So với nạp {safePlannedIntake.toLocaleString('vi-VN')}:{' '}
+                    {selectedDayIntakeDelta > 0
+                      ? `+${selectedDayIntakeDelta.toLocaleString('vi-VN')}`
+                      : selectedDayIntakeDelta.toLocaleString('vi-VN')}{' '}
+                    kcal
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-slate-600 dark:text-slate-300 tabular-nums">
+                <span className="inline-flex items-center gap-1">
+                  <Footprints className="w-3.5 h-3.5 text-emerald-600" />
+                  <strong className="text-slate-900 dark:text-white">
+                    {activeDay.steps.toLocaleString('vi-VN')}
+                  </strong>{' '}
+                  bước
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Flame className="w-3.5 h-3.5 text-amber-500" />
+                  <strong className="text-slate-900 dark:text-white">
+                    {activeDay.totalCalories.toLocaleString('vi-VN')}
+                  </strong>
+                  <span className="text-slate-400">
+                    /{calorieBurnGoal.toLocaleString('vi-VN')}
+                  </span>{' '}
+                  kcal
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Route className="w-3.5 h-3.5 text-cyan-600" />
+                  <strong className="text-slate-900 dark:text-white">
+                    {activeDay.distanceKm.toLocaleString('vi-VN')}
+                  </strong>{' '}
+                  km
+                </span>
+                {activeDay.activeMinutes > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-cyan-700 dark:text-cyan-300 font-semibold">
+                    <Timer className="w-3 h-3" />
+                    {activeDay.activeMinutes} phút
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-400 dark:text-slate-500">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                Vòng ngoài: Bước chân ({safeStepTarget.toLocaleString('vi-VN')})
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                Vòng giữa: Tiêu hao / {usingCustomCalorieGoal ? 'Mục tiêu' : 'TDEE'} (
+                {calorieBurnGoal.toLocaleString('vi-VN')} kcal)
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-500" />
+                Vòng trong: Quãng đường ({distanceGoalKm} km)
+              </span>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Compact Nutrition Advice & Calorie Balance Footer */}
+      <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-800/60 space-y-2.5">
+        <div className="flex items-start gap-2.5">
+          <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+            {metrics.aiAdvice}
+          </p>
+        </div>
         <div className="pt-2 border-t border-emerald-200/50 dark:border-emerald-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-400">
           <span>
-            Gợi ý bữa phụ hồi phục:{' '}
+            Gợi ý bữa phụ:{' '}
             <strong className="text-emerald-800 dark:text-emerald-300 font-bold">
               {metrics.recommendedSnack}
             </strong>
@@ -715,96 +1177,10 @@ export const WearableGoogleFitTracker: React.FC<WearableTrackerProps> = ({
                 {netCalorieBalance > 0 ? `+${netCalorieBalance}` : netCalorieBalance} kcal
               </strong>
             ) : (
-              <span className="text-slate-400 font-normal">Chưa đủ dữ liệu</span>
+              <span className="text-slate-400 font-normal">Chưa thiết lập mục tiêu</span>
             )}
           </span>
         </div>
-      </div>
-
-      {/* Collapsible Architecture Explanation */}
-      <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-        <button
-          type="button"
-          onClick={() => setShowArchitectureGuide(prev => !prev)}
-          className="w-full flex items-center justify-between text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-400 transition cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-600" />
-            Xem cơ chế thống nhất nguồn dữ liệu Google Fit &amp; Live Sync 15 giây
-          </span>
-          {showArchitectureGuide ? (
-            <ChevronUp className="w-4 h-4" />
-          ) : (
-            <ChevronDown className="w-4 h-4" />
-          )}
-        </button>
-
-        {showArchitectureGuide && (
-          <div className="mt-4 p-5 rounded-2xl bg-slate-50 dark:bg-[#182230] border border-slate-200 dark:border-slate-700 space-y-4 text-xs text-slate-600 dark:text-slate-300 animate-in fade-in">
-            <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-              Sơ đồ luồng dữ liệu thống nhất qua Google Fit (Single Source of Truth):
-            </h4>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-center">
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 mx-auto flex items-center justify-center font-bold">
-                  1
-                </div>
-                <strong className="block text-slate-900 dark:text-white font-bold">
-                  Thiết bị thu thập
-                </strong>
-                <p className="text-[11px] text-slate-400">
-                  Điện thoại di động, Apple Watch, Galaxy Watch, Xiaomi Band, Garmin, Fitbit...
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 mx-auto flex items-center justify-center font-bold">
-                  2
-                </div>
-                <strong className="block text-slate-900 dark:text-white font-bold">
-                  Cầu nối hệ sinh thái
-                </strong>
-                <p className="text-[11px] text-slate-400">
-                  Mi Fitness, Samsung Health, Apple Health đẩy dữ liệu vào Health Connect / Google Fit
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 mx-auto flex items-center justify-center font-bold">
-                  3
-                </div>
-                <strong className="block text-slate-900 dark:text-white font-bold">
-                  Google Fit Cloud
-                </strong>
-                <p className="text-[11px] text-slate-400">
-                  Gộp &amp; khử trùng lặp Bước chân, Tổng calo tiêu hao, Quãng đường chuẩn 1-1
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-1">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 mx-auto flex items-center justify-center font-bold">
-                  4
-                </div>
-                <strong className="block text-slate-900 dark:text-white font-bold">
-                  VEGEAI Live Sync
-                </strong>
-                <p className="text-[11px] text-slate-400">
-                  Kéo ngay &amp; tự động Live Sync 15 giây mỗi lần bấm đồng bộ, tự làm mới khi tải lại trang
-                </p>
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
-              <strong className="text-slate-900 dark:text-white block font-bold">
-                Vì sao số liệu trên VEGEAI đối chiếu chuẩn theo Google Fit thay vì từng app đồng hồ riêng lẻ?
-              </strong>
-              <p className="leading-relaxed text-[11px]">
-                Mỗi hãng đồng hồ (như Mi Fitness) chỉ đếm khi đeo tay và chỉ hiển thị calo tập luyện, đồng thời không đồng bộ đầy đủ nhịp tim/SpO₂ sang Google Fit. Google Fit đóng vai trò <strong>nguồn chuẩn hợp nhất</strong> (gộp cả cảm biến điện thoại + vòng tay và tự khử trùng lặp), giúp VEGEAI hiển thị chính xác <strong>Bước chân, Tổng tiêu hao calo và Quãng đường</strong> đồng nhất trên mọi thiết bị.
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -50,6 +50,14 @@ const ALLERGIES_LIST = [
   'Nấm hương'
 ];
 
+const ACTIVITY_MULTIPLIERS: Record<string, number> = {
+  SEDENTARY: 1.2,
+  LIGHT: 1.375,
+  MODERATE: 1.55,
+  ACTIVE: 1.725,
+  VERY_ACTIVE: 1.9,
+};
+
 const RESERVED_USERNAMES = new Set([
   'admin', 'administrator', 'root', 'system', 'support',
   'vegeai', 'moderator', 'staff', 'null', 'undefined',
@@ -255,9 +263,12 @@ export const AccountSettingsPage: React.FC = () => {
       const effectiveHeight = updated.heightCm ?? (heightCm !== '' ? Number(heightCm) : nutrition?.heightCm);
       const effectiveWeight = updated.weightKg ?? (weightKg !== '' ? Number(weightKg) : nutrition?.weightKg);
 
+      let latestDailyTarget = updated.dailyCalorieTarget;
       if (effectiveGender && effectiveDob && effectiveHeight && effectiveWeight) {
         try {
-          await nutritionService.saveProfile({
+          const normalizedNutritionDiet =
+            dietaryPreferences === 'OVO_LACTO' ? 'LACTO_OVO' : dietaryPreferences || undefined;
+          const savedNutrition = await nutritionService.saveProfile({
             gender: effectiveGender,
             dateOfBirth: effectiveDob,
             heightCm: effectiveHeight,
@@ -265,13 +276,15 @@ export const AccountSettingsPage: React.FC = () => {
             activityLevel: nutrition?.activityLevel || 'MODERATE',
             goal: nutrition?.goal || 'MAINTAIN',
             phoneNumber: updated.phoneNumber || undefined,
-            dietaryPreferences: dietaryPreferences || undefined,
+            dietaryPreferences: normalizedNutritionDiet,
             allergies: selectedAllergies.join(',') || undefined,
             customDailyCalories: dailyCalorieTarget !== '' ? Number(dailyCalorieTarget) : null,
           });
-          const fresh = await nutritionService.getProfile();
-          setNutrition(fresh);
-          setDailyCalorieTarget(fresh.targets.customCalorieTarget ? fresh.targets.dailyCaloriesTarget : '');
+          setNutrition(savedNutrition);
+          setDailyCalorieTarget(
+            savedNutrition.targets.customCalorieTarget ? savedNutrition.targets.dailyCaloriesTarget : ''
+          );
+          latestDailyTarget = savedNutrition.targets.dailyCaloriesTarget;
         } catch (err) {
           console.warn('Could not sync nutrition profile:', err);
         }
@@ -279,9 +292,13 @@ export const AccountSettingsPage: React.FC = () => {
         const fresh = await nutritionService.getProfile();
         setNutrition(fresh);
         setDailyCalorieTarget(fresh.targets.customCalorieTarget ? fresh.targets.dailyCaloriesTarget : '');
+        latestDailyTarget = fresh.targets.dailyCaloriesTarget;
       }
       try {
-        localStorage.setItem('vegeai_user_profile', JSON.stringify(updated));
+        localStorage.setItem(
+          'vegeai_user_profile',
+          JSON.stringify({ ...updated, dailyCalorieTarget: latestDailyTarget }),
+        );
         window.dispatchEvent(new Event('user_profile_updated'));
       } catch {}
       sfx.playSuccess();
@@ -512,20 +529,30 @@ export const AccountSettingsPage: React.FC = () => {
 
   // Deterministic BMR & TDEE Calculations
   const hasPhysicalStats = Boolean(hNum > 0 && wNum > 0);
-  // Server targets use the saved activity level and goal; the local estimate is only for users without a profile.
+  // Server targets use the saved activity level and goal; recompute live when body fields change in the form.
   const serverTargets = nutrition?.targets;
+  const bodyMatchesSavedNutrition = Boolean(
+    nutrition &&
+      hNum === Number(nutrition.heightCm) &&
+      wNum === Number(nutrition.weightKg) &&
+      (!dateOfBirth || dateOfBirth === nutrition.dateOfBirth) &&
+      (!gender || gender === 'OTHER' || gender === nutrition.gender),
+  );
   const bmr = useMemo(() => {
-    if (serverTargets) return Math.round(serverTargets.bmr);
+    if (serverTargets && bodyMatchesSavedNutrition) return Math.round(serverTargets.bmr);
     if (hasPhysicalStats) {
-      return calculateBmr(wNum, hNum, age, (gender as any) || 'OTHER');
+      const effectiveGender =
+        gender === 'MALE' || gender === 'FEMALE' ? gender : nutrition?.gender || 'OTHER';
+      return calculateBmr(wNum, hNum, age, effectiveGender);
     }
     return 0;
-  }, [serverTargets, hasPhysicalStats, hNum, wNum, age, gender]);
+  }, [serverTargets, bodyMatchesSavedNutrition, hasPhysicalStats, hNum, wNum, age, gender, nutrition?.gender]);
 
   const tdee = useMemo(() => {
-    if (serverTargets) return Math.round(serverTargets.tdee);
-    return bmr > 0 ? calculateTdee(bmr, 1.375) : 0;
-  }, [serverTargets, bmr]);
+    if (serverTargets && bodyMatchesSavedNutrition) return Math.round(serverTargets.tdee);
+    const mult = ACTIVITY_MULTIPLIERS[nutrition?.activityLevel || ''] || 1.375;
+    return bmr > 0 ? calculateTdee(bmr, mult) : 0;
+  }, [serverTargets, bodyMatchesSavedNutrition, bmr, nutrition?.activityLevel]);
 
   // Smart Default Calorie: if user leaves it blank, auto-assign scientific TDEE / BMR
   const defaultScientificCalorie = useMemo(() => {
@@ -1502,6 +1529,8 @@ export const AccountSettingsPage: React.FC = () => {
         <WearableGoogleFitTracker
           plannedCalorieIntake={calorieInput}
           userBmr={bmr}
+          userTdee={tdee}
+          isCustomCalorieTarget={!isUsingDefaultCalorie}
           onSyncMetrics={(m) => setWearableKcal(m.calories)}
         />
 

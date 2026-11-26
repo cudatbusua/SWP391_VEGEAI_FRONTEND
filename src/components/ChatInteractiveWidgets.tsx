@@ -14,6 +14,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { HealthActivityRings } from './HealthActivityRings';
+import { useTodayDailyIntake } from '../hooks/useTodayDailyIntake';
 import type { ScheduledDayPlan } from '../data/weeklyScheduleData';
 import { sfx } from '../utils/soundEffects';
 import { wearableService } from '../utils/wearableService';
@@ -272,6 +273,8 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [liveMetrics, setLiveMetrics] = useState<WearableMetrics>(() => wearableService.getMetrics());
   const [serverTargets, setServerTargets] = useState<NutritionTargets | null>(null);
+  const [profileSyncCount, setProfileSyncCount] = useState(0);
+  const todayIntake = useTodayDailyIntake(hasSession());
 
   // Signed-in members get the same server-calculated targets as their profile and dashboard.
   useEffect(() => {
@@ -279,8 +282,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
     const controller = new AbortController();
     nutritionService.getProfile(controller.signal).then(p => setServerTargets(p.targets)).catch(() => {});
     return () => controller.abort();
-  }, []);
-  const [, setProfileSyncCount] = useState(0);
+  }, [profileSyncCount]);
 
   useEffect(() => {
     const handleWearableUpdate = () => {
@@ -337,33 +339,55 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 
   const effectiveFiberTarget = serverTargets ? Math.round(serverTargets.fiberTargetG) : (effectiveCalorieTarget > 0 ? 35 : 0);
 
-  // Active calories from wearable / live sync (today only, exact snapshot at sync time)
+  // Active burn from Google Fit (today only, exact snapshot at sync time)
   const currentActiveKcal = liveMetrics.hasSyncedToday
     ? liveMetrics.todayActiveCalories
     : liveMetrics.todayActiveCalories > 0
     ? liveMetrics.todayActiveCalories
-    : (card.calories === 1420 ? 0 : (card.calories > 0 ? card.calories : card.wearableKcal));
+    : Math.max(0, Number(card.wearableKcal) || 0);
 
   const currentSteps = liveMetrics.hasSyncedToday
     ? liveMetrics.steps
-    : (liveMetrics.steps > 0 ? liveMetrics.steps : card.steps);
+    : liveMetrics.steps > 0
+    ? liveMetrics.steps
+    : card.steps;
   const currentTotalKcal = liveMetrics.hasSyncedToday
     ? liveMetrics.totalCaloriesExpended
     : liveMetrics.totalCaloriesExpended > 0
     ? liveMetrics.totalCaloriesExpended
-    : (card.totalCalories || 0);
+    : card.totalCalories || 0;
   const currentDistanceKm = liveMetrics.hasSyncedToday
     ? liveMetrics.distanceKm
     : liveMetrics.distanceKm > 0
     ? liveMetrics.distanceKm
-    : (card.distanceKm || 0);
+    : card.distanceKm || 0;
   const isConnected = liveMetrics.isConnected || card.isConnected;
   const lastSyncedAt = liveMetrics.lastSyncedAt || card.lastSyncedAt;
   const currentAdvice = liveMetrics.aiAdvice || card.advice;
 
-  // Clean protein and fiber intake (if 58 or 30 from old hardcoded mock, reset to 0 unless custom tracked)
-  const currentProteinGrams = card.proteinGrams === 58 ? 0 : (card.proteinGrams || 0);
-  const currentFiberGrams = card.fiberGrams === 30 ? 0 : (card.fiberGrams || 0);
+  // Real today meal intake from GET /api/meal-plans/intake?date=today
+  const currentIntakeCalories = todayIntake.loaded
+    ? Math.round(todayIntake.totals.calories)
+    : card.calories === 1420
+    ? 0
+    : Math.max(0, Math.round(card.calories || 0));
+  const currentProteinGrams = todayIntake.loaded
+    ? Math.round(todayIntake.totals.protein)
+    : card.proteinGrams === 58
+    ? 0
+    : Math.max(0, Math.round(card.proteinGrams || 0));
+  const currentFiberGrams = todayIntake.loaded
+    ? Math.round(todayIntake.totals.fiber)
+    : card.fiberGrams === 30
+    ? 0
+    : Math.max(0, Math.round(card.fiberGrams || 0));
+
+  const recent7Days =
+    isConnected && Array.isArray(liveMetrics.dailyHistory) && liveMetrics.dailyHistory.length === 7
+      ? liveMetrics.dailyHistory
+      : [];
+  const total7DaySteps = recent7Days.reduce((sum, d) => sum + d.steps, 0);
+  const max7DaySteps = Math.max(...recent7Days.map(d => d.steps), 10000);
 
   const handleSyncClick = async () => {
     sfx.playTap();
@@ -377,19 +401,23 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
 
   const handleAskAdvice = () => {
     sfx.playTap();
+    const intakePart =
+      todayIntake.loaded && currentIntakeCalories > 0
+        ? `Hôm nay đã nạp ${currentIntakeCalories.toLocaleString('vi-VN')}/${effectiveCalorieTarget.toLocaleString('vi-VN')} kcal (${currentProteinGrams}g đạm, ${currentFiberGrams}g chất xơ). `
+        : `Hôm nay chưa ghi nhận bữa ăn (mục tiêu ${effectiveCalorieTarget.toLocaleString('vi-VN')} kcal, ${effectiveProteinTarget}g đạm, ${effectiveFiberTarget}g chất xơ). `;
     const distanceText =
       currentDistanceKm > 0 ? `, Quãng đường: ${currentDistanceKm.toLocaleString('vi-VN')} km` : '';
     const kcalText =
       currentTotalKcal > 0
         ? `Tổng tiêu hao Google Fit: ${currentTotalKcal.toLocaleString('vi-VN')} kcal`
         : `Calo vận động: ${currentActiveKcal} kcal`;
-    const prompt = `Dựa vào dữ liệu Google Fit hôm nay của tôi (Bước chân: ${currentSteps.toLocaleString('vi-VN')}, ${kcalText}${distanceText}), Bếp trưởng hãy tư vấn thực đơn bữa tối chay để bù đắp năng lượng và hồi phục cơ bắp tối ưu nhé!`;
+    const prompt = `${intakePart}Dữ liệu vận động Google Fit hôm nay: ${currentSteps.toLocaleString('vi-VN')} bước, ${kcalText}${distanceText}. Bếp trưởng hãy gợi ý thực đơn bữa tối chay cân đối năng lượng và đạm thực vật nhé!`;
     onAskAiAdvice?.(prompt);
   };
 
   return (
     <div className="mt-3.5 rounded-2xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-[#182230] p-4 sm:p-5 shadow-sm space-y-4 text-slate-800 dark:text-slate-100 animate-in fade-in">
-      {/* Header */}
+      {/* Single Unified Header (no duplicated inner Zen Rings header) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-emerald-100 dark:border-emerald-800">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-500 via-emerald-500 to-cyan-500 p-0.5 flex items-center justify-center shrink-0">
@@ -399,13 +427,13 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
           </div>
           <div>
             <h4 className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200 uppercase tracking-wide flex items-center gap-2">
-              <span>Vòng Ring Hoạt Động &amp; Thể Trạng</span>
+              <span>Tiến độ Dinh dưỡng &amp; Vận động</span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
                 Zen Rings
               </span>
             </h4>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Đo lường tiến độ calo, đạm thực vật và dữ liệu vòng đeo tay Google Fit
+              Dinh dưỡng thực tế hôm nay (Calo · Đạm · Chất xơ) &amp; vận động Google Fit
             </p>
           </div>
         </div>
@@ -416,7 +444,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
             onClick={handleSyncClick}
             disabled={isSyncing}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-100 transition cursor-pointer disabled:opacity-50"
-            title="Đồng bộ bước chân & calo từ Google Fit"
+            title="Đồng bộ bước chân & tiêu hao từ Google Fit"
           >
             <RotateCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ Google Fit'}</span>
@@ -424,15 +452,18 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
         </div>
       </div>
 
-      {/* Embedded Concentric Rings Component */}
+      {/* Embedded Concentric Nutrition Rings (Real Daily Intake — single clean header) */}
       <div className="bg-slate-50 dark:bg-slate-900/60 rounded-2xl p-2 border border-slate-200/80 dark:border-slate-800">
         <HealthActivityRings
-          calories={currentActiveKcal > 0 ? currentActiveKcal : 0}
+          calories={currentIntakeCalories}
           calorieTarget={effectiveCalorieTarget}
+          activeBurnBonus={currentActiveKcal}
           proteinGrams={currentProteinGrams}
           proteinTarget={effectiveProteinTarget}
           fiberGrams={currentFiberGrams}
           fiberTarget={effectiveFiberTarget}
+          recordedMealsCount={todayIntake.recordedMealsCount}
+          intakeLoaded={todayIntake.loaded}
           heightCm={hNum || ''}
           weightKg={wNum || ''}
           age={age}
@@ -440,18 +471,25 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
           bmr={bmr}
           tdee={tdee}
           compact={true}
+          hideHeader={true}
           showDetails={true}
         />
       </div>
 
-      {/* Wearable Live Metrics Strip */}
+      {/* Google Fit Activity Today + Compact 7-Day Strip */}
       <div className="p-3.5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border border-emerald-500/30 space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
             <Watch className="w-4 h-4 text-emerald-400" />
-            <strong className="font-bold text-white text-xs">Dữ liệu thiết bị thông minh (Google Fit / Smartband):</strong>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isConnected ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-300 border border-slate-700'}`}>
-              {isConnected ? '🟢 Đã liên kết' : 'Chưa liên kết'}
+            <strong className="font-bold text-white text-xs">Vận động Google Fit hôm nay</strong>
+            <span
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                isConnected
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  : 'bg-slate-800 text-slate-300 border border-slate-700'
+              }`}
+            >
+              {isConnected ? 'Đã liên kết' : 'Chưa liên kết'}
             </span>
           </div>
           <span className="text-[10px] text-slate-400">Cập nhật: {lastSyncedAt}</span>
@@ -462,7 +500,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
             <span className="text-[10px] text-slate-400 block flex items-center justify-center gap-1">
               <Footprints className="w-3 h-3 text-cyan-400" /> Bước chân
             </span>
-            <strong className="text-sm sm:text-base font-extrabold text-white block mt-0.5">
+            <strong className="text-sm sm:text-base font-extrabold text-white block mt-0.5 tabular-nums">
               {currentSteps.toLocaleString('vi-VN')}
             </strong>
           </div>
@@ -471,7 +509,7 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
             <span className="text-[10px] text-slate-400 block flex items-center justify-center gap-1">
               <Flame className="w-3 h-3 text-amber-400" /> Tổng tiêu hao
             </span>
-            <strong className="text-sm sm:text-base font-extrabold text-amber-300 block mt-0.5">
+            <strong className="text-sm sm:text-base font-extrabold text-amber-300 block mt-0.5 tabular-nums">
               {liveMetrics.hasSyncedToday || currentTotalKcal > 0
                 ? currentTotalKcal.toLocaleString('vi-VN')
                 : `+${currentActiveKcal.toLocaleString('vi-VN')}`}{' '}
@@ -483,13 +521,58 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
             <span className="text-[10px] text-slate-400 block flex items-center justify-center gap-1">
               <Route className="w-3 h-3 text-emerald-400" /> Quãng đường
             </span>
-            <strong className="text-sm sm:text-base font-extrabold text-emerald-300 block mt-0.5">
+            <strong className="text-sm sm:text-base font-extrabold text-emerald-300 block mt-0.5 tabular-nums">
               {liveMetrics.hasSyncedToday || currentDistanceKm > 0
                 ? `${currentDistanceKm.toLocaleString('vi-VN')} km`
                 : '—'}
             </strong>
           </div>
         </div>
+
+        {/* Compact 7-day Google Fit overview matching Account Settings */}
+        {recent7Days.length === 7 && (
+          <div className="pt-2.5 border-t border-white/10 space-y-2">
+            <div className="flex items-center justify-between text-[10px] text-slate-400">
+              <span>7 ngày gần nhất</span>
+              <span className="tabular-nums text-slate-300 font-semibold">
+                Tổng {total7DaySteps.toLocaleString('vi-VN')} bước
+              </span>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5 text-center">
+              {recent7Days.map(day => {
+                const pct =
+                  day.steps > 0
+                    ? Math.min(100, Math.max(14, Math.round((day.steps / max7DaySteps) * 100)))
+                    : 0;
+                return (
+                  <div
+                    key={day.dateKey}
+                    className={`flex flex-col items-center gap-1 py-1 rounded-lg ${
+                      day.isToday ? 'bg-emerald-500/15 ring-1 ring-emerald-500/40' : ''
+                    }`}
+                    title={`${day.fullWeekdayLabel} ${day.shortDateLabel}: ${day.steps.toLocaleString('vi-VN')} bước · ${day.totalCalories.toLocaleString('vi-VN')} kcal · ${day.distanceKm.toLocaleString('vi-VN')} km`}
+                  >
+                    <div className="w-1.5 h-7 rounded-full bg-white/10 flex items-end overflow-hidden">
+                      <div
+                        className={`w-full rounded-full ${
+                          day.steps >= day.stepTarget ? 'bg-emerald-400' : 'bg-cyan-400/85'
+                        }`}
+                        style={{ height: `${pct}%` }}
+                      />
+                    </div>
+                    <span
+                      className={`text-[9px] font-bold leading-none ${
+                        day.isToday ? 'text-emerald-300' : 'text-slate-400'
+                      }`}
+                    >
+                      {day.weekdayLabel}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* AI Advice Callout & Interactive Action */}
@@ -504,14 +587,14 @@ export const ChatActivityRingsView: React.FC<ChatActivityRingsViewProps> = ({
             className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 hover:underline cursor-pointer"
           >
             <ChefHat className="w-3.5 h-3.5" />
-            <span>Nhờ Bếp trưởng cân đối bữa tối theo vòng Ring này →</span>
+            <span>Nhờ Bếp trưởng cân đối bữa tối theo tiến độ hôm nay →</span>
           </button>
 
           <Link
             to="/settings?tab=profile"
             className="text-[11px] font-semibold text-slate-500 hover:text-emerald-700 dark:hover:text-emerald-300 underline"
           >
-            Mở Cài đặt Hồ sơ &amp; Thiết bị
+            Mở Cài đặt Hồ sơ &amp; Google Fit
           </Link>
         </div>
       </div>

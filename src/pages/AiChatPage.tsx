@@ -175,7 +175,7 @@ function SafeChatBubbleImage({ src }: { src: string }) {
 const DEFAULT_SUGGESTIONS = [
   { icon: Sparkles, title: '⭕ Hiện vòng Ring & Thể trạng hôm nay', text: 'Hãy hiển thị vòng Ring hoạt động, tiến độ calo và thể trạng dinh dưỡng của tôi ngay trong đoạn chat này.' },
   { icon: Sparkles, title: '📅 Gửi lịch biểu thực đơn 7 ngày tương tác', text: 'Hãy gửi cho tôi một lịch biểu thực đơn 7 ngày hoàn chỉnh có thể tương tác bấm chọn từng ngày và xem chi tiết các bữa ngay trong chat.' },
-  { icon: Sparkles, title: '⌚ Đồng bộ thiết bị đeo & Google Fit', text: 'Tôi muốn kiểm tra và đồng bộ dữ liệu vòng đeo tay Google Fit (bước chân, calo vận động) trên VEGEAI. Bếp trưởng hãy giải thích ý nghĩa các chỉ số trên vòng Zen Rings và cách hệ thống tự động cân đối dinh dưỡng thích ứng theo mức vận động nhé!' },
+  { icon: Sparkles, title: '⌚ Đồng bộ thiết bị đeo & Google Fit', text: 'Tôi muốn kiểm tra và đồng bộ dữ liệu Google Fit (bước chân, tổng tiêu hao, quãng đường) trên VEGEAI. Bếp trưởng hãy giải thích ý nghĩa 3 vòng tiến độ dinh dưỡng Zen Rings và cách hệ thống cân đối thực đơn theo mức vận động nhé!' },
   { icon: Soup, title: '🥗 Món ngon từ kho tủ lạnh', text: 'CHECK_FRIDGE_AUTO' },
 ];
 function formatTime(timestamp: number | string): string {
@@ -1120,7 +1120,7 @@ export function AiChatPage() {
         const w = wearableService.getMetrics();
 
         attachedRingsCard = {
-          calories: w.todayActiveCalories > 0 ? w.todayActiveCalories : 0,
+          calories: 0,
           calorieTarget: effectiveCalorieTarget,
           proteinGrams: 0,
           proteinTarget: effectiveProteinTarget,
@@ -1148,14 +1148,14 @@ export function AiChatPage() {
         replyText = replyText.replace(/tính năng đồng bộ dữ liệu thời gian thực từ thiết bị đeo.*khung chat này\.?/gi, '').trim();
         replyText = replyText.replace(/mình hỗ trợ các chủ đề về ăn chay, công thức và tính năng của vegeai\.? bạn có muốn tìm một món chay phù hợp hôm nay không\??/gi, '').trim();
         if (!replyText || replyText.length < 20) {
-          replyText = 'Hệ thống VEGEAI hỗ trợ kết nối trực tiếp với Google Fit và các thiết bị đeo thông minh (Xiaomi Band, Apple Watch, Smartband...) một cách an toàn và bảo mật. Các chỉ số bước chân và calo tiêu hao vận động sẽ được tự động cập nhật vào vòng Zen Rings để Bếp trưởng cân bằng lại thực đơn thích ứng cho bạn. Bạn có thể bấm nút **"Đồng bộ Google Fit"** ngay trên thẻ bên dưới hoặc mở mục **"Hồ sơ & Thể trạng"** để hoàn tất liên kết tài khoản.';
+          replyText = 'VEGEAI hỗ trợ kết nối trực tiếp với **Google Fit** (từ điện thoại hoặc thiết bị đeo thông minh) để lấy số bước chân, tổng tiêu hao và quãng đường thực tế, kết hợp cùng **biểu đồ 3 vòng Zen Rings** theo dõi tiến độ dinh dưỡng hôm nay (Đỏ: Calo nạp · Xanh lá: Đạm thực vật · Xanh lam: Chất xơ). Bạn có thể bấm **"Đồng bộ Google Fit"** ngay trên thẻ bên dưới hoặc mở **"Hồ sơ & Thể trạng"** để xem chi tiết lịch biểu 7 ngày.';
         }
       }
 
       if (isSchedule && !replyText.includes('Lịch biểu thực đơn tuần')) {
         replyText = '🌿 Dạ, tôi đã gửi ngay cho bạn **Lịch biểu thực đơn tuần 7 ngày tương tác** bên dưới! Bạn có thể nhấp chọn từng ngày từ Thứ Hai đến Chủ Nhật, xem chi tiết 3 bữa ăn kèm năng lượng calo & đạm thực vật, hoặc bấm "Đổi món" và "Đi chợ" trực tiếp ngay trong chat nhé.\n\n' + replyText;
-      } else if ((isRings || isWearable) && !replyText.includes('Vòng Ring')) {
-        replyText = '✨ Dạ, đây là **Vòng Ring Hoạt Động (Zen Rings)** và các chỉ số thể trạng của bạn hôm nay trực tiếp trong khung chat! Vòng tròn màu đỏ thể hiện Calo, màu xanh lá thể hiện Đạm thực vật, và màu xanh lam thể hiện Vận động từ vòng đeo tay Google Fit.\n\n' + replyText;
+      } else if ((isRings || isWearable) && !replyText.includes('Zen Rings')) {
+        replyText = '✨ Đây là **biểu đồ tiến độ dinh dưỡng Zen Rings** (Đỏ: Calo nạp hôm nay · Xanh lá: Đạm thực vật · Xanh lam: Chất xơ) kèm dữ liệu vận động **Google Fit** của bạn ngay bên dưới!\n\n' + replyText;
       }
 
 
@@ -1614,7 +1614,6 @@ export function AiChatPage() {
                                   ...newMsgs[idx],
                                   activityRingsCard: {
                                     ...newMsgs[idx].activityRingsCard!,
-                                    calories: fresh.todayActiveCalories > 0 ? fresh.todayActiveCalories : 0,
                                     steps: fresh.steps,
                                     wearableKcal: fresh.todayActiveCalories,
                                     totalCalories: fresh.totalCaloriesExpended,
@@ -1788,7 +1787,7 @@ export function AiChatPage() {
                       navigate('/login', { state: { from: '/ai-chef' } });
                       return;
                     }
-                    handleSubmitWithText('Tôi muốn kiểm tra và đồng bộ dữ liệu vòng đeo tay Google Fit (bước chân, calo vận động) trên VEGEAI. Bếp trưởng hãy giải thích ý nghĩa các chỉ số trên vòng Zen Rings và cách hệ thống tự động cân đối dinh dưỡng thích ứng theo mức vận động nhé!');
+                    handleSubmitWithText('Tôi muốn kiểm tra và đồng bộ dữ liệu Google Fit (bước chân, tổng tiêu hao, quãng đường) trên VEGEAI. Bếp trưởng hãy giải thích ý nghĩa 3 vòng tiến độ dinh dưỡng Zen Rings và cách hệ thống cân đối thực đơn theo mức vận động nhé!');
                   }}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/40 text-sky-800 dark:text-sky-300 text-[11px] font-bold border border-sky-200 dark:border-sky-800 transition cursor-pointer shadow-2xs"
                 >

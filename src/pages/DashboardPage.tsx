@@ -32,6 +32,7 @@ import { DailyIntakeCard } from '../components/DailyIntakeCard';
 import { ApiError, errorMessage } from '../services/apiClient';
 import { RecipeCard } from '../components/RecipeCard';
 import { HealthActivityRings } from '../components/HealthActivityRings';
+import { useTodayDailyIntake } from '../hooks/useTodayDailyIntake';
 import { wearableService } from '../utils/wearableService';
 import { dietLabels, displayAllergies } from '../utils/nutritionProfile';
 import { sfx } from '../utils/soundEffects';
@@ -96,7 +97,17 @@ export const DashboardPage: React.FC = () => {
   const [fridge, setFridge] = useState<FridgeSummary | null>(null);
   const [expiringItems, setExpiringItems] = useState<FridgeItem[]>([]);
   const [todayCalendarDay, setTodayCalendarDay] = useState<MealCalendarDay | null>(null);
+  const [wearableActiveKcal, setWearableActiveKcal] = useState<number>(
+    () => wearableService.getMetrics().todayActiveCalories || 0,
+  );
+  const todayIntake = useTodayDailyIntake(isAuthenticated);
   const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    const onWearable = () => setWearableActiveKcal(wearableService.getMetrics().todayActiveCalories || 0);
+    window.addEventListener('wearable_sync_updated', onWearable);
+    return () => window.removeEventListener('wearable_sync_updated', onWearable);
+  }, []);
   const [errors, setErrors] = useState<string[]>([]);
   const [attempt, setAttempt] = useState(0);
 
@@ -630,12 +641,15 @@ export const DashboardPage: React.FC = () => {
                 /* Authenticated Profile exists: Apple Watch Concentric Activity Rings Snapshot */
                 <div className="space-y-4">
                   <HealthActivityRings
-                    calories={wearableService.getMetrics().todayActiveCalories || 0}
+                    calories={todayIntake.totals.calories}
                     calorieTarget={Math.round(nutrition.targets.dailyCaloriesTarget)}
-                    proteinGrams={0}
+                    activeBurnBonus={wearableActiveKcal}
+                    proteinGrams={todayIntake.totals.protein}
                     proteinTarget={Math.round(nutrition.targets.proteinTargetG)}
-                    fiberGrams={0}
+                    fiberGrams={todayIntake.totals.fiber}
                     fiberTarget={Math.round(nutrition.targets.fiberTargetG)}
+                    recordedMealsCount={todayIntake.recordedMealsCount}
+                    intakeLoaded={todayIntake.loaded}
                     heightCm={nutrition.heightCm}
                     weightKg={nutrition.weightKg}
                     bmr={nutrition.targets.bmr}

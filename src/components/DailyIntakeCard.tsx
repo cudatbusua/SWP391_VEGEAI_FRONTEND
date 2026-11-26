@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { mealPlanService } from '../services/mealPlanService';
 import { errorMessage } from '../services/apiClient';
+import { DAILY_INTAKE_UPDATED_EVENT } from '../hooks/useTodayDailyIntake';
 import { wearableService, type WearableMetrics } from '../utils/wearableService';
 import type { DailyIntake, MealCalendarDay, PlanNutrients } from '../types/mealPlan';
 import type { NutritionTargets } from '../types/api';
@@ -43,8 +44,11 @@ export function DailyIntakeCard({ date, day, targets }: {
     }
     setBusySlot(slot); setError('');
     try {
-      setIntake(remove ? await mealPlanService.removeIntake(date, slot)
-        : await mealPlanService.recordIntake(date, slot, amount));
+      const nextIntake = remove
+        ? await mealPlanService.removeIntake(date, slot)
+        : await mealPlanService.recordIntake(date, slot, amount);
+      setIntake(nextIntake);
+      window.dispatchEvent(new CustomEvent(DAILY_INTAKE_UPDATED_EVENT, { detail: nextIntake }));
     } catch (reason) { setError(errorMessage(reason)); }
     finally { setBusySlot(null); }
   };

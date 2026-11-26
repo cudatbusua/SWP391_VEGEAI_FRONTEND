@@ -32,6 +32,7 @@ import { SeasonalRegionalMealsView } from '../components/SeasonalRegionalMealsVi
 import { CookbookTab } from '../components/CookbookTab';
 import { sfx } from '../utils/soundEffects';
 import { HealthActivityRings } from '../components/HealthActivityRings';
+import { useTodayDailyIntake } from '../hooks/useTodayDailyIntake';
 import { WearableGoogleFitTracker } from '../components/WearableGoogleFitTracker';
 import { wearableService } from '../utils/wearableService';
 import { dietLabels, calculateBmr, calculateTdee, calculateExactAge } from '../utils/nutritionProfile';
@@ -574,6 +575,7 @@ export const AccountSettingsPage: React.FC = () => {
   const isUsingDefaultCalorie = dailyCalorieTarget === '' || Number(dailyCalorieTarget) === defaultScientificCalorie;
 
   const [wearableKcal, setWearableKcal] = useState<number>(() => wearableService.getMetrics().todayActiveCalories);
+  const todayIntake = useTodayDailyIntake(true);
 
   // Reactive listener so wearable sync immediately propagates to Zen Rings & Calculations
   useEffect(() => {
@@ -1343,14 +1345,17 @@ export const AccountSettingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Activity Concentric Rings */}
+          {/* Activity Concentric Rings (Real Today Nutrition Intake) */}
           <HealthActivityRings
-            calories={wearableKcal > 0 ? wearableKcal : 0}
+            calories={todayIntake.totals.calories}
             calorieTarget={calorieInput > 0 ? calorieInput : (tdee > 0 ? tdee : 0)}
-            proteinGrams={0}
+            activeBurnBonus={wearableKcal > 0 ? wearableKcal : 0}
+            proteinGrams={todayIntake.totals.protein}
             proteinTarget={serverTargets ? Math.round(serverTargets.proteinTargetG) : (hasPhysicalStats ? Math.round(wNum * 1.1) : (calorieInput > 0 ? Math.round((calorieInput * 0.20) / 4) : 0))}
-            fiberGrams={0}
+            fiberGrams={todayIntake.totals.fiber}
             fiberTarget={serverTargets ? Math.round(serverTargets.fiberTargetG) : (hasCalorieTarget ? 35 : 0)}
+            recordedMealsCount={todayIntake.recordedMealsCount}
+            intakeLoaded={todayIntake.loaded}
             heightCm={heightCm}
             weightKg={weightKg}
             age={age}

@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CircleHelp, FileQuestion, Loader2, MessageCircle, Search, Send, ShieldCheck, Video } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CircleHelp, FileQuestion, Leaf, Loader2, MessageCircle, Search, Send, ShieldCheck, Sparkles, Video } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
 import { useCommunityQuery, useDebouncedValue } from '../hooks/useCommunityQuery';
+import { useCommunityMotion } from '../hooks/useCommunityMotion';
 import { communityService } from '../services/communityService';
 import { errorMessage } from '../services/apiClient';
 import type { Question, QuestionStatus } from '../types/community';
 import { questionStatuses } from '../types/community';
 import { CommunityError, CommunityGuard, CommunityLoading, CommunityPagination, QuestionArticle } from '../components/CommunityUi';
+import '../styles/communityMotion.css';
 
 function AskQuestion() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -33,6 +35,8 @@ function AskQuestion() {
     <div className="cm-side-links">{isAuthenticated && <Link to="/videos"><span>Vào bếp cùng VEGEAI</span><Video size={17} /></Link>}<Link to="/explore"><span>Tìm cảm hứng cho bữa chay</span><ArrowRight size={16} /></Link></div>
   </div></aside>;
 }
+const suggestedTopics = ['Đậu hũ', 'Đạm thực vật', 'Bữa ăn chay', 'Nguyên liệu'];
+
 function QuestionList({ mine }: { mine: boolean }) {
   const { isAuthenticated, user } = useAuth();
   const [search, setSearch] = useState('');
@@ -43,14 +47,57 @@ function QuestionList({ mine }: { mine: boolean }) {
   const query = useCommunityQuery(JSON.stringify(['questions', mine, mine ? user?.id : '', keyword, answered, status, page]), signal => mine
     ? communityService.myQuestions(status, page, signal)
     : communityService.questions({ keyword, answered: answered === '' ? undefined : answered === 'true', page }, signal));
-  return <div className="cm-shell"><header className="cm-heading"><div><span className="cm-eyebrow"><CircleHelp size={15} /> CỘNG ĐỒNG VEGEAI</span><h1>{mine ? 'Câu hỏi của tôi' : 'Hỏi & đáp'}</h1><p>Một câu hỏi nhỏ, thêm cảm hứng cho căn bếp mỗi ngày.</p></div><div className="cm-actions">{isAuthenticated && user?.role !== 'admin' && <Link className="cm-button secondary" to={mine ? '/questions' : '/questions/mine'}><FileQuestion size={16} />{mine ? 'Hỏi đáp cộng đồng' : 'Câu hỏi của tôi'}</Link>}{user?.role === 'admin' && <Link to="/admin/questions" className="cm-button secondary"><ShieldCheck size={16} /> Quản lý hỏi đáp</Link>}</div></header>
-    <div className={'cm-qa-layout' + (user?.role === 'admin' ? ' cm-qa-admin' : '')}><section aria-label={mine ? 'Danh sách câu hỏi của tôi' : 'Câu hỏi cộng đồng'}><div className="cm-toolbar">{mine ? <select className="cm-select" aria-label="Trạng thái câu hỏi" value={status} onChange={event => { setStatus(event.target.value as QuestionStatus | ''); setPage(0); }}><option value="">Tất cả trạng thái</option>{Object.entries(questionStatuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select> : <><div className="cm-tabs">{[['', 'Tất cả'], ['true', 'Đã trả lời'], ['false', 'Chưa trả lời']].map(([value, label]) => <button key={value} aria-pressed={answered === value} onClick={() => { setAnswered(value as typeof answered); setPage(0); }}>{label}</button>)}</div><label className="cm-search"><Search size={17} /><input aria-label="Tìm câu hỏi" placeholder="Tìm câu hỏi..." maxLength={200} value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} /></label></>}
-      {!query.busy && query.data && <span className="cm-count">{query.data.totalElements} câu hỏi</span>}</div>
-      {query.busy && <CommunityLoading />}{query.error && <CommunityError message={query.error} retry={query.refresh} />}
-      {!query.busy && !query.error && query.data?.items.length === 0 && <div className="cm-empty"><MessageCircle size={34} /><h2>{search || status || answered ? 'Chưa tìm thấy câu hỏi phù hợp' : mine ? 'Bạn chưa có câu hỏi nào' : 'Cùng mở đầu một cuộc trò chuyện'}</h2><p>{mine ? 'Có điều gì bạn muốn hỏi về căn bếp chay?' : 'Chuyện nấu nướng, nguyên liệu và những bữa ăn xanh.'}</p></div>}
-      <div className="cm-question-list">{query.data?.items.map(question => <QuestionArticle key={question.id} question={question} mine={mine} />)}</div><CommunityPagination data={query.data} change={setPage} />
-    </section>{user?.role !== 'admin' && <AskQuestion />}</div>
-  </div>;
+  useCommunityMotion('.cm-qa-motion .cm-question-list .cm-question', query.data?.items.map(question => question.id).join('|') || '');
+  return (
+    <div className="cm-shell cm-qa-motion">
+      <header className="cm-heading qa-hero">
+        <div className="qa-hero-copy">
+          <span className="cm-eyebrow"><CircleHelp size={15} /> CỘNG ĐỒNG VEGEAI</span>
+          <h1>{mine ? 'Câu hỏi của bạn, hành trình của bạn.' : user?.role === 'admin' ? 'Lắng nghe cộng đồng. Giải đáp đúng lúc.' : 'Hỏi điều bạn cần. Cùng nhau hiểu hơn.'}</h1>
+          <p>{mine ? 'Theo dõi câu hỏi đã gửi và xem phản hồi từ ban biên tập.' : user?.role === 'admin' ? 'Theo dõi thắc mắc về món chay, duyệt nội dung và trả lời cho cộng đồng VEGEAI.' : 'Từ nguyên liệu, cách nấu đến dinh dưỡng chay — cùng chia sẻ kinh nghiệm và tìm câu trả lời đáng tin cậy.'}</p>
+          <div className="qa-hero-links">
+            <a className="qa-hero-primary" href={mine ? '#qa-feed' : user?.role === 'admin' ? '#qa-feed' : '#ask-question'}>
+              {mine || user?.role === 'admin' ? <BookOpen size={17} /> : <Send size={17} />}
+              {mine ? 'Xem câu hỏi của tôi' : user?.role === 'admin' ? 'Xem câu hỏi cộng đồng' : 'Đặt câu hỏi'}
+              <ArrowRight size={16} />
+            </a>
+            {!mine && <a className="qa-hero-secondary" href="#qa-feed">Khám phá câu trả lời <ArrowRight size={16} /></a>}
+          </div>
+          <div className="cm-actions qa-hero-actions">
+            {isAuthenticated && user?.role !== 'admin' && <Link className="cm-button secondary" to={mine ? '/questions' : '/questions/mine'}><FileQuestion size={16} />{mine ? 'Hỏi đáp cộng đồng' : 'Câu hỏi của tôi'}</Link>}
+            {user?.role === 'admin' && <Link to="/admin/questions" className="cm-button secondary"><ShieldCheck size={16} /> Quản lý hỏi đáp</Link>}
+          </div>
+        </div>
+        <div className="qa-hero-visual" aria-hidden="true">
+          <img src="/images/vegan-tofu-meal.png" alt="" />
+          <div className="qa-hero-note"><Sparkles size={18} /><span>Mỗi câu hỏi mở ra<br /><strong>một bữa chay tốt hơn.</strong></span></div>
+        </div>
+      </header>
+
+      <div className="qa-intro" id="qa-feed">
+        <div><span className="qa-kicker"><Leaf size={14} /> GÓC CHIA SẺ</span><h2>{mine ? 'Các câu hỏi bạn đã gửi' : 'Câu hỏi từ cộng đồng'}</h2><p>{mine ? 'Xem trạng thái duyệt và câu trả lời cho từng câu hỏi.' : 'Tìm kinh nghiệm thực tế và câu trả lời từ ban biên tập VEGEAI.'}</p></div>
+        {!query.busy && query.data && <span className="qa-total">{query.data.totalElements} câu hỏi</span>}
+      </div>
+
+      {!mine && <div className="qa-topics" aria-label="Tìm nhanh theo chủ đề"><span>Khám phá nhanh</span>{suggestedTopics.map(topic => <button key={topic} type="button" aria-pressed={search === topic} onClick={() => { setSearch(search === topic ? '' : topic); setPage(0); }}>{topic}<ArrowRight size={13} /></button>)}</div>}
+
+      <div className={'cm-qa-layout' + (user?.role === 'admin' ? ' cm-qa-admin' : '')}>
+        <section aria-label={mine ? 'Danh sách câu hỏi của tôi' : 'Câu hỏi cộng đồng'}>
+          <div className="cm-toolbar qa-toolbar">
+            {mine ? <select className="cm-select" aria-label="Trạng thái câu hỏi" value={status} onChange={event => { setStatus(event.target.value as QuestionStatus | ''); setPage(0); }}><option value="">Tất cả trạng thái</option>{Object.entries(questionStatuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select> : <>
+              <div className="cm-tabs">{[['', 'Tất cả'], ['true', 'Đã trả lời'], ['false', 'Chưa trả lời']].map(([value, label]) => <button key={value} aria-pressed={answered === value} onClick={() => { setAnswered(value as typeof answered); setPage(0); }}>{label}</button>)}</div>
+              <label className="cm-search"><Search size={17} /><input aria-label="Tìm câu hỏi" placeholder="Tìm câu hỏi, nguyên liệu, dinh dưỡng..." maxLength={200} value={search} onChange={event => { setSearch(event.target.value); setPage(0); }} /></label>
+            </>}
+          </div>
+          {query.busy && <CommunityLoading />}{query.error && <CommunityError message={query.error} retry={query.refresh} />}
+          {!query.busy && !query.error && query.data?.items.length === 0 && <div className="cm-empty qa-empty"><MessageCircle size={34} /><h2>{search || status || answered ? 'Chưa tìm thấy câu hỏi phù hợp' : mine ? 'Bạn chưa có câu hỏi nào' : 'Cùng mở đầu một cuộc trò chuyện'}</h2><p>{mine ? 'Có điều gì bạn muốn hỏi về căn bếp chay?' : 'Chuyện nấu nướng, nguyên liệu và những bữa ăn xanh.'}</p>{!mine && user?.role !== 'admin' && <a className="qa-empty-action" href="#ask-question">Đặt câu hỏi đầu tiên <ArrowRight size={16} /></a>}</div>}
+          <div className="cm-question-list">{query.data?.items.map(question => <QuestionArticle key={question.id} question={question} mine={mine} />)}</div>
+          <CommunityPagination data={query.data} change={setPage} />
+        </section>
+        {user?.role !== 'admin' && <AskQuestion />}
+      </div>
+    </div>
+  );
 }
 export function QuestionsPage({ mine = false }: { mine?: boolean }) {
   const { user } = useAuth();

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Search,
-  Camera,
   Clock,
   RefreshCw,
   X,
@@ -21,6 +20,7 @@ import {
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
 import '../styles/discovery.css';
+import '../styles/exploreRefresh.css';
 import { recipeService } from '../services/recipeService';
 import { blogService } from '../services/blogService';
 import { communityService } from '../services/communityService';
@@ -302,41 +302,62 @@ export function RecipeDiscoveryPage() {
 
   const totalItemsCount = (recipesData?.totalElements || 0) + (blogsData?.totalElements || 0) + (videosData?.totalElements || 0) + (qaData?.totalElements || 0);
 
+  const visibleCardIds = sortedCards.map(card => card.id).join('|');
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cards = document.querySelectorAll<HTMLElement>('.explore-refresh .explore-content-card:not([data-motion-seen])');
+    if (!cards.length) return;
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const card = entry.target as HTMLElement;
+        card.classList.remove('explore-await-reveal');
+        card.dataset.motionSeen = 'true';
+        observer.unobserve(card);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px 45px 0px' });
+    cards.forEach(card => {
+      card.classList.add('explore-await-reveal');
+      observer.observe(card);
+    });
+    return () => {
+      observer.disconnect();
+      cards.forEach(card => card.classList.remove('explore-await-reveal'));
+    };
+  }, [visibleCardIds]);
+
   return (
     <MainLayout>
-      <div className="discovery-page max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="discovery-page explore-refresh max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* HERO BANNER */}
-        <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-emerald-950 via-teal-900 to-emerald-850 px-6 py-8 sm:px-10 sm:py-10 text-white shadow-lg">
-          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
-          <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <div className="max-w-2xl space-y-3">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-emerald-200">
-                <Sparkles size={14} /> KHÁM PHÁ &amp; CỘNG ĐỒNG TOÀN DIỆN
-              </span>
-              <h1 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
-                Cảm hứng món chay, kiến thức &amp; kết nối
-              </h1>
-              <p className="text-xs sm:text-sm leading-relaxed text-emerald-50/85 max-w-xl">
-                Hợp nhất 4 loại hình nội dung: Công thức nấu ăn, Blog dinh dưỡng, Video hướng dẫn và Diễn đàn Hỏi đáp Q&amp;A.
-              </p>
+        <section className="discovery-motion-hero explore-hero">
+          <div className="explore-hero-copy">
+            <span className="explore-eyebrow"><Leaf size={15} /> VEGEAI · CĂN BẾP XANH</span>
+            <h1>Ăn chay ngon hơn,<br /><em>mỗi ngày một chút.</em></h1>
+            <p>Từ công thức dễ nấu đến câu chuyện sống xanh. Tìm cảm hứng cho bữa ăn hôm nay và chia sẻ cùng cộng đồng.</p>
+            <div className="explore-hero-actions">
+              <a href="#explore-results" className="explore-primary-action">Khám phá ngay <ArrowUpRight size={18} /></a>
+              <Link to="/blog/write" className="explore-secondary-action"><BookOpen size={17} /> Viết bài chia sẻ</Link>
             </div>
-
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              <Link to="/blog/write" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-emerald-900 shadow-sm transition hover:bg-emerald-50">
-                <Sparkles size={16} /> Chia sẻ bài viết mới
-              </Link>
-              {isAuthenticated && (
-                <Link to="/fridge-scan" className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20">
-                  <Camera size={16} /> Quét tủ lạnh
-                </Link>
-              )}
+            <div className="explore-hero-tags" aria-label="Nội dung khám phá">
+              <span><Utensils size={15} /> Công thức</span>
+              <span><Play size={15} /> Video</span>
+              <span><MessageCircle size={15} /> Cộng đồng</span>
             </div>
+          </div>
+          <div className="explore-hero-media">
+            <img src="/images/vietnamese-vegan-table.png" alt="Bàn ăn chay với các món rau và đậu phụ" />
+            <div className="explore-hero-note"><Sparkles size={18} /><span>Hôm nay ăn gì?<strong>Cùng VEGEAI tìm món ngon.</strong></span></div>
           </div>
         </section>
 
         {/* 4 DISTINCT CONTENT TYPE TABS */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-slate-100/90 dark:bg-slate-800/90 rounded-2xl border border-slate-200 dark:border-slate-700">
-          <div className="flex flex-wrap items-center gap-1.5">
+        <div className="explore-section-heading">
+          <div><span className="explore-kicker">MỘT KHÔNG GIAN, NHIỀU CẢM HỨNG</span><h2>Hôm nay bạn muốn khám phá gì?</h2></div>
+          <span className="explore-heading-aside">Chọn chủ đề bạn quan tâm</span>
+        </div>
+        <div className="discovery-motion-tabs explore-tabs">
+          <div className="explore-tabs-track">
             {[
               { id: 'ALL', label: 'Tất cả khám phá', icon: <Sparkles size={15} />, count: totalItemsCount },
               { id: 'RECIPES', label: 'Công thức nấu ăn', icon: <Utensils size={15} />, count: recipesData?.totalElements },
@@ -357,16 +378,12 @@ export function RecipeDiscoveryPage() {
                     setContentType(tab.id as ExploreCategoryType);
                     setPage(0);
                   }}
-                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer ${
-                    active
-                      ? 'bg-emerald-700 text-white shadow-2xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-emerald-700 hover:bg-white/70 dark:hover:bg-slate-700/60'
-                  }`}
+                  className={`explore-tab ${active ? 'is-active' : ''}`}
                 >
                   {tab.icon}
                   <span>{tab.label}</span>
                   {tab.count !== undefined && (
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${active ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
+                    <span className="explore-tab-count">
                       {tab.count}
                     </span>
                   )}
@@ -375,16 +392,13 @@ export function RecipeDiscoveryPage() {
             })}
           </div>
 
-          <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 px-3 hidden sm:block">
-            Hiển thị dạng lưới ô vuông với logo thể loại trực quan
-          </div>
         </div>
 
         {/* INTEGRATED SEARCH & FILTER CONTROLS */}
-        <div className="space-y-3">
+        <div className="explore-controls space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Search Box */}
-            <div className="relative flex-1">
+            <div className="explore-search relative flex-1">
               <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -394,7 +408,7 @@ export function RecipeDiscoveryPage() {
                   setPage(0);
                 }}
                 placeholder="Tìm công thức, bài blog, video nấu nướng hoặc thắc mắc dinh dưỡng..."
-                className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-xs sm:text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
               />
               {keyword && (
                 <button
@@ -439,7 +453,7 @@ export function RecipeDiscoveryPage() {
           )}
 
           {/* Dietary Quick Filter Pills */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <div className="explore-quick-filters flex flex-wrap items-center gap-1.5 pt-1">
             <span className="text-[11px] font-bold text-slate-400 mr-1 flex items-center gap-1">
               <Leaf size={12} /> Trường phái:
             </span>
@@ -467,7 +481,12 @@ export function RecipeDiscoveryPage() {
           </div>
         </div>
 
-        {/* 4x4 RESPONSIVE UNIFIED GRID */}
+        <div id="explore-results" className="explore-results-heading">
+          <div><span className="explore-kicker">TUYỂN CHỌN CHO BẠN</span><h2>{contentType === 'ALL' ? 'Cảm hứng mới nhất' : contentType === 'RECIPES' ? 'Công thức đáng thử' : contentType === 'BLOGS' ? 'Chuyện từ cộng đồng' : contentType === 'VIDEOS' ? 'Xem và vào bếp' : 'Hỏi đáp cùng cộng đồng'}</h2></div>
+          {!loading && !error && <span className="explore-result-count">{sortedCards.length} nội dung</span>}
+        </div>
+
+        {/* RESPONSIVE UNIFIED GRID */}
         {loading && !sortedCards.length && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
@@ -494,15 +513,15 @@ export function RecipeDiscoveryPage() {
         )}
 
         {!error && sortedCards.length > 0 && (
-          <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 ${loading ? 'opacity-60' : ''}`}>
+          <div className={`explore-card-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 ${loading ? 'opacity-60' : ''}`}>
             {sortedCards.map((card) => (
               <article
                 key={card.id}
-                className="rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group"
+                className="explore-content-card rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group"
               >
                 <div>
                   {/* Media & Floating Logo Badge */}
-                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
+                  <div className="explore-card-image relative aspect-[16/10] w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
                     <Link to={card.linkUrl} className="block w-full h-full">
                       <img
                         src={card.imageUrl}
@@ -528,7 +547,7 @@ export function RecipeDiscoveryPage() {
                   </div>
 
                   {/* Body Content */}
-                  <div className="p-4 pb-2">
+                  <div className="explore-card-body p-4 pb-2">
                     <div className="flex items-center justify-between gap-2 text-xs">
                       <div className="flex items-center gap-2 min-w-0">
                         <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-black text-[11px] flex items-center justify-center shrink-0">
@@ -563,7 +582,7 @@ export function RecipeDiscoveryPage() {
                 </div>
 
                 {/* Footer Action */}
-                <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-800/80 mt-2 flex items-center justify-between">
+                <div className="explore-card-footer px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-800/80 mt-2 flex items-center justify-between">
                   <span className="text-[11px] font-semibold text-slate-400">
                     {card.type === 'RECIPE' ? 'Công thức nấu' : card.type === 'BLOG' ? 'Bài chia sẻ' : card.type === 'VIDEO' ? 'Clip trực quan' : 'Cộng đồng hỏi'}
                   </span>
@@ -581,7 +600,7 @@ export function RecipeDiscoveryPage() {
         )}
 
         {/* BOTTOM NAVIGATION BRIDGES TO SPECIALIZED MODULES */}
-        <section className="pt-6 border-t border-slate-200 dark:border-slate-800">
+        <section className="explore-next-section pt-6 border-t border-slate-200 dark:border-slate-800">
           <div className="mb-4">
             <span className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
               CHUYỆN TỪ CĂN BẾP &amp; ĐIỀU HƯỚNG CHUYÊN SÂU

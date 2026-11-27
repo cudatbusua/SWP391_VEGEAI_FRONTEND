@@ -34,6 +34,7 @@ import { errorMessage } from '../services/apiClient';
 import { BlogBody, BlogCover, BlogError, BlogPagination, blogDate } from '../components/BlogUi';
 import { ContentInteractions } from '../components/ContentInteractions';
 import { useAuth } from '../hooks/useAuth';
+import { useCommunityMotion } from '../hooks/useCommunityMotion';
 import { videoSource } from '../utils/communityVideo';
 import { aiService } from '../services/aiService';
 import { blogCategories, BLOG_POST_TEMPLATES, resolvePostAiMode } from '../types/blog';
@@ -41,6 +42,7 @@ import type { BlogCategory, BlogPost } from '../types/blog';
 import type { BlogInsightAiResponse, GeneratedRecipeAiResponse, PageResponse } from '../types/api';
 import type { SmartMarketItem } from '../data/smartMarketData';
 import '../styles/blog.css';
+import '../styles/communityMotion.css';
 
 function getBlogAiAccessError(isAuthenticated: boolean, role: string | undefined, mode: 'RECIPE_STEPS' | 'KNOWLEDGE_INSIGHT'): string | null {
   if (!isAuthenticated) {
@@ -322,6 +324,8 @@ export function BlogPage() {
   const [feedKnowledgeResults, setFeedKnowledgeResults] = useState<Record<string, BlogInsightAiResponse>>({});
   const [feedErrors, setFeedErrors] = useState<Record<string, string>>({});
 
+  useCommunityMotion('.blog-motion .blog-feed-card', data?.items.map(post => post.postId).join('|') || '');
+
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true);
@@ -394,7 +398,7 @@ export function BlogPage() {
 
   return (
     <MainLayout>
-      <div className="blog-shell max-w-[1320px] mx-auto px-4 py-6 sm:py-8 space-y-6">
+      <div className="blog-shell blog-motion max-w-[1320px] mx-auto px-4 py-6 sm:py-8 space-y-6">
         {/* Editorial Blog Header */}
         <header className="relative overflow-hidden rounded-[28px] bg-linear-to-br from-emerald-950 via-emerald-900 to-teal-700 px-6 py-8 text-white shadow-lg sm:px-9 sm:py-10">
           <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
@@ -475,7 +479,7 @@ export function BlogPage() {
 
         {/* BÀI ĐĂNG CỘNG ĐỒNG */}
             {/* FACEBOOK-STYLE QUICK POST COMPOSER BOX */}
-        <section className="rounded-3xl border border-emerald-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs space-y-4">
+        <section className="blog-compose-card rounded-3xl border border-emerald-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-emerald-700 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-2xs">
               {isAuthenticated ? (user?.name || user?.username || 'U').charAt(0).toUpperCase() : '🌱'}
@@ -678,7 +682,7 @@ export function BlogPage() {
                   return (
                     <article
                       key={post.postId}
-                      className="rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group"
+                      className="blog-feed-card rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between overflow-hidden group"
                     >
                       <div>
                         {/* Post Cover & Floating Badges */}

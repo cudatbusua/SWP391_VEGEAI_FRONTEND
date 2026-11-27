@@ -4,10 +4,12 @@ import { CirclePlay, Plus, Search, Settings2, Trash2 } from 'lucide-react';
 import { MainLayout } from '../layouts/MainLayout';
 import { useAuth } from '../hooks/useAuth';
 import { useCommunityQuery, useDebouncedValue } from '../hooks/useCommunityQuery';
+import { useCommunityMotion } from '../hooks/useCommunityMotion';
 import { communityService } from '../services/communityService';
 import { errorMessage } from '../services/apiClient';
 import { videoCategories } from '../types/community';
 import { CommunityError, CommunityGuard, CommunityLoading, CommunityPagination, VideoCard } from '../components/CommunityUi';
+import '../styles/communityMotion.css';
 
 function VideoList({ saved }: { saved: boolean }) {
   const { user, isAuthenticated } = useAuth();
@@ -18,6 +20,7 @@ function VideoList({ saved }: { saved: boolean }) {
   const [removing, setRemoving] = useState('');
   const [error, setError] = useState('');
   const query = useCommunityQuery(JSON.stringify(['videos', saved, saved ? user?.id : '', keyword, category, page]), signal => saved ? communityService.savedVideos(page, signal) : communityService.videos({ keyword, category, page }, signal));
+  useCommunityMotion('.video-library .cm-video-card', query.data?.items.map(video => video.id).join('|') || '');
   const categories = Array.from(new Set([...Object.keys(videoCategories), category, ...(query.data?.items.map(video => video.category || '') || [])])).filter(Boolean);
   const remove = async (id: string) => {
     if (removing) return;

@@ -23,7 +23,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <div className="min-h-screen w-full relative overflow-hidden bg-[#f4f9f1] dark:bg-[#071a11] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-10 font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-300">
+    <div className="vegeai-auth-shell min-h-screen w-full relative overflow-hidden bg-[#f4f9f1] dark:bg-[#071a11] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-10 font-sans selection:bg-emerald-500 selection:text-white transition-colors duration-300">
       
       {/* ================= VEGAN DOODLE PATTERN WALLPAPER BACKGROUND ================= */}
       {/* Light mode: crisp lime-green botanical doodle pattern on soft cream-sage backdrop */}
@@ -42,8 +42,8 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(244,249,241,0.2)_0%,rgba(232,243,226,0.78)_100%)] dark:bg-[radial-gradient(circle_at_center,rgba(7,26,17,0.35)_0%,rgba(4,15,10,0.88)_100%)]" />
 
       {/* Ambient Botanical Glow Orbs */}
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-lime-400/25 dark:bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-emerald-400/25 dark:bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="vegeai-auth-orb vegeai-auth-orb-one absolute -top-32 -left-32 w-96 h-96 bg-lime-400/25 dark:bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="vegeai-auth-orb vegeai-auth-orb-two absolute -bottom-32 -right-32 w-96 h-96 bg-emerald-400/25 dark:bg-teal-500/20 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-1/2 left-1/4 w-80 h-80 bg-green-300/20 dark:bg-emerald-400/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Floating Action Bar: Back to Home & Direct Theme Switcher */}
@@ -78,16 +78,16 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
       </div>
 
       {/* ================= MAIN SPLIT CARD CONTAINER ================= */}
-      <div className="w-full max-w-6xl min-h-[700px] bg-white/95 dark:bg-[#101920]/95 rounded-[2rem] shadow-[0_24px_70px_-15px_rgba(22,101,52,0.22)] dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.65)] border border-emerald-600/15 dark:border-emerald-500/15 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10 backdrop-blur-xl transition-all duration-300">
+      <div className="vegeai-auth-card w-full max-w-6xl min-h-[700px] bg-white/95 dark:bg-[#101920]/95 rounded-[2rem] shadow-[0_24px_70px_-15px_rgba(22,101,52,0.22)] dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.65)] border border-emerald-600/15 dark:border-emerald-500/15 overflow-hidden grid grid-cols-1 lg:grid-cols-12 relative z-10 backdrop-blur-xl transition-all duration-300">
         
         {/* Left Column: Visual Showcase Banner */}
-        <div className="lg:col-span-6 relative min-h-[400px] lg:min-h-full overflow-hidden bg-[#0a2e1c] flex flex-col justify-between p-8 sm:p-11 text-white">
+        <div className="vegeai-auth-visual lg:col-span-6 relative min-h-[400px] lg:min-h-full overflow-hidden bg-[#0a2e1c] flex flex-col justify-between p-8 sm:p-11 text-white">
           
           {/* Background Image with Slow Zoom & Rich Botanical Gradient Overlay */}
           <img
             src={bannerImage}
             alt="VEGEAI Banner"
-            className="absolute inset-0 w-full h-full object-cover opacity-85 transition-transform duration-1000 ease-out hover:scale-105"
+            className="vegeai-auth-photo absolute inset-0 w-full h-full object-cover opacity-85"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#041d11]/95 via-[#072617]/55 to-black/25" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#041d11]/40 to-transparent" />
@@ -136,7 +136,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
             </p>
 
             {/* Feature Pills on Banner */}
-            <div className="grid grid-cols-3 gap-2.5 pt-2">
+            <div className="vegeai-auth-features grid grid-cols-3 gap-2.5 pt-2">
               <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 flex flex-col gap-1">
                 <div className="flex items-center gap-1.5 text-lime-300 font-bold text-xs">
                   <ChefHat className="w-3.5 h-3.5 shrink-0" />
@@ -172,7 +172,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({
         </div>
 
         {/* Right Column: Form Container with Subtle Top Botanical Accent */}
-        <div className="lg:col-span-6 relative flex flex-col justify-center items-center p-6 sm:p-10 lg:p-12 bg-white dark:bg-[#101920] transition-colors duration-200">
+        <div className="vegeai-auth-panel lg:col-span-6 relative flex flex-col justify-center items-center p-6 sm:p-10 lg:p-12 bg-white dark:bg-[#101920] transition-colors duration-200">
           {/* Subtle decorative vegan pattern strip at the top of the form panel */}
           <div
             className="absolute top-0 inset-x-0 h-24 opacity-[0.06] dark:opacity-[0.04] pointer-events-none bg-repeat-x"

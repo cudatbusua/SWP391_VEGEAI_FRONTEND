@@ -315,7 +315,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-10">
+      <div className="dashboard-home max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-10">
         {/* Sync notification if API failed */}
         {errors.length > 0 && (
           <div
@@ -333,7 +333,7 @@ export const DashboardPage: React.FC = () => {
         )}
 
         {/* 1. HERO SECTION: Welcoming & Editorial Introduction with Elongated AI Chat Capsule */}
-        <section className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#f8f6f0] via-[#fbfaf7] to-[#f4f1ea] dark:from-[#111923] dark:via-[#131d28] dark:to-[#0f1720] border border-stone-200/70 dark:border-slate-800/80 p-7 sm:p-9 shadow-xs">
+        <section className="dashboard-motion-hero relative overflow-hidden rounded-3xl bg-linear-to-br from-[#f8f6f0] via-[#fbfaf7] to-[#f4f1ea] dark:from-[#111923] dark:via-[#131d28] dark:to-[#0f1720] border border-stone-200/70 dark:border-slate-800/80 p-7 sm:p-9 shadow-xs">
           {/* Subtle botanical accent */}
           <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 opacity-5 dark:opacity-10 pointer-events-none">
             <svg viewBox="0 0 200 200" className="w-full h-full text-emerald-800 fill-current">

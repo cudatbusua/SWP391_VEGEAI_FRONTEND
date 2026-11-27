@@ -286,7 +286,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, compact = false
   };
 
   return (
-    <div className="w-full">
+    <div className="vegeai-login-form w-full">
       {step === 'CREDENTIALS' ? (
         <>
           {/* Form Header */}

@@ -1,0 +1,362 @@
+/* Short, purposeful motion shared by public and customer screens. */
+@keyframes vegeai-page-enter {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes vegeai-card-enter {
+  from { opacity: 0; transform: translate3d(0, 16px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes vegeai-skeleton-sweep {
+  to { background-position-x: -200%; }
+}
+
+@keyframes vegeai-hero-light {
+  0%, 12% { transform: translateX(-30%) skewX(-16deg); opacity: 0; }
+  18% { opacity: .6; }
+  48% { transform: translateX(380%) skewX(-16deg); opacity: 0; }
+  100% { transform: translateX(380%) skewX(-16deg); opacity: 0; }
+}
+
+@keyframes vegeai-orb-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-34px, 28px, 0) scale(1.18); }
+}
+
+@keyframes vegeai-hero-glow {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: .42; }
+  50% { transform: translate3d(-7%, 4%, 0) scale(1.2); opacity: .7; }
+}
+
+@keyframes vegeai-auth-photo-drift {
+  0%, 100% { transform: scale(1.04) translate3d(1.5%, -.5%, 0); }
+  50% { transform: scale(1.16) translate3d(-2.5%, 1.5%, 0); }
+}
+
+@keyframes vegeai-auth-orb-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(62px, -38px, 0) scale(1.24); }
+}
+
+@keyframes vegeai-auth-feature-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+
+@keyframes vegeai-auth-accent-flow {
+  0%, 100% { background-position: 50% 0%; }
+  50% { background-position: 50% 100%; }
+}
+
+@keyframes vegeai-auth-cta-light {
+  0%, 20% { transform: translateX(-150%) skewX(-22deg); opacity: 0; }
+  25% { opacity: .9; }
+  55%, 100% { transform: translateX(420%) skewX(-22deg); opacity: 0; }
+}
+
+.vegeai-page-stage > * {
+  animation: vegeai-page-enter 320ms cubic-bezier(.2,.8,.2,1) backwards;
+}
+
+.vegeai-layout .vegeai-primary-link,
+.vegeai-layout .vegeai-context-subnav a,
+.vegeai-layout .vegeai-ai-subnav-link {
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 180ms;
+  transition-timing-function: ease-out;
+}
+
+.vegeai-layout .vegeai-primary-link:hover,
+.vegeai-layout .vegeai-context-subnav a:hover,
+.vegeai-layout .vegeai-ai-subnav-link:hover {
+  transform: translateY(-2px);
+}
+
+.vegeai-layout .vegeai-primary-link:active,
+.vegeai-layout .vegeai-context-subnav a:active,
+.vegeai-layout .vegeai-ai-subnav-link:active {
+  transform: translateY(0);
+}
+
+.discovery-motion-hero::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: -20%;
+  bottom: -20%;
+  left: -55%;
+  width: 55%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 13%), transparent);
+  animation: vegeai-hero-light 9s ease-in-out infinite;
+}
+.discovery-motion-orb {
+  animation: vegeai-orb-float 6.5s ease-in-out infinite;
+}
+
+.discovery-page > section:first-child h1,
+.discovery-page > section:first-child p,
+.discovery-hero-actions {
+  animation: vegeai-card-enter 440ms cubic-bezier(.2,.8,.2,1) backwards;
+}
+.discovery-page > section:first-child p { animation-delay: 70ms; }
+.discovery-hero-actions { animation-delay: 130ms; }
+.discovery-hero-actions a {
+  transition: transform 220ms ease-out, box-shadow 220ms ease-out, background-color 220ms ease-out;
+}
+.discovery-hero-actions a:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 26px rgb(0 0 0 / 22%);
+}
+.discovery-motion-tabs button {
+  transition: transform 180ms ease-out, background-color 180ms ease-out, box-shadow 180ms ease-out;
+}
+.discovery-motion-tabs button:hover { transform: translateY(-3px); }
+.discovery-motion-tabs button:active { transform: translateY(0) scale(.96); }
+
+.discovery-page > .grid > article {
+  animation: vegeai-card-enter 380ms cubic-bezier(.2,.8,.2,1) backwards;
+  transition-property: transform, box-shadow, border-color;
+  transition-duration: 220ms;
+}
+.discovery-page > .grid > article:nth-child(4n + 2) { animation-delay: 45ms; }
+.discovery-page > .grid > article:nth-child(4n + 3) { animation-delay: 90ms; }
+.discovery-page > .grid > article:nth-child(4n + 4) { animation-delay: 135ms; }
+.discovery-page > .grid > article:hover {
+  transform: translateY(-5px);
+  border-color: #a7d9bc;
+  box-shadow: 0 18px 40px rgb(18 82 54 / 13%);
+}
+
+.dashboard-home > section {
+  animation: vegeai-card-enter 420ms cubic-bezier(.2,.8,.2,1) backwards;
+}
+.dashboard-home > section:nth-of-type(2) { animation-delay: 70ms; }
+.dashboard-home > section:nth-of-type(3) { animation-delay: 130ms; }
+.dashboard-home > section:nth-of-type(n + 4) { animation-delay: 180ms; }
+.dashboard-motion-hero::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  right: -13%;
+  top: -90%;
+  width: 48%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgb(16 185 129 / 15%), transparent 66%);
+  animation: vegeai-hero-glow 9s ease-in-out infinite;
+}
+.dark .dashboard-motion-hero::after {
+  background: radial-gradient(circle, rgb(16 185 129 / 19%), transparent 66%);
+}
+.dark .discovery-page > .grid > article:hover {
+  border-color: #246348;
+  box-shadow: 0 18px 40px rgb(0 0 0 / 28%);
+}
+
+.vegeai-page-stage .dashboard-card,
+.vegeai-page-stage .ai-action-card,
+.vegeai-page-stage .recipe-card {
+  transition-property: transform, box-shadow, border-color;
+  transition-duration: 220ms;
+  transition-timing-function: ease-out;
+}
+.vegeai-page-stage .dashboard-card:hover,
+.vegeai-page-stage .ai-action-card:hover,
+.vegeai-page-stage .recipe-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 34px rgb(18 82 54 / 12%);
+}
+
+.vegeai-page-stage :is(.discovery-chef, .discovery-scan, .plan-primary, .cm-button, .blog-button):not(:disabled) {
+  transition-property: transform, box-shadow, background-color, border-color;
+  transition-duration: 180ms;
+  transition-timing-function: ease-out;
+}
+.vegeai-page-stage :is(.discovery-chef, .discovery-scan, .plan-primary, .cm-button, .blog-button):not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 9px 22px rgb(5 80 54 / 16%);
+}
+.vegeai-page-stage :is(.discovery-chef, .discovery-scan, .plan-primary, .cm-button, .blog-button):not(:disabled):active {
+  transform: translateY(0) scale(.98);
+}
+
+.vegeai-page-stage .recipe-skeleton > div,
+.vegeai-page-stage .recipe-skeleton > span {
+  background-image: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 50%) 48%, transparent 66%);
+  background-size: 200% 100%;
+  animation: vegeai-skeleton-sweep 1.6s linear infinite;
+}
+.dark .vegeai-page-stage .recipe-skeleton > div,
+.dark .vegeai-page-stage .recipe-skeleton > span {
+  background-image: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 7%) 48%, transparent 66%);
+}
+
+/* Login and registration share one calm visual language. */
+.vegeai-auth-card {
+  animation: vegeai-card-enter 600ms cubic-bezier(.2,.8,.2,1) backwards;
+}
+.vegeai-auth-orb {
+  animation: vegeai-auth-orb-drift 7s ease-in-out infinite;
+}
+.vegeai-auth-orb-two { animation-delay: -3.5s; }
+.vegeai-auth-photo {
+  animation: vegeai-auth-photo-drift 8s ease-in-out infinite;
+}
+.vegeai-auth-visual::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -15% auto -15% -60%;
+  width: 60%;
+  background: linear-gradient(90deg, transparent, rgb(227 255 200 / 25%), transparent);
+  pointer-events: none;
+  animation: vegeai-hero-light 6s ease-in-out infinite;
+}
+.vegeai-auth-panel::before {
+  content: '';
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  top: 8%;
+  bottom: 8%;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, transparent, #10b981, #d9f99d, #10b981, transparent);
+  background-size: 100% 220%;
+  box-shadow: 0 0 18px rgb(16 185 129 / 34%);
+  animation: vegeai-auth-accent-flow 3.8s ease-in-out infinite;
+}
+.vegeai-auth-features > div {
+  transition: border-color 220ms ease-out, background-color 220ms ease-out, box-shadow 220ms ease-out;
+  animation: vegeai-auth-feature-float 4.2s ease-in-out infinite;
+}
+.vegeai-auth-features > div:nth-child(2) { animation-delay: -1.4s; }
+.vegeai-auth-features > div:nth-child(3) { animation-delay: -2.8s; }
+.vegeai-auth-features > div:hover {
+  border-color: rgb(190 242 100 / 60%);
+  background-color: rgb(255 255 255 / 18%);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 20%);
+}
+.vegeai-auth-visual > .relative,
+.vegeai-auth-panel > .relative { z-index: 1; }
+.vegeai-auth-visual > .relative:last-child {
+  animation: vegeai-card-enter 650ms cubic-bezier(.2,.8,.2,1) 140ms backwards;
+}
+.vegeai-auth-panel .vegeai-login-form > div:first-child,
+.vegeai-auth-panel .vegeai-login-form form > * {
+  animation: vegeai-card-enter 420ms cubic-bezier(.2,.8,.2,1) backwards;
+}
+.vegeai-auth-panel .vegeai-login-form form > :nth-child(1) { animation-delay: 100ms; }
+.vegeai-auth-panel .vegeai-login-form form > :nth-child(2) { animation-delay: 150ms; }
+.vegeai-auth-panel .vegeai-login-form form > :nth-child(3) { animation-delay: 200ms; }
+.vegeai-auth-panel .vegeai-login-form form > :nth-child(4) { animation-delay: 250ms; }
+.vegeai-auth-panel .vegeai-login-form button[type='submit']:not(:disabled),
+.vegeai-auth-panel .vegeai-login-form button[type='button']:not(:disabled) {
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out, background-color 180ms ease-out;
+}
+.vegeai-auth-panel .vegeai-login-form button[type='submit']:not(:disabled):hover,
+.vegeai-auth-panel .vegeai-login-form button[type='button']:not(:disabled):hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgb(5 80 54 / 18%);
+}
+.vegeai-auth-panel .vegeai-login-form button:not(:disabled):active {
+  transform: translateY(0) scale(.98);
+}
+.vegeai-auth-panel .vegeai-login-form button[type='submit']:not(:disabled) {
+  overflow: hidden;
+  isolation: isolate;
+}
+.vegeai-auth-panel .vegeai-login-form button[type='submit']:not(:disabled)::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -35%;
+  width: 35%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 38%), transparent);
+  animation: vegeai-auth-cta-light 4.6s ease-in-out infinite;
+}
+.vegeai-auth-panel .vegeai-login-form button[type='submit'] > span { position: relative; z-index: 1; }
+
+@media (max-width: 1023px) {
+  .vegeai-auth-panel::before {
+    top: 0;
+    bottom: auto;
+    left: 8%;
+    right: 8%;
+    width: auto;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #10b981, #d9f99d, #10b981, transparent);
+    background-size: 220% 100%;
+  }
+}
+
+@media (max-width: 639px) {
+  .vegeai-auth-visual {
+    min-height: 315px;
+    padding: 24px;
+  }
+  .vegeai-auth-visual > .relative:last-child { padding-top: 18px; }
+  .vegeai-auth-visual > .relative:last-child h2 {
+    font-size: 23px;
+    line-height: 1.22;
+  }
+  .vegeai-auth-visual > .relative:last-child p { font-size: 12px; }
+  .vegeai-auth-features { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vegeai-page-stage > *,
+  .discovery-page > section:first-child h1,
+  .discovery-page > section:first-child p,
+  .discovery-hero-actions,
+  .discovery-motion-hero::after,
+  .discovery-motion-orb,
+  .dashboard-motion-hero::after,
+  .discovery-page > .grid > article,
+  .dashboard-home > section,
+  .vegeai-page-stage .recipe-skeleton > div,
+  .vegeai-page-stage .recipe-skeleton > span,
+  .vegeai-auth-card,
+  .vegeai-auth-orb,
+  .vegeai-auth-photo,
+  .vegeai-auth-visual::after,
+  .vegeai-auth-panel::before,
+  .vegeai-auth-features > div,
+  .vegeai-auth-panel .vegeai-login-form button[type='submit']::before,
+  .vegeai-auth-visual > .relative:last-child,
+  .vegeai-auth-panel .vegeai-login-form > div:first-child,
+  .vegeai-auth-panel .vegeai-login-form form > * {
+    animation: none !important;
+  }
+
+  .vegeai-layout .vegeai-primary-link,
+  .vegeai-layout .vegeai-context-subnav a,
+  .vegeai-layout .vegeai-ai-subnav-link,
+  .vegeai-page-stage .dashboard-card,
+  .vegeai-page-stage .ai-action-card,
+  .vegeai-page-stage .recipe-card,
+  .discovery-hero-actions a,
+  .discovery-motion-tabs button,
+  .vegeai-auth-panel .vegeai-login-form button,
+  .vegeai-page-stage :is(.discovery-chef, .discovery-scan, .plan-primary, .cm-button, .blog-button) {
+    transition: none !important;
+  }
+
+  .vegeai-layout .vegeai-primary-link:hover,
+  .vegeai-layout .vegeai-context-subnav a:hover,
+  .vegeai-layout .vegeai-ai-subnav-link:hover,
+  .discovery-page > .grid > article:hover,
+  .vegeai-page-stage .dashboard-card:hover,
+  .vegeai-page-stage .ai-action-card:hover,
+  .vegeai-page-stage .recipe-card:hover,
+  .discovery-hero-actions a:hover,
+  .discovery-motion-tabs button:hover,
+  .vegeai-auth-panel .vegeai-login-form button:hover,
+  .vegeai-page-stage :is(.discovery-chef, .discovery-scan, .plan-primary, .cm-button, .blog-button):hover {
+    transform: none !important;
+  }
+}

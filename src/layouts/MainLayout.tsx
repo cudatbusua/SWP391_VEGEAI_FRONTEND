@@ -399,7 +399,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       </header>
 
       {/* Page Content */}
-      <main className="flex-1">{children}</main>
+      <main className="vegeai-page-stage flex-1">{children}</main>
 
       {/* Footer */}
       <footer className="bg-white dark:bg-[#121922] border-t border-[#e6e5de] dark:border-[#212c3b] py-8 text-xs text-slate-500 dark:text-slate-400 mt-16 transition-colors duration-200">

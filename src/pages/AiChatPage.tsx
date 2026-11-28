@@ -293,6 +293,7 @@ export function AiChatPage() {
 
   useEffect(() => {
     if (isAuthLoading) return;
+    if (loadedStorageKeyRef.current === storageKey) return;
     const nextSessions = readChatSessions<ChatSession>(localStorage, storageKey) ?? [{
       id: 'default-welcome',
       title: 'Chào mừng bạn đến với Bếp trưởng',
@@ -536,21 +537,30 @@ export function AiChatPage() {
             ...(res.recommendedRecipes || []),
             ...(state.suggestedRecipes || []),
           ]));
-          setSessions(prev => prev.map(s => {
-            if (s.id === newSession.id) {
-              return {
-                ...s,
-                sessionId: res.sessionId,
-                recommendedRecipes: mergedRecipes,
-                messages: [
-                  ...s.messages,
-                  { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
-                ],
-                updatedAt: Date.now()
-              };
-            }
-            return s;
-          }));
+          setSessions(prev => {
+            const exists = prev.some(s => s.id === newSession.id);
+            const updatedSession: ChatSession = {
+              ...newSession,
+              sessionId: res.sessionId,
+              recommendedRecipes: mergedRecipes,
+              messages: [
+                ...newSession.messages,
+                { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
+              ],
+              updatedAt: Date.now()
+            };
+            if (!exists) return [updatedSession, ...prev];
+            return prev.map(s => (s.id === newSession.id ? {
+              ...s,
+              sessionId: res.sessionId,
+              recommendedRecipes: mergedRecipes,
+              messages: [
+                ...s.messages,
+                { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
+              ],
+              updatedAt: Date.now()
+            } : s));
+          });
         })
         .catch(err => {
           setError(errorMessage(err));
@@ -620,21 +630,30 @@ export function AiChatPage() {
 
       aiService.chat(userPromptText, undefined, historyForAi)
         .then(res => {
-          setSessions(prev => prev.map(s => {
-            if (s.id === newSession.id) {
-              return {
-                ...s,
-                sessionId: res.sessionId,
-                recommendedRecipes: res.recommendedRecipes,
-                messages: [
-                  ...s.messages,
-                  { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
-                ],
-                updatedAt: Date.now()
-              };
-            }
-            return s;
-          }));
+          setSessions(prev => {
+            const exists = prev.some(s => s.id === newSession.id);
+            const updatedSession: ChatSession = {
+              ...newSession,
+              sessionId: res.sessionId,
+              recommendedRecipes: res.recommendedRecipes,
+              messages: [
+                ...newSession.messages,
+                { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
+              ],
+              updatedAt: Date.now()
+            };
+            if (!exists) return [updatedSession, ...prev];
+            return prev.map(s => (s.id === newSession.id ? {
+              ...s,
+              sessionId: res.sessionId,
+              recommendedRecipes: res.recommendedRecipes,
+              messages: [
+                ...s.messages,
+                { sender: 'ai', text: res.reply, time: formatTime(Date.now()) }
+              ],
+              updatedAt: Date.now()
+            } : s));
+          });
         })
         .catch(err => {
           setError(errorMessage(err));
